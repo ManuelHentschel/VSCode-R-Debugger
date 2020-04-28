@@ -62,7 +62,7 @@ export class DebugSession extends LoggingDebugSession {
 		// super("r-debugger.txt");
 		super();
 
-		console.log("Constructing Debug Session...")
+		console.log("Constructing Debug Session...");
 
 		// this debugger uses zero-based lines and columns
 		this.setDebuggerLinesStartAt1(true);
@@ -117,7 +117,7 @@ export class DebugSession extends LoggingDebugSession {
 			this.sendEvent(new TerminatedEvent());
 		});
 
-		console.log("Done constructing.")
+		console.log("Done constructing.");
 	}
 
 	/**
@@ -220,7 +220,7 @@ export class DebugSession extends LoggingDebugSession {
 					return {
 						line: args.line,
 						column: this.convertDebuggerColumnToClient(col)
-					}
+					};
 				})
 			};
 		} else {
@@ -243,7 +243,7 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-		console.log('request: stackTraceRequest')
+		console.log('request: stackTraceRequest');
 
 		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
@@ -259,19 +259,19 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
-		console.log('request: scopesRequest')
+		console.log('request: scopesRequest');
 		var scopes = await this._runtime.getScopes(args.frameId);
 
 		var newScopes: Scope[] = [];
 		for(var i=0; i<scopes[0].length; i++){
 			const scopeName = scopes[0][i];
-			const nextHandle = this._variableHandles.create(scopeName)
+			const nextHandle = this._variableHandles.create(scopeName);
 			const nextScope = new Scope(scopeName, nextHandle, false);
-			newScopes.push(nextScope) 
+			newScopes.push(nextScope); 
 		}
 		response.body = {
 			scopes: newScopes
-		}
+		};
 
 		// for(var i=0; i<sc)
 		// response.body = {
@@ -286,7 +286,7 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
 
-		console.log('request: variablesRequest')
+		console.log('request: variablesRequest');
 
 		const id = this._variableHandles.get(args.variablesReference);
 		const variables: DebugProtocol.Variable[] = [];
@@ -300,7 +300,7 @@ export class DebugSession extends LoggingDebugSession {
 				type: "string",
 				value: v['value'],
 				variablesReference: 0
-			})
+			});
 		}
 
 		// if (this._isLongrunning.get(args.variablesReference)) {
@@ -556,11 +556,11 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
-		this._runtime.cancel()
+		this._runtime.cancel();
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
-		this._runtime.cancel()
+		this._runtime.cancel();
 	}
 
 	protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments) {
@@ -570,7 +570,7 @@ export class DebugSession extends LoggingDebugSession {
 		if (args.progressId) {
 			this._cancelledProgressId= args.progressId;
 		}
-		this._runtime.cancel()
+		this._runtime.cancel();
 	}
 
 	//---- helpers

@@ -13,6 +13,7 @@ main <- function(){
     asdf <- 99999
     qwer <- 98989898989
     g()
+    print(3)
 }
 
 mytracer <- function(){

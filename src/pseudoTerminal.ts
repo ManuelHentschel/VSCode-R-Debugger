@@ -36,15 +36,15 @@ export function createPseudoTerminal(inputHandler: (data: any) => any, writeEmit
 export function spawnChildProcess(directory: string) {
     const options = {
         cwd: directory
-    }
-    const cmdTerminal = getTerminalPath()
+    };
+    const cmdTerminal = getTerminalPath();
     const cmdArgs: string[] = [];
     // const cmdTerminal = getRpath()
     // const cmdArgs = ['--no-save', '--quiet', '--interactive']
-    const cp = child.spawn(cmdTerminal, cmdArgs, options)
+    const cp = child.spawn(cmdTerminal, cmdArgs, options);
     // const Rpath = '"C:\\Program Files\\R\\R-3.6.1\\bin\\R.exe"';
     // const cp = child.spawn(Rpath, ['--no-save', '--interactive'], options)
-    console.log("Spawned Process with PID: " + cp.pid)
+    console.log("Spawned Process with PID: " + cp.pid);
     // const cp = child.spawn("cmd", ['/K', 'Rterminal', '--no-save']);
 
     cp.stdout.on("data", data => {

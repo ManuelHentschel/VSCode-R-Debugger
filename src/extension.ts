@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
 import { DebugSession } from './debugSession';
-import * as Net from 'net'
+import * as Net from 'net';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed

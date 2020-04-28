@@ -2,9 +2,9 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-import { readFileSync, write } from 'fs';
+// import { readFileSync, write } from 'fs';
 import { EventEmitter } from 'events';
-import { Terminal, window } from 'vscode';
+// import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
 import {ToRStringLiteral, getRPath, getTerminalPath } from "./rUtils";
 import { TextDecoder, isUndefined } from 'util';
@@ -28,9 +28,6 @@ export class DebugRuntime extends EventEmitter {
 		return this._sourceFile;
 	}
 
-	// the contents (= lines) of the one and only file
-	private _sourceLines!: string[];
-
 	// This is the next line that will be 'executed'
 	private _currentLine = 0;
 	private _currentFile = this._sourceFile;
@@ -45,8 +42,6 @@ export class DebugRuntime extends EventEmitter {
 	private _breakAddresses = new Set<string>();
 
 	private cp!: child.ChildProcessWithoutNullStreams;
-	private pt!: vscode.Terminal;
-	private writeEmitter!: vscode.EventEmitter<string>;
 
 	private hasStartedMain: boolean = false;
 	private isRunningMain: boolean = false;
@@ -60,15 +55,14 @@ export class DebugRuntime extends EventEmitter {
 
 	private stdoutIsBrowserInfo = false; // set to true if cp.stdout is currently giving browser()-details
 
-	private variables: any = undefined;
 	private scopes: any = undefined;
 	private stack: any = undefined;
 	private requestId = 0;
 	private messageId = 0;
 
 	// delimiters used when printing info from R which is meant for the debugger
-	// currently need to occurr on the same line!
-	// are passed to RegExp() -> need to be escaped 'double'
+	// need to occurr on the same line!
+	// are passed to RegExp() -> need to be escaped 'twice'
 	readonly delimiter0 = '<v\\\\s\\\\c>';
 	readonly delimiter1 = '</v\\\\s\\\c>';
 	readonly rprompt = '<#>';
@@ -93,25 +87,12 @@ export class DebugRuntime extends EventEmitter {
 
 		this.sendEvent('output', 'startCollapsed: Starting R session...');
 
-		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rprompt}`)
+		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rprompt}`);
 
 		// is set to true, once main() is called in R
 		this.isRunningMain = false;
 		
 		this.cp = spawnChildProcess(path.dirname(program));
-
-		// handles input to the R process
-		const inputHandler = (data: any) => {
-			this.cp.stdin.write(data);
-			console.log('stdin: ' + data)
-		}
-
-		// writes output to the pseudoterminal
-		this.writeEmitter = new vscode.EventEmitter<string>();
-
-		// pseudoterminal shown to the user
-		this.pt = createPseudoTerminal(inputHandler, this.writeEmitter);
-		this.pt.show(false);
 
 		// start R
 		// const Rpath = '"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe"';
@@ -123,19 +104,19 @@ export class DebugRuntime extends EventEmitter {
 		// const fileNamePrep = "prep.R"
 		const fileNamePrep = vscode.workspace.getConfiguration().get<string>('rdebugger.prep.r','prep.R');
 		const cmdSourcePrep = 'source(' + ToRStringLiteral(fileNamePrep, '"') + ')';
-		this.runCommand(cmdSourcePrep, true, true)
+		this.runCommand(cmdSourcePrep, true, true);
 
 		// source file that is being debugged
 		const cmdSourceProgram = 'source(' + ToRStringLiteral(program, '"') + ')';
-		this.runCommand(cmdSourceProgram, true, true)
+		this.runCommand(cmdSourceProgram, true, true);
 
 		// set breakpoints in R
 		this._breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
 			bps.forEach((bp: DebugBreakpoint) => {
 				var command = '.vsc.mySetBreakpoint(' + ToRStringLiteral(path, '"') + ', ' + bp.line + ')\n';
-				this.runCommand(command, true, true)
-			})
-		})
+				this.runCommand(command, true, true);
+			});
+		});
 		
 		// handle output from the R-process
 		this.cp.stdout.on("data", data => {
@@ -143,51 +124,43 @@ export class DebugRuntime extends EventEmitter {
 		});
 		this.cp.stderr.on("data", data => {
 			this.handleData(data, true);
-		})
+		});
 
 		// call main()
 		// TODO: replace runMain() with direct main() call
 		const cmdRunMain = '.vsc.runMain()';
 		// command = 'browser()'
-		this.runCommand(cmdRunMain, true, true)
-		this.sendEvent('output', 'end: ')
+		this.runCommand(cmdRunMain, true, true);
+		this.sendEvent('output', 'end: ');
 	}
 
 	private runCommand(command: string, addNewline = true, logToDebugConsole = false){
 		// runs a give command in the R child process
 		// adds newline if necessary
 		if(logToDebugConsole){
-			this.sendEvent('output', command)
+			this.sendEvent('output', command);
 		}
-		if(command.slice(-1) != '\n' && addNewline){
-			command = command + '\n'
+		if(command.slice(-1) !== '\n' && addNewline){
+			command = command + '\n';
 		}
 		this.cp.stdin.write(command);
 		console.log('stdin:\n' + command.trim());
 	}
 
 	private writeOutput(text: any, addNewline = true, toStderr = false){
-		if(text.slice(-1) != '\n' && addNewline){
-			text = text + '\n'
+		if(text.slice(-1) !== '\n' && addNewline){
+			text = text + '\n';
 		}
-		if(toStderr){
-			this.writeEmitter.fire("\x1b[31m");
-			this.writeEmitter.fire(text);
-			// this.writeEmitter.fire('\r\n');
-			this.writeEmitter.fire("\x1b[0m");
-		} else { // stdout
-			this.writeEmitter.fire(text);
-			// this.writeEmitter.fire('\r\n');
-		}
-		const category = (toStderr ? "stderr" : "stdout")
-		this.sendEvent("output", text, category)
+
+		const category = (toStderr ? "stderr" : "stdout");
+		this.sendEvent("output", text, category);
 	}
 
 	private handleData(data: any, fromStderr: boolean = false) {
 		// handles output from the R child process
 		// splits cp.stdout into lines / waits for complete lines
 		// calls handleLine() on each line
-		const dec = new TextDecoder
+		const dec = new TextDecoder;
 		var s = dec.decode(data);
 		s = s.replace(/\r/g,'');
 		if(fromStderr){
@@ -197,15 +170,17 @@ export class DebugRuntime extends EventEmitter {
 			s = this.restOfStdout + s;
 			this.restOfStdout = "";
 		}
-		const lines = s.split(/\n/)
+		const lines = s.split(/\n/);
 
 		for(var i = 0; i<lines.length - 1; i++){
-			var line = lines[i]
+			var line = lines[i];
 			this.handleLine(line, fromStderr);
 		}
 
 		if(lines.length > 0) {
-			var remainingText = lines[lines.length - 1]
+			// calls this.handleLine on the remainder of the last line
+			// necessary, since e.g. input prompt (">") does not send newline
+			var remainingText = lines[lines.length - 1];
 			const isHandled = this.handleLine(remainingText, fromStderr, false);
 			// const isHandled = false;
 			if(isHandled){
@@ -226,11 +201,11 @@ export class DebugRuntime extends EventEmitter {
 			var matches: any;
 			var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningMain;
 
-			const debugRegex = new RegExp(this.delimiter0 + '(.*)' + this.delimiter1)
+			const debugRegex = new RegExp(this.delimiter0 + '(.*)' + this.delimiter1);
 			
 			matches = debugRegex.exec(line);
 			if(matches){
-				console.log('matches: <vsc>')
+				console.log('matches: <vsc>');
 				this.handleJson(matches[1]);
 				line = line.replace(debugRegex, '');
 			}
@@ -247,11 +222,11 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 			}
 			if(isFullLine && /^[ncsfQ]$/.test(line)) {
-				console.log('matches: [ncsfQ]')
+				console.log('matches: [ncsfQ]');
 				showLine = false;
 			}
 			if(isFullLine && /^\.vsc\./.test(line)) {
-				console.log('matches: .vsc')
+				console.log('matches: .vsc');
 				showLine = false;
 			}
 			if(isFullLine && (/debug: /.test(line) ||
@@ -260,7 +235,7 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
-			matches = /^debug at (.*)#(\d+): .*$/.exec(line)
+			matches = /^debug at (.*)#(\d+): .*$/.exec(line);
 			if(matches){
 				this._currentFile = matches[1];
 				this._currentLine = parseInt(matches[2]);
@@ -274,25 +249,26 @@ export class DebugRuntime extends EventEmitter {
 			// } //else {
 			if(showLine){
 				if(isFullLine && line.length>0){
-					line = line + '\n'
+					line = line + '\n';
 				}
-				this.writeOutput(line, fromStderr)
+				this.writeOutput(line, fromStderr);
 			}
-		return false
+		return false;
 	}
 
 	private handleJson(json: string){
+		// handles the json that is printed by .vsc.sendToVsc()
 		const j = JSON.parse(json);
 		const message = j['message'];
 		const body = j['body'];
 		const id = j['id'];
-		console.log('message ' + id + ': ' + message)
+		console.log('message ' + id + ': ' + message);
 		if(id > this.messageId){
 			this.messageId = id;
 		}
 		switch(message){
 			case 'breakpoint':
-				this.requestInfoFromR();
+				// this.requestInfoFromR();
 				this.step();
 				this.sendEvent('stopOnBreakpoint');
 				this.stdoutIsBrowserInfo = true;
@@ -311,25 +287,30 @@ export class DebugRuntime extends EventEmitter {
 				this.stack = body;
 				break;
 			default:
-				console.warn('Unknown message: ' + message)
+				console.warn('Unknown message: ' + message);
 		}
 	}
 	
-	private async waitForMessages(){
+	private async waitForMessages2(){
 		const poll = (resolve: () => void) => {
 			if(this.messageId >= this.requestId){
 				resolve();
 			} else {
 				setTimeout(_ => poll(resolve), 100);
 			}
-		}
+		};
 		return new Promise(poll);
+	}
+
+	private async waitForMessages(){
+		await this.waitForMessages2();
+		console.log('check: ' + this.messageId + ' =?= ' + this.requestId)
 	}
 
 	private requestInfoFromR(): number {
 		this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ')');
 		this.runCommand('.vsc.getStack(id=' + ++this.requestId + ')');
-		return(this.requestId)
+		return(this.requestId);
 	}
 
 	///////////////////////////////////////////////
@@ -343,37 +324,39 @@ export class DebugRuntime extends EventEmitter {
 
 	public step(reverse = false, event = 'stopOnStep') {
 		this.runCommand('n');
-		this.requestInfoFromR()
+		this.requestInfoFromR();
 		this.sendEvent(event);
 	}
 
 	public stepIn(event = 'stopOnStep') {
 		this.runCommand('s');
-		this.requestInfoFromR()
+		this.requestInfoFromR();
 		this.sendEvent(event);
 	}
 
 	public stepOut(reverse = false, event = 'stopOnStep') {
 		this.runCommand('f');
-		this.requestInfoFromR()
+		this.requestInfoFromR();
 		this.sendEvent(event);
 	}
 
 
 	// info for debug session
 	public async getScopes(frameId: number) {
-		const envString = this.stack['frames'][frameId]
-		if(isUndefined(this.scopes) || this.scopes[0][0] != envString){
+		await this.waitForMessages();
+		const envString = this.stack['frames'][frameId];
+		if(isUndefined(this.scopes) || this.scopes[0][0] !== envString){
 			this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ', envString=' + ToRStringLiteral(envString, '"') + ')');
-			await this.waitForMessages();
 		}
+		await this.waitForMessages();
 		// wrapper to access scopes
 		return this.scopes;
 	}
 
 	public async getVariables(scope: string) {
+		await this.waitForMessages();
 		for(var i=0; i<this.scopes[0].length; i++){
-			if(this.scopes[0][i] == scope){
+			if(this.scopes[0][i] === scope){
 				return this.scopes[1][i];
 			}
 		}
@@ -385,8 +368,8 @@ export class DebugRuntime extends EventEmitter {
 
 		if(isUndefined(this.stack)){
 			this.requestInfoFromR();
-			await this.waitForMessages();
 		}
+		await this.waitForMessages();
 
 		for(var i=0; i<this.stack['calls'].length; i++){
 			var line: number;
@@ -404,7 +387,7 @@ export class DebugRuntime extends EventEmitter {
 				line: line
 				// line: this.stack['lineNumbers'][i]
 				// line: this._currentLine //TODO: get correct line!
-			})
+			});
 		}
 
 		return {
@@ -414,22 +397,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public getBreakpoints(path: string, line: number): number[] {
-
-	// 	const l = this._sourceLines[line];
-
-	// 	let sawSpace = true;
 		const bps: number[] = [];
-	// 	for (let i = 0; i < l.length; i++) {
-	// 		if (l[i] !== ' ') {
-	// 			if (sawSpace) {
-	// 				bps.push(i);
-	// 				sawSpace = false;
-	// 			}
-	// 		} else {
-	// 			sawSpace = true;
-	// 		}
-	// 	}
-
 		return bps;
 	}
 
@@ -495,69 +463,21 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public cancel(): void {
-		this.cp.kill()
-		this.pt.dispose()
+		this.cp.kill();
 	}
 
-
-
-
-
-	// private methods
-
-	private loadSource(file: string) {
-		if (this._sourceFile !== file) {
-			this._sourceFile = file;
-			this._sourceLines = readFileSync(this._sourceFile).toString().split('\n');
-		}
-	}
 
 	/**
 	 * Run through the file.
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
-	private run(reverse = false, stepEvent?: string) {
-		// if (reverse) {
-		// 	for (let ln = this._currentLine-1; ln >= 0; ln--) {
-		// 		if (this.fireEventsForLine(ln, stepEvent)) {
-		// 			this._currentLine = ln;
-		// 			return;
-		// 		}
-		// 	}
-		// 	// no more lines: stop at first line
-		// 	this._currentLine = 0;
-		// 	this.sendEvent('stopOnEntry');
-		// } else {
-		// 	for (let ln = this._currentLine+1; ln < this._sourceLines.length; ln++) {
-		// 		if (this.fireEventsForLine(ln, stepEvent)) {
-		// 			this._currentLine = ln;
-		// 			return true;
-		// 		}
-		// 	}
-		// 	// no more lines: run to end
-		// 	this.sendEvent('end');
-		// }
-	}
+	private run(reverse = false, stepEvent?: string) {}
 
 	private verifyBreakpoints(path: string) : void {
 		let bps = this._breakPoints.get(path);
 		if (bps) {
 			// this.loadSource(path);
 			bps.forEach(bp => {
-				// if (!bp.verified && bp.line < this._sourceLines.length) {
-				// 	const srcLine = this._sourceLines[bp.line].trim();
-
-				// 	// if a line is empty or starts with '+' we don't allow to set a breakpoint but move the breakpoint down
-				// 	if (srcLine.length === 0 || srcLine.indexOf('+') === 0) {
-				// 		bp.line++;
-				// 	}
-				// 	// if a line starts with '-' we don't allow to set a breakpoint but move the breakpoint up
-				// 	if (srcLine.indexOf('-') === 0) {
-				// 		bp.line--;
-				// 	}
-				// 	// don't set 'verified' to true if the line contains the word 'lazy'
-				// 	// in this case the breakpoint will be verified 'lazy' after hitting it once.
-				// 	if (srcLine.indexOf('lazy') < 0) {
 						bp.verified = true;
 						this.sendEvent('breakpointValidated', bp);
 				// 	}
@@ -566,63 +486,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	/**
-	 * Fire events if line has a breakpoint or the word 'exception' is found.
-	 * Returns true is execution needs to stop.
-	 */
-	// private fireEventsForLine(ln: number, stepEvent?: string): boolean {
 
-	// 	const line = this._sourceLines[ln].trim();
-
-	// 	// if 'log(...)' found in source -> send argument to debug console
-	// 	const matches = /log\((.*)\)/.exec(line);
-	// 	if (matches && matches.length === 2) {
-	// 		this.sendEvent('output', matches[1], this._sourceFile, ln, matches.index)
-	// 	}
-
-	// 	// if a word in a line matches a data breakpoint, fire a 'dataBreakpoint' event
-	// 	const words = line.split(" ");
-	// 	for (let word of words) {
-	// 		if (this._breakAddresses.has(word)) {
-	// 			this.sendEvent('stopOnDataBreakpoint');
-	// 			return true;
-	// 		}
-	// 	}
-
-	// 	// if word 'exception' found in source -> throw exception
-	// 	if (line.indexOf('exception') >= 0) {
-	// 		this.sendEvent('stopOnException');
-	// 		return true;
-	// 	}
-
-	// 	// is there a breakpoint?
-	// 	const breakpoints = this._breakPoints.get(this._sourceFile);
-	// 	if (breakpoints) {
-	// 		const bps = breakpoints.filter(bp => bp.line === ln);
-	// 		if (bps.length > 0) {
-
-	// 			// send 'stopped' event
-	// 			this.sendEvent('stopOnBreakpoint');
-
-	// 			// the following shows the use of 'breakpoint' events to update properties of a breakpoint in the UI
-	// 			// if breakpoint is not yet verified, verify it now and send a 'breakpoint' update event
-	// 			if (!bps[0].verified) {
-	// 				bps[0].verified = true;
-	// 				this.sendEvent('breakpointValidated', bps[0]);
-	// 			}
-	// 			return true;
-	// 		}
-	// 	}
-
-	// 	// non-empty line
-	// 	if (stepEvent && line.length > 0) {
-	// 		this.sendEvent(stepEvent);
-	// 		return true;
-	// 	}
-
-	// 	// nothing interesting found -> continue
-	// 	return false;
-	// }
 
 	private sendEvent(event: string, ... args: any[]) {
 		setImmediate(_ => {

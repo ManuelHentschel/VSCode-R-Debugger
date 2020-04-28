@@ -1,12 +1,17 @@
 {
 	"name": "r-debugger",
-	"displayName": "R-Debugger",
+	"displayName": "R Debugger",
 	"description": "R Debugger",
 	"version": "0.0.1",
+	"publisher": "ManuelHentschel",
 	"author": {
-		"name": "Manuel"
+		"name": "Manuel Hentschel"
 	},
-	"publisher": "Manuel",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ManuelHentschel/VSCode-R-Debugger.git"
+	},
+	"icon": "images/Rlogo.png",
 	"engines": {
 		"vscode": "^1.44.0"
 	},
@@ -16,8 +21,7 @@
 	"activationEvents": [
 		"onLanguage:r",
 		"onLanguage:rd",
-		"onLanguage:rmd",
-		"*"
+		"onLanguage:rmd"
 	],	
 	"main": "./out/extension.js",
 	"contributes": {
@@ -92,7 +96,33 @@
 					}
 				]
 			}
-		]
+		],
+		"configuration": {
+			"type": "object",
+			"title": "rdebugger",
+			"properties": {
+				"rdebugger.rterm.windows": {
+					"type": "string",
+					"default": "\"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe\"",
+					"description": "R.exe path for windows"
+				},
+				"rdebugger.rterm.mac": {
+					"type": "string",
+					"default": "/usr/local/bin/R",
+					"description": "R path for Mac OS X"
+				},
+				"rdebugger.rterm.linux": {
+					"type": "string",
+					"default": "/usr/bin/R",
+					"description": "R path for Linux"
+				},
+				"rdebugger.prep.r": {
+					"type": "string",
+					"default": "./prep.R",
+					"description": "Path to prep.R"
+				}
+			}
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
@@ -118,31 +148,5 @@
 	"dependencies": {
 		"await-notify": "1.0.1",
 		"vscode-debugadapter": "^1.40.0"
-	},
-	"configuration": {
-		"type": "object",
-		"title": "rdebugger",
-		"properties": {
-			"rdebugger.rterm.windows": {
-				"type": "string",
-				"default": "\"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe\"",
-				"description": "R.exe path for windows"
-			},
-			"rdebugger.rterm.mac": {
-				"type": "string",
-				"default": "/usr/local/bin/R",
-				"description": "R path for Mac OS X"
-			},
-			"rdebugger.rterm.linux": {
-				"type": "string",
-				"default": "/usr/bin/R",
-				"description": "R path for Linux"
-			},
-			"rdebugger.prep.r": {
-				"type": "string",
-				"default": "./prep.R",
-				"description": "Path to prep.R"
-			}
-		}
 	}
 }
