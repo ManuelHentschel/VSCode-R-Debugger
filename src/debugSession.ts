@@ -13,6 +13,8 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
 import { DebugRuntime, DebugBreakpoint } from './debugRuntime';
 const { Subject } = require('await-notify');
+import * as vscode from 'vscode';
+import { isUndefined } from 'util';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -54,11 +56,13 @@ export class DebugSession extends LoggingDebugSession {
 	private _cancelledProgressId: string | undefined = undefined;
 	private _isProgressCancellable = true;
 
+	private _evalResponse!: DebugProtocol.EvaluateResponse;
+
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
 	 * We configure the default implementation of a debug adapter here.
 	 */
-	public constructor() {
+	public constructor(context: vscode.ExtensionContext) {
 		// super("r-debugger.txt");
 		super();
 
@@ -68,7 +72,7 @@ export class DebugSession extends LoggingDebugSession {
 		this.setDebuggerLinesStartAt1(true);
 		this.setDebuggerColumnsStartAt1(true);
 
-		this._runtime = new DebugRuntime();
+		this._runtime = new DebugRuntime(context);
 
 		// setup event handlers
 		this._runtime.on('stopOnEntry', () => {
@@ -115,6 +119,18 @@ export class DebugSession extends LoggingDebugSession {
 		});
 		this._runtime.on('end', () => {
 			this.sendEvent(new TerminatedEvent());
+		});
+		this._runtime.on('evalResponse', (result: string) => {
+			const response = this._evalResponse;
+			if(result.length>0){
+				response.body = {
+					result: result,
+					variablesReference: 0
+				};
+			} else {
+				response.success = false;
+			}
+			this.sendResponse(response);
 		});
 
 		console.log("Done constructing.");
@@ -273,14 +289,6 @@ export class DebugSession extends LoggingDebugSession {
 			scopes: newScopes
 		};
 
-		// for(var i=0; i<sc)
-		// response.body = {
-		// 	scopes: [
-		// 		new Scope("Local", this._variableHandles.create("local"), false),
-		// 		new Scope("Global", this._variableHandles.create("global"), true),
-		// 		new Scope("Allencompassing", this._variableHandles.create("ae"), true)
-		// 	]
-		// };
 		this.sendResponse(response);
 	}
 
@@ -302,73 +310,6 @@ export class DebugSession extends LoggingDebugSession {
 				variablesReference: 0
 			});
 		}
-
-		// if (this._isLongrunning.get(args.variablesReference)) {
-		// 	// long running
-
-		// 	// if (request) {
-		// 	// 	this._cancelationTokens.set(request.seq, false);
-		// 	// }
-
-		// 	// for (let i = 0; i < 100; i++) {
-		// 	// 	await timeout(1000);
-		// 	// 	variables.push({
-		// 	// 		name: `i_${i}`,
-		// 	// 		type: "integer",
-		// 	// 		value: `${i}`,
-		// 	// 		variablesReference: 0
-		// 	// 	});
-		// 	// 	if (request && this._cancelationTokens.get(request.seq)) {
-		// 	// 		break;
-		// 	// 	}
-		// 	// }
-
-		// 	// if (request) {
-		// 	// 	this._cancelationTokens.delete(request.seq);
-		// 	// }
-
-		// } else {
-
-			
-
-		// 	if (id) {
-		// 		variables.push({
-		// 			name: id + "_i",
-		// 			type: "integer",
-		// 			value: "123456789",
-		// 			variablesReference: 0
-		// 		});
-		// 		variables.push({
-		// 			name: id + "_f",
-		// 			type: "float",
-		// 			value: "3.1415926535",
-		// 			variablesReference: 0
-		// 		});
-		// 		variables.push({
-		// 			name: id + "_s",
-		// 			type: "string",
-		// 			value: "hello world",
-		// 			variablesReference: 0
-		// 		});
-		// 		variables.push({
-		// 			name: id + "_o",
-		// 			type: "object",
-		// 			value: "Object",
-		// 			variablesReference: this._variableHandles.create(id + "_o")
-		// 		});
-
-		// 		// // cancelation support for long running requests
-		// 		// const nm = id + "_long_running";
-		// 		// const ref = this._variableHandles.create(id + "_lr");
-		// 		// variables.push({
-		// 		// 	name: nm,
-		// 		// 	type: "object",
-		// 		// 	value: "Object",
-		// 		// 	variablesReference: ref
-		// 		// });
-		// 		// this._isLongrunning.set(ref, true);
-		// 	}
-		// }
 
 		response.body = {
 			variables: variables
@@ -407,47 +348,10 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
+		console.log('request: evaluateRequest')
 
-		let reply: string | undefined = undefined;
-
-		if (args.context === 'repl') {
-			// 'evaluate' supports to create and delete breakpoints from the 'repl':
-			const matches = /new +([0-9]+)/.exec(args.expression);
-			if (matches && matches.length === 2) {
-				const mbp = this._runtime.setBreakPoint(this._runtime.sourceFile, this.convertClientLineToDebugger(parseInt(matches[1])));
-				const bp = <DebugProtocol.Breakpoint> new Breakpoint(mbp.verified, this.convertDebuggerLineToClient(mbp.line), undefined, this.createSource(this._runtime.sourceFile));
-				bp.id= mbp.id;
-				this.sendEvent(new BreakpointEvent('new', bp));
-				reply = `breakpoint created`;
-			} else {
-				const matches = /del +([0-9]+)/.exec(args.expression);
-				if (matches && matches.length === 2) {
-					const mbp = this._runtime.clearBreakPoint(this._runtime.sourceFile, this.convertClientLineToDebugger(parseInt(matches[1])));
-					if (mbp) {
-						const bp = <DebugProtocol.Breakpoint> new Breakpoint(false);
-						bp.id= mbp.id;
-						this.sendEvent(new BreakpointEvent('removed', bp));
-						reply = `breakpoint deleted`;
-					}
-				} else {
-					const matches = /progress/.exec(args.expression);
-					if (matches && matches.length === 1) {
-						if (this._reportProgress) {
-							reply = `progress started`;
-							this.progressSequence();
-						} else {
-							reply = `frontend doesn't support progress (capability 'supportsProgressReporting' not set)`;
-						}
-					}
-				}
-			}
-		}
-
-		response.body = {
-			result: reply ? reply : `evaluate(context: '${args.context}', '${args.expression}')`,
-			variablesReference: 0
-		};
-		this.sendResponse(response);
+		this._evalResponse = response;
+		this._runtime.evaluate(args.expression, args.frameId);
 	}
 
 	private async progressSequence() {

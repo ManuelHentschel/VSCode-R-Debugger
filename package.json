@@ -115,11 +115,6 @@
 					"type": "string",
 					"default": "/usr/bin/R",
 					"description": "R path for Linux"
-				},
-				"rdebugger.prep.r": {
-					"type": "string",
-					"default": "./prep.R",
-					"description": "Path to prep.R"
 				}
 			}
 		}

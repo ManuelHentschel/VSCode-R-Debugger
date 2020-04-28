@@ -3,7 +3,6 @@
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
 import { DebugSession } from './debugSession';
-import * as Net from 'net';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -16,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// debug adapters can be run in different ways by using a vscode.DebugAdapterDescriptorFactory:
 	let factory: vscode.DebugAdapterDescriptorFactory;
     // run the debug adapter inside the extension and directly talk to it
-    factory = new InlineDebugAdapterFactory();
+    factory = new InlineDebugAdapterFactory(context);
 
 
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
@@ -66,8 +65,14 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
 
+	public context: vscode.ExtensionContext;
+
+	public constructor(context: vscode.ExtensionContext){
+		this.context = context;
+	}
+
 	createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
-        let ret = new vscode.DebugAdapterInlineImplementation(new DebugSession());
+        let ret = new vscode.DebugAdapterInlineImplementation(new DebugSession(this.context));
         return ret;
 	}
 }

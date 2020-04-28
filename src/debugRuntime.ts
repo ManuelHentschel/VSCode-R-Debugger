@@ -13,6 +13,7 @@ import * as debugadapter from 'vscode-debugadapter';
 
 import { spawnChildProcess, createPseudoTerminal } from './pseudoTerminal';
 import * as child from 'child_process';
+import { utils } from 'mocha';
 const path = require('path');
 export interface DebugBreakpoint {
 	id: number;
@@ -31,6 +32,8 @@ export class DebugRuntime extends EventEmitter {
 	// This is the next line that will be 'executed'
 	private _currentLine = 0;
 	private _currentFile = this._sourceFile;
+
+	private prepRPath: string;
 
 	// maps from sourceFile to array of breakpoints
 	private _breakPoints = new Map<string, DebugBreakpoint[]>();
@@ -67,8 +70,9 @@ export class DebugRuntime extends EventEmitter {
 	readonly delimiter1 = '</v\\\\s\\\c>';
 	readonly rprompt = '<#>';
 
-	constructor() {
+	constructor(context: vscode.ExtensionContext) {
 		super();
+		this.prepRPath = context.asAbsolutePath('./R/prep.R');
 	}
 
 	/**
@@ -102,7 +106,8 @@ export class DebugRuntime extends EventEmitter {
 
 		// load helper functions etc.
 		// const fileNamePrep = "prep.R"
-		const fileNamePrep = vscode.workspace.getConfiguration().get<string>('rdebugger.prep.r','prep.R');
+		// const fileNamePrep = vscode.workspace.getConfiguration().get<string>('rdebugger.prep.r','');
+		const fileNamePrep = this.prepRPath;
 		const cmdSourcePrep = 'source(' + ToRStringLiteral(fileNamePrep, '"') + ')';
 		this.runCommand(cmdSourcePrep, true, true);
 
@@ -147,7 +152,8 @@ export class DebugRuntime extends EventEmitter {
 		console.log('stdin:\n' + command.trim());
 	}
 
-	private writeOutput(text: any, addNewline = true, toStderr = false){
+	// private writeOutput(text: any, addNewline = true, toStderr = false){
+	private writeOutput(text: any, addNewline = false, toStderr = false){
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
 		}
@@ -247,8 +253,8 @@ export class DebugRuntime extends EventEmitter {
 			// 	this.sendEvent('end')
 			// 	return true;
 			// } //else {
-			if(showLine){
-				if(isFullLine && line.length>0){
+			if(showLine && line.length>0){
+				if(isFullLine){
 					line = line + '\n';
 				}
 				this.writeOutput(line, fromStderr);
@@ -285,6 +291,10 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'stack':
 				this.stack = body;
+				break;
+			case 'eval':
+				const result = body;
+				this.sendEvent('evalResponse', result);
 				break;
 			default:
 				console.warn('Unknown message: ' + message);
@@ -338,6 +348,17 @@ export class DebugRuntime extends EventEmitter {
 		this.runCommand('f');
 		this.requestInfoFromR();
 		this.sendEvent(event);
+	}
+	
+	// eval
+	public async evaluate(expr: string, frameId: number | undefined) {
+		if(isUndefined(frameId)){
+			frameId = 0;
+		}
+		expr = ToRStringLiteral(expr, '"');
+		this.runCommand('.vsc.evalInFrame(' + expr + ', ' + frameId + ')', true, false);
+		this.requestInfoFromR();
+		await this.waitForMessages();
 	}
 
 
