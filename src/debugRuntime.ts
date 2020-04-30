@@ -13,7 +13,7 @@ import * as debugadapter from 'vscode-debugadapter';
 
 import { spawnChildProcess, createPseudoTerminal } from './pseudoTerminal';
 import * as child from 'child_process';
-import { utils } from 'mocha';
+
 const path = require('path');
 export interface DebugBreakpoint {
 	id: number;
