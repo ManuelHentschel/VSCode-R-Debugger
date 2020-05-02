@@ -204,7 +204,7 @@ options(prompt = "<#>")
 # attr(attr(attributes(eval.parent(sys.call()[[1]]))$original, 'srcref'), 'srcfile')
 
 
-.vsc.mySetBreakpoint <- function(srcfile, lines){
+.vsc.mySetBreakpoint <- function(srcfile, lines, includePackages=TRUE){
     # helper function. used to loop through (potentially empty) lists
     seq2 <- function(from, to){
         if(from>to) return(c())
@@ -214,9 +214,14 @@ options(prompt = "<#>")
     # find steps, that correspond to the given line numbers
     stepList <- list()
     for(i in seq2(1,length(lines))){
-        refs <- findLineNum(srcfile, lines[i])
+        if(includePackages){
+            lastenv <- emptyenv() # searches through package-envs as well
+        } else {
+            lastenv <- .GlobalEnv # searches only thourh 'user'-envs
+        }
+        refs <- findLineNum(srcfile, lines[i], lastenv=lastenv)
         if(length(refs)>0){
-            step <- refs[[1]]
+            step <- refs[[1]] # Ignore other refs?? In what cases are there >1 refs??
             found <- FALSE
 
             # check if the same function already has breakpoints:
@@ -244,25 +249,34 @@ options(prompt = "<#>")
     # loop through functions found above
     for(i in seq2(1, length(stepList))){
         step <- stepList[[i]]
-        func <- eval(parse(text=step$name), envir = step$env)
+        if(FALSE){
+            tracer <- bquote({
+                cat(paste0(.(step$filename), "#", .(step$line), "\n"))
+                browser(skipCalls = 4L)
+            })
+        } else {
+            func <- eval(parse(text=step$name), envir = step$env)
 
-        # loop through breakpoints for each function
-        for(j in seq2(1, length(step$at))){
-            loc <- step$at[[j]]
-            # insert calls to cat() and browser()
-            catString <- paste0(
-                .vsc.makeStringForVsc('breakpoint'),
-                "debug at ", step$filename, '#', step$line[[j]], ": ?\n"
-            )
-            body(func)[[loc]] <- call('{',
-                    # call('cat',paste0("<v\\s\\c>breakpoint</v\\s\\c>\ndebug at ", (step$filename), '#', step$line[[j]], ": ?\n")),
-                    call('cat', catString),
-                    quote(.doTrace(browser())),
-                    body(func)[[loc]]
-            )
+            # loop through breakpoints for each function
+            for(j in seq2(1, length(step$at))){
+                loc <- step$at[[j]]
+                # insert calls to cat() and browser()
+                catString <- paste0(
+                    .vsc.makeStringForVsc('breakpoint'),
+                    "debug at ", step$filename, '#', step$line[[j]], ": ?\n"
+                )
+                body(func)[[loc]] <- call('{',
+                        # call('cat',paste0("<v\\s\\c>breakpoint</v\\s\\c>\ndebug at ", (step$filename), '#', step$line[[j]], ": ?\n")),
+                        call('cat', catString),
+                        quote(.doTrace(browser())),
+                        body(func)[[loc]]
+                )
+            }
+            # assign modified function to original environment
+            # assign(step$name, func, envir = step$env)
+            global <- identical(step$env, .GlobalEnv)
+            methods:::.assignOverBinding(step$name, func, step$env, FALSE)
         }
-        # assign modified function to original environment
-        assign(step$name, func, envir = step$env)
     }
     return(invisible(stepList))
 }
