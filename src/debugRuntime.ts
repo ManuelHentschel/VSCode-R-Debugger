@@ -153,13 +153,13 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// private writeOutput(text: any, addNewline = true, toStderr = false){
-	private writeOutput(text: any, addNewline = false, toStderr = false){
+	private writeOutput(text: any, addNewline = false, toStderr = false, filePath = '', line = 1){
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
 		}
 
 		const category = (toStderr ? "stderr" : "stdout");
-		this.sendEvent("output", text, category);
+		this.sendEvent("output", text, category, filePath, line);
 	}
 
 	private handleData(data: any, fromStderr: boolean = false) {
@@ -296,6 +296,12 @@ export class DebugRuntime extends EventEmitter {
 				const result = body;
 				this.sendEvent('evalResponse', result);
 				break;
+			case 'print':
+				const output = body['output'];
+				const file = body['file'];
+				const line = body['line'];
+				this.writeOutput(output, true, false, file, line);
+				break;
 			default:
 				console.warn('Unknown message: ' + message);
 		}
@@ -387,10 +393,11 @@ export class DebugRuntime extends EventEmitter {
 	public async getStack(startFrame: number, endFrame: number) {
 		const frames = new Array<any>();
 
+		await this.waitForMessages();
 		if(isUndefined(this.stack)){
 			this.requestInfoFromR();
+			await this.waitForMessages();
 		}
-		await this.waitForMessages();
 
 		for(var i=0; i<this.stack['calls'].length; i++){
 			var line: number;

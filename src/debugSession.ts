@@ -112,7 +112,12 @@ export class DebugSession extends LoggingDebugSession {
 				e.body.output = text;
 			}
 			e.body.category = category;
-			e.body.source = filePath;
+			if(filePath !== ''){
+				var source: DebugProtocol.Source = new Source(basename(filePath), filePath);
+				e.body.source = source;
+			} else {
+				// e.body.source = new Source('');
+			}
 			e.body.line = line;
 			e.body.column = column;
 			this.sendEvent(e);

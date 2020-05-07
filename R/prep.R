@@ -3,6 +3,7 @@ library(jsonlite)
 
 # options(prompt = "<.vsc>")
 
+
 options(prompt = "<#>")
 
 .vsc.evalInFrame <- function(expr, frameId, id=0){
@@ -27,7 +28,7 @@ options(prompt = "<#>")
 }
 
 .vsc.callAsString <- function(call) {
-    capture.output(print(call))[1]
+    capture.output(base::print(call))[1]
 }
 
 .vsc.ls2 <- function(env = parent.frame()) {
@@ -120,31 +121,23 @@ options(prompt = "<#>")
     .vsc.sendToVsc('stack', ret, id=id)
 }
 
-# .vsc.listEnvAsString <- function() {
-#     l <- .vsc.listEnv()
-#     p <- lapply(l, function(e) {
-#         capture.output(str(e))[1]
-#     })
-#     return(p)
-# }
 
+.vsc.print <- function(...){
+    # TODO: consider correct environment for print(...)?
+    # env <- sys.frame(-1)
+    # ret <- capture.output(base::print(...), envir=env)
 
+    ret <- capture.output(base::print(...))
+    output <- paste(ret, sep="", collapse="\n")
 
+    line <- .vsc.getLineNumber(sys.call())
+    frame <- parent.frame()
+    call <- sys.call(-1)
+    file <- .vsc.getFileName(call, frame)
+    # output <- capture.output(base::print(...))
+    .vsc.sendToVsc('print', list(output=output, file=file, line=line))
+}
 
-# printEnv <- function() {
-#     p <- .vsc.listEnvAsString()
-#     for(pp in p){
-#         cat(pp)
-#         cat('\n')
-#     }
-# }
-
-# printSecret <- function(...) {
-#     stringList <- capture.output(print(...))
-#     for(s in stringList) {
-#         cat(paste0("<v\\s\\c>", s, "</v\\s\\c>\n"))
-#     }
-# }
 
 .vsc.sendToVsc <- function(message, body="", id=0){
     s <- .vsc.makeStringForVsc(message, body, id)
@@ -182,15 +175,11 @@ options(prompt = "<#>")
 
 
 
-# describeLs <- function(env = parent.frame()) {
-#     d <- .vsc.ls2(env)
-#     .vsc.sendToVsc('ls',d)
-#     # s <- toJSON(d)
-#     # printEnv()
-#     # cat(paste0('<v\\s\\cls>', s, '</v\\s\\cls>\n'))
-# }
+# TODO: toggle this assignment with some option
+print <- .vsc.print
 
 .vsc.runMain <- function() {
+
     .vsc.sendToVsc('go')
     main()
     .vsc.sendToVsc('end')
@@ -280,5 +269,6 @@ options(prompt = "<#>")
     }
     return(invisible(stepList))
 }
+
 
 cat('sourced prep.R\n')
