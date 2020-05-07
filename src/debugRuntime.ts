@@ -6,8 +6,10 @@
 import { EventEmitter } from 'events';
 // import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
-import {ToRStringLiteral, getRPath, getTerminalPath } from "./rUtils";
+import {toRStringLiteral, getRPath, getTerminalPath } from "./rUtils";
 import { TextDecoder, isUndefined } from 'util';
+
+import {RSession} from './rSession';
 
 import * as debugadapter from 'vscode-debugadapter';
 
@@ -45,6 +47,7 @@ export class DebugRuntime extends EventEmitter {
 	private _breakAddresses = new Set<string>();
 
 	private cp!: child.ChildProcessWithoutNullStreams;
+	private rSession!: RSession;
 
 	private hasStartedMain: boolean = false;
 	private isRunningMain: boolean = false;
@@ -82,78 +85,60 @@ export class DebugRuntime extends EventEmitter {
 		
 		console.log('go!');
 
-		// //Create output channel
-		// let orange = vscode.window.createOutputChannel("Orange");
-		// //Write to output.
-		// orange.appendLine("I am a banana.");
-
 		this._sourceFile = program;
 
+		// print some info about the rSession
 		this.sendEvent('output', 'startCollapsed: Starting R session...');
-
 		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rprompt}`);
 
 		// is set to true, once main() is called in R
 		this.isRunningMain = false;
 		
-		this.cp = spawnChildProcess(path.dirname(program));
-
 		// start R
 		// const Rpath = '"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe"';
-		const Rpath = getRPath();
-		const cmdStartR = Rpath + " --ess --quiet --interactive --no-save\n";
-		this.runCommand(cmdStartR, true, true);
+		const terminalPath = getTerminalPath();
+		const rPath = getRPath();
+		const cwd = path.dirname(program);
+		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
+		this.rSession = new RSession(terminalPath, rPath, cwd, rArgs);
+
 
 		// load helper functions etc.
 		// const fileNamePrep = "prep.R"
 		// const fileNamePrep = vscode.workspace.getConfiguration().get<string>('rdebugger.prep.r','');
 		const fileNamePrep = this.prepRPath;
-		const cmdSourcePrep = 'source(' + ToRStringLiteral(fileNamePrep, '"') + ')';
-		this.runCommand(cmdSourcePrep, true, true);
+		this.rSession.callFunction('source', [toRStringLiteral(fileNamePrep)]);
 
 		// source file that is being debugged
-		const cmdSourceProgram = 'source(' + ToRStringLiteral(program, '"') + ')';
-		this.runCommand(cmdSourceProgram, true, true);
+		this.rSession.callFunction('source', [toRStringLiteral(program)]);
 
 		// set breakpoints in R
 		this._breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
 			bps.forEach((bp: DebugBreakpoint) => {
-				var command = '.vsc.mySetBreakpoint(' + ToRStringLiteral(path, '"') + ', ' + bp.line + ')\n';
-				this.runCommand(command, true, true);
+				this.rSession.callFunction('.vsc.mySetBreakpoint', [toRStringLiteral(path), bp.line]);
 			});
 		});
 		
 		// handle output from the R-process
-		this.cp.stdout.on("data", data => {
+		this.rSession.cp.stdout.on("data", data => {
+			this.rSession.cp.stdout.pause();
 			this.handleData(data);
+			this.rSession.cp.stdout.resume();
 		});
-		this.cp.stderr.on("data", data => {
+		this.rSession.cp.stderr.on("data", data => {
+			this.rSession.cp.stderr.pause();
 			this.handleData(data, true);
+			this.rSession.cp.stderr.resume();
 		});
 
 		// call main()
 		// TODO: replace runMain() with direct main() call
-		const cmdRunMain = '.vsc.runMain()';
-		// command = 'browser()'
-		this.runCommand(cmdRunMain, true, true);
+		this.rSession.callFunction('.vsc.runMain');
 		this.sendEvent('output', 'end: ');
 	}
 
-	private runCommand(command: string, addNewline = true, logToDebugConsole = false){
-		// runs a give command in the R child process
-		// adds newline if necessary
-		if(logToDebugConsole){
-			this.sendEvent('output', command);
-		}
-		if(command.slice(-1) !== '\n' && addNewline){
-			command = command + '\n';
-		}
-		this.cp.stdin.write(command);
-		console.log('stdin:\n' + command.trim());
-	}
-
-	// private writeOutput(text: any, addNewline = true, toStderr = false){
 	private writeOutput(text: any, addNewline = false, toStderr = false, filePath = '', line = 1){
+		// writes output to the debug console
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
 		}
@@ -168,7 +153,9 @@ export class DebugRuntime extends EventEmitter {
 		// calls handleLine() on each line
 		const dec = new TextDecoder;
 		var s = dec.decode(data);
-		s = s.replace(/\r/g,'');
+		s = s.replace(/\r/g,''); //keep only \n as linebreak
+
+		// join with rest text from previous call(s)
 		if(fromStderr){
 			s = this.restOfStderr + s;
 			this.restOfStderr = "";
@@ -176,19 +163,22 @@ export class DebugRuntime extends EventEmitter {
 			s = this.restOfStdout + s;
 			this.restOfStdout = "";
 		}
+
+		// split into lines
 		const lines = s.split(/\n/);
 
+		// handle all the complete lines
 		for(var i = 0; i<lines.length - 1; i++){
-			var line = lines[i];
-			this.handleLine(line, fromStderr);
+			this.handleLine(lines[i], fromStderr);
 		}
 
 		if(lines.length > 0) {
 			// calls this.handleLine on the remainder of the last line
-			// necessary, since e.g. input prompt (">") does not send newline
+			// necessary, since e.g. input prompt (">") does not send a newline
 			var remainingText = lines[lines.length - 1];
 			const isHandled = this.handleLine(remainingText, fromStderr, false);
-			// const isHandled = false;
+			
+			// isHandled indicates if the text was 'understood' or if we should wait for the rest of the line
 			if(isHandled){
 				remainingText = "";
 			}
@@ -205,18 +195,22 @@ export class DebugRuntime extends EventEmitter {
 		// handles output-lines from R child process
 		// if(this.isRunningMain) {
 			var matches: any;
+			// onlye show the line to the user if it is complete & relevant
 			var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningMain;
+			// var showLine = isFullLine && !this.stdoutIsBrowserInfo;
 
 			const debugRegex = new RegExp(this.delimiter0 + '(.*)' + this.delimiter1);
-			
+			const promptRegex = new RegExp(this.rprompt);
 			matches = debugRegex.exec(line);
 			if(matches){
+				// is meant for the debugger, not the user
 				console.log('matches: <vsc>');
 				this.handleJson(matches[1]);
 				line = line.replace(debugRegex, '');
 			}
 
 			if(/Browse\[\d+\]>/.test(line)){
+				// R has entered the browser (usually caused by a breakpoint)
 				if(!this.isPaused){
 					this.isPaused = true;
 				}
@@ -224,35 +218,41 @@ export class DebugRuntime extends EventEmitter {
 				this.stdoutIsBrowserInfo = false;
 				return true;
 			} 
-			if(/Called from: /.test(line)){
+			if(/^Called from: /.test(line)){
+				// part of browser-info
 				showLine = false;
 			}
 			if(isFullLine && /^[ncsfQ]$/.test(line)) {
+				// commands used to control the browser
 				console.log('matches: [ncsfQ]');
 				showLine = false;
 			}
 			if(isFullLine && /^\.vsc\./.test(line)) {
+				// was a command sent to R by the debugger
 				console.log('matches: .vsc');
 				showLine = false;
 			}
 			if(isFullLine && (/debug: /.test(line) ||
 					/exiting from: /.test(line) ||
 					/debugging in: /.test(line))){
+				// is info given by browser()
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
 			matches = /^debug at (.*)#(\d+): .*$/.exec(line);
 			if(matches){
+				// is info given by browser()
 				this._currentFile = matches[1];
 				this._currentLine = parseInt(matches[2]);
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
-			// if(this.isRunningMain && /<#>$/.test(line)){
-			// 	console.log("matches: <#> (End)");
-			// 	this.sendEvent('end')
-			// 	return true;
-			// } //else {
+			if(this.isRunningMain && promptRegex.test(line)){
+				console.log("matches: <#> (End)");
+				this.sendEvent('end')
+				showLine = false;
+				return true;
+			} //else {
 			if(showLine && line.length>0){
 				if(isFullLine){
 					line = line + '\n';
@@ -324,8 +324,10 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	private requestInfoFromR(): number {
-		this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ')');
-		this.runCommand('.vsc.getStack(id=' + ++this.requestId + ')');
+		this.rSession.callFunction('.vsc.describeLs2', ['id=' + ++this.requestId]);
+		// this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ')');
+		this.rSession.callFunction('.vsc.getStack', ['id=' + ++this.requestId]);
+		// this.runCommand('.vsc.getStack(id=' + ++this.requestId + ')');
 		return(this.requestId);
 	}
 
@@ -335,23 +337,23 @@ export class DebugRuntime extends EventEmitter {
 
 	public continue(reverse = false) {
 		this.isPaused = false;
-		this.runCommand('c');
+		this.rSession.runCommand('c');
 	}
 
 	public step(reverse = false, event = 'stopOnStep') {
-		this.runCommand('n');
+		this.rSession.runCommand('n');
 		this.requestInfoFromR();
 		this.sendEvent(event);
 	}
 
 	public stepIn(event = 'stopOnStep') {
-		this.runCommand('s');
+		this.rSession.runCommand('s');
 		this.requestInfoFromR();
 		this.sendEvent(event);
 	}
 
 	public stepOut(reverse = false, event = 'stopOnStep') {
-		this.runCommand('f');
+		this.rSession.runCommand('f');
 		this.requestInfoFromR();
 		this.sendEvent(event);
 	}
@@ -361,8 +363,9 @@ export class DebugRuntime extends EventEmitter {
 		if(isUndefined(frameId)){
 			frameId = 0;
 		}
-		expr = ToRStringLiteral(expr, '"');
-		this.runCommand('.vsc.evalInFrame(' + expr + ', ' + frameId + ')', true, false);
+		expr = toRStringLiteral(expr, '"');
+		// this.runCommand('.vsc.evalInFrame(' + expr + ', ' + frameId + ')', true, false);
+		this.rSession.callFunction('.vsc.evalInFrame', [expr, frameId]);
 		this.requestInfoFromR();
 		await this.waitForMessages();
 	}
@@ -373,7 +376,8 @@ export class DebugRuntime extends EventEmitter {
 		await this.waitForMessages();
 		const envString = this.stack['frames'][frameId];
 		if(isUndefined(this.scopes) || this.scopes[0][0] !== envString){
-			this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ', envString=' + ToRStringLiteral(envString, '"') + ')');
+			// this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ', envString=' + toRStringLiteral(envString, '"') + ')');
+			this.rSession.callFunction('.vsc.describeLs2', ['id=' + ++this.requestId, 'envString=' + toRStringLiteral(envString, '"')]);
 		}
 		await this.waitForMessages();
 		// wrapper to access scopes

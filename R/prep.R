@@ -4,7 +4,7 @@ library(jsonlite)
 # options(prompt = "<.vsc>")
 
 
-options(prompt = "<#>")
+options(prompt = "<#>\n")
 
 .vsc.evalInFrame <- function(expr, frameId, id=0){
     env <- sys.frame(frameId + 1)

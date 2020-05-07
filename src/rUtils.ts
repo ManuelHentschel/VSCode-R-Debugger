@@ -31,7 +31,7 @@ export function getTerminalPath() {
     return "";
 }
 
-export function ToRStringLiteral(s: string, quote: string) {
+export function toRStringLiteral(s: string, quote: string='"') {
     if (s === undefined) {
         return "NULL";
     } else {
