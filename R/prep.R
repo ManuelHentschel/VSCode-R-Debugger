@@ -6,9 +6,31 @@ library(jsonlite)
 
 options(prompt = "<#>\n")
 
+.vsc.overwritePrint <- FALSE
+assign('.vsc.isEvaluating', FALSE, envir=.GlobalEnv)
+
+
+.vsc.seq2 <- function(from, to=NULL){
+    if(is.null(from) || is.list(from) || (is.vector(from) && length(from)>1)){
+        return(.vsc.seq2(length(from)))
+    } else if(is.null(to)){
+        if(from==0){
+            return(NULL)
+        } else {
+            return(seq(from))
+        }
+    } else if(from>to){
+        return(NULL)
+    } else{
+        return(seq(from, to))
+    }
+}
+
 .vsc.evalInFrame <- function(expr, frameId, id=0){
     env <- sys.frame(frameId + 1)
+    assign('.vsc.isEvaluating', TRUE, envir=.GlobalEnv)
     ret <- capture.output(eval(parse(text=expr), envir=env))
+    assign('.vsc.isEvaluating', FALSE, envir=.GlobalEnv)
     ret <- paste(ret, sep="", collapse="\n")
     .vsc.sendToVsc('eval', ret, id=id)
 }
@@ -31,21 +53,13 @@ options(prompt = "<#>\n")
     capture.output(base::print(call))[1]
 }
 
-.vsc.ls2 <- function(env = parent.frame()) {
-    name <- ls(env)
-    value <- c()
-    for(n in name){
-        value <- c(value, .vsc.describeVar(n, env))
-    }
-    d <- data.frame(name, value, row.names = NULL)
-    return(d)
-}
+
 
 .vsc.describeEnvs <- function(firstenv=parent.frame(), lastenv=.GlobalEnv) {
     envList <- .vsc.listEnv(firstenv, lastenv)
     envNames <- lapply(envList, .vsc.envAsString)
     envContent <- lapply(envList, .vsc.ls2)
-    ret <- list(envNames, envContent)
+    ret <- list(environments=envNames, content=envContent)
     return(ret)
 }
 
@@ -55,8 +69,6 @@ options(prompt = "<#>\n")
     }
     d <- .vsc.describeEnvs(env)
     .vsc.sendToVsc('ls',d, id=id)
-    # s <- toJSON(d)
-    # cat(paste0('<v\\s\\c.vsc.ls2>', s, '</v\\s\\c.vsc.ls2>\n'))
 }
 
 .vsc.getScopes <- function(firstenv=parent.frame(), lastenv=.GlobalEnv, id=0) {
@@ -108,16 +120,23 @@ options(prompt = "<#>\n")
 }
 
 .vsc.getStack <- function(id=0){
+    # get frames + calls
     frames <- sys.frames()
     calls <- sys.calls()
+
+    # remove emptyenv()
     frames[length(frames)] <- NULL
     calls[length(calls)] <- NULL
+
+    # get files, lines, variables
     fileNames <- mapply(.vsc.getFileName, calls, frames)
-    # fileNames <- lapply(calls, .vsc.getFileName)
     lineNumbers <- lapply(calls, .vsc.getLineNumber)
+    scopes <- lapply(frames, .vsc.describeEnvs)
+
+    # convert to string and return
     frames <- lapply(frames, .vsc.envAsString)
     calls <- lapply(calls, .vsc.callAsString)
-    ret <- list(calls=calls, frames=frames, fileNames=fileNames, lineNumbers=lineNumbers)
+    ret <- list(calls=calls, frames=frames, fileNames=fileNames, lineNumbers=lineNumbers, scopes=scopes)
     .vsc.sendToVsc('stack', ret, id=id)
 }
 
@@ -127,6 +146,9 @@ options(prompt = "<#>\n")
     # env <- sys.frame(-1)
     # ret <- capture.output(base::print(...), envir=env)
 
+    if(.vsc.isEvaluating){
+        return(base::print(...))
+    }
     ret <- capture.output(base::print(...))
     output <- paste(ret, sep="", collapse="\n")
 
@@ -173,16 +195,84 @@ options(prompt = "<#>\n")
 }
 
 
+.vsc.runMain <- function(overWritePrint=TRUE) {
 
+    .vsc.overwritePrint = overWritePrint
 
-# TODO: toggle this assignment with some option
-print <- .vsc.print
-
-.vsc.runMain <- function() {
+    if(overWritePrint){
+        assign('print', .vsc.print, envir=.GlobalEnv)
+    }
 
     .vsc.sendToVsc('go')
     main()
     .vsc.sendToVsc('end')
+}
+
+.vsc.ls2 <- function(env = parent.frame()) {
+    names <- ls(env)
+
+    values <- lapply(names, function(name){
+        eval(parse(text=name), envir=env)
+    })
+
+    d <- mapply(.vsc.toObj, values, names, SIMPLIFY = FALSE)
+
+    # names(values) <- names
+
+    # d <- .vsc.toObj(values)
+
+    
+
+    # values <- c()
+    # for(n in name){
+        # value <- c(value, .vsc.describeVar(n, env))
+    # }
+    # d <- data.frame(name, value, row.names = NULL)
+    return(d)
+}
+
+.vsc.toJson <- function(v){
+    return(toJSON(vsc.toObj(v)))
+}
+
+.vsc.toObj <- function(v, name='ls'){
+    if(is.list(v) || (is.vector(v) && length(v)>1)){
+        names <- names(v)
+        if(is.null(names)){
+            names <- .vsc.seq2(v)
+        }
+        content <- mapply(.vsc.toObj, v, names, SIMPLIFY = FALSE)
+        if(is.list(v)){
+            type <- 'list'
+        } else {
+            type <- 'vector'
+        }
+    } else if(is.matrix(v)){
+        content <- split(v, rep(1:ncol(v), each=nrow(v)))
+        content <- .vsc.toObj(content, name)
+        type <- 'matrix'
+    } else {
+        content <- NULL
+        type <- typeof(v)
+    }
+    value <- .vsc.toString(v)
+    v <- list(name=name, value=value, type=type, content=content)
+    return(v)
+}
+
+.vsc.toString <- function(v){
+    ret <- try(toString(v), silent = TRUE)
+    if(class(ret) != 'try-error') return(ret)
+    ret <- try(.vsc.toStringByCaptureOutput(v), silent = TRUE)
+    if(class(ret) != 'try-error') return(ret)
+    return('???')
+}
+
+.vsc.toStringByCaptureOutput <- function(v){
+    ret <- capture.output(v)
+    ret <- lapply(ret, trimws)
+    ret <- paste0(ret, collapse=';\n')
+    return(ret)
 }
 
 
@@ -206,7 +296,7 @@ print <- .vsc.print
         if(includePackages){
             lastenv <- emptyenv() # searches through package-envs as well
         } else {
-            lastenv <- .GlobalEnv # searches only thourh 'user'-envs
+            lastenv <- .GlobalEnv # searches only through 'user'-envs
         }
         refs <- findLineNum(srcfile, lines[i], lastenv=lastenv)
         if(length(refs)>0){
