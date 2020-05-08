@@ -30,9 +30,18 @@ export class RSession {
 		this.cp.stdin.write(cmd);
 		console.log('stdin:\n' + cmd.trim());
     }
-    public callFunction(fnc: string, args: (string|number)[]=[]){
+    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number)})=[]){
+        // if necessary, convert args form object-form to array, save to args2 to have a unamibuous data type
+        var args2: (string|number)[] = [];
+        if(Array.isArray(args)){
+            args2 = args;
+        } else {
+            for(const arg in args){
+                args2.push(arg + '=' + args[arg]);
+            }
+        }
         // construct and execute function-call
-        const cmd = fnc + '(' + args.join(',') + ')';
+        const cmd = fnc + '(' + args2.join(',') + ')';
         this.runCommand(cmd);
     }
 }
@@ -53,21 +62,37 @@ function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=
     console.log("Spawned Process with PID: " + cp.pid);
     // const cp = child.spawn("cmd", ['/K', 'Rterminal', '--no-save']);
 
+
+    // log all output to console.log:
     cp.stdout.on("data", data => {
         console.log('stdout:\n' + data);
     });
-
     cp.stderr.on("data", data => {
         console.warn('stderr:\n' + data);
     });
-
     cp.on("error", (error) => {
         console.log('error:\n' + error.message);
     });
-
     cp.on("close", code => {
         console.log('Child process exited with code: ' + code);
     });
     return cp;
 }
 
+export function toRStringLiteral(s: string, quote: string='"') {
+    if (s === undefined) {
+        return "NULL";
+    } else {
+        return (quote +
+            s.replace(/\\/g, "\\\\")
+                .replace(/"""/g, `\\${quote}`)
+                .replace(/\\n/g, "\\n")
+                .replace(/\\r/g, "\\r")
+                .replace(/\\t/g, "\\t")
+                .replace(/\\b/g, "\\b")
+                .replace(/\\a/g, "\\a")
+                .replace(/\\f/g, "\\f")
+                .replace(/\\v/g, "\\v") +
+            quote);
+    }
+}

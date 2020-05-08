@@ -273,53 +273,30 @@ export class DebugSession extends LoggingDebugSession {
 		const stk = await this._runtime.getStack(startFrame, endFrame);
 
 		response.body = {
-			stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
-			totalFrames: stk.count
+			stackFrames: stk['frames'],
+			totalFrames: stk['frames'].count
 		};
 		this.sendResponse(response);
 	}
 
 	protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
-		console.log('request: scopesRequest');
-		var scopes = await this._runtime.getScopes(args.frameId);
+		const scopes = await this._runtime.getScopes(args.frameId);
 
-		var newScopes: Scope[] = [];
-		for(var i=0; i<scopes[0].length; i++){
-			const scopeName = scopes[0][i];
-			const nextHandle = this._variableHandles.create(scopeName);
-			const nextScope = new Scope(scopeName, nextHandle, false);
-			newScopes.push(nextScope); 
-		}
 		response.body = {
-			scopes: newScopes
+			scopes: scopes
 		};
-
-		this.sendResponse(response);
+		this.sendResponse(response)
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
 
-		console.log('request: variablesRequest');
-
-		const id = this._variableHandles.get(args.variablesReference);
-		const variables: DebugProtocol.Variable[] = [];
-		const Rvariables: DebugProtocol.Variable[] = await this._runtime.getVariables(id);
-
-		for (var i = 0; i<Rvariables.length; i++) {
-			const v = Rvariables[i];
-			variables.push({
-				name: v['name'],
-				// type: v['type'],
-				type: "string",
-				value: v['value'],
-				variablesReference: 0
-			});
-		}
+		const variables = await this._runtime.getVariables(args.variablesReference);
 
 		response.body = {
 			variables: variables
 		};
 		this.sendResponse(response);
+		return;
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
