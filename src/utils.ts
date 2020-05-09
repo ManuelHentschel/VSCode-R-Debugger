@@ -1,4 +1,3 @@
-"use strict";
 
 import { window, workspace } from "vscode";
 let config = workspace.getConfiguration();

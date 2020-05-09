@@ -3,7 +3,6 @@ import * as child from 'child_process';
 import * as vscode from 'vscode';
 import { getRPath, getTerminalPath } from './utils';
 
-
 // var pty:vscode.Pseudoterminal = {
 //     onDidWrite = new Event<string> 
 // };
