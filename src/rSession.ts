@@ -59,14 +59,14 @@ function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=
     const cp = child.spawn(terminalPath, cmdArgs, options);
     // const Rpath = '"C:\\Program Files\\R\\R-3.6.1\\bin\\R.exe"';
     // const cp = child.spawn(Rpath, ['--no-save', '--interactive'], options)
-    console.log("Spawned Process with PID: " + cp.pid);
+    // console.log("Spawned Process with PID: " + cp.pid);
     // const cp = child.spawn("cmd", ['/K', 'Rterminal', '--no-save']);
 
 
-    // log all output to console.log:
-    cp.stdout.on("data", data => {
-        console.log('stdout:\n' + data);
-    });
+    // log output to console.log:
+    // cp.stdout.on("data", data => {
+    //     console.log('stdout:\n' + data);
+    // });
     cp.stderr.on("data", data => {
         console.warn('stderr:\n' + data);
     });

@@ -62,17 +62,15 @@ export class DebugSession extends LoggingDebugSession {
 	 * Creates a new debug adapter that is used for one debug session.
 	 * We configure the default implementation of a debug adapter here.
 	 */
-	public constructor(context: vscode.ExtensionContext) {
+	public constructor() {
 		// super("r-debugger.txt");
 		super();
-
-		console.log("Constructing Debug Session...");
 
 		// this debugger uses zero-based lines and columns
 		this.setDebuggerLinesStartAt1(true);
 		this.setDebuggerColumnsStartAt1(true);
 
-		this._runtime = new DebugRuntime(context);
+		this._runtime = new DebugRuntime();
 
 		// setup event handlers
 		this._runtime.on('stopOnEntry', () => {
@@ -137,8 +135,6 @@ export class DebugSession extends LoggingDebugSession {
 			}
 			this.sendResponse(response);
 		});
-
-		console.log("Done constructing.");
 	}
 
 	/**
@@ -264,8 +260,6 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-		console.log('request: stackTraceRequest');
-
 		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
 		const endFrame = startFrame + maxLevels;
@@ -330,8 +324,6 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
-		console.log('request: evaluateRequest')
-
 		this._evalResponse = response;
 		this._runtime.evaluate(args.expression, args.frameId);
 	}

@@ -34,8 +34,6 @@ export class DebugRuntime extends EventEmitter {
 	private _currentLine = 0;
 	private _currentFile = this._sourceFile;
 
-	private prepRPath: string;
-
 	// maps from sourceFile to array of breakpoints
 	private _breakPoints = new Map<string, DebugBreakpoint[]>();
 
@@ -72,9 +70,8 @@ export class DebugRuntime extends EventEmitter {
 	readonly delimiter1 = '</v\\\\s\\\c>';
 	readonly rprompt = '<#>';
 
-	constructor(context: vscode.ExtensionContext) {
+	constructor() {
 		super();
-		this.prepRPath = context.asAbsolutePath('./R/prep.R');
 	}
 
 	/**
@@ -82,8 +79,6 @@ export class DebugRuntime extends EventEmitter {
 	 */
 	public async start(program: string, stopOnEntry: boolean) {
 		
-		console.log('go!');
-
 		this._sourceFile = program;
 
 		// print some info about the rSession
@@ -204,7 +199,6 @@ export class DebugRuntime extends EventEmitter {
 			matches = debugRegex.exec(line);
 			if(matches){
 				// is meant for the debugger, not the user
-				console.log('matches: <vsc>');
 				this.handleJson(matches[1]);
 				line = line.replace(debugRegex, '');
 			}

@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// debug adapters can be run in different ways by using a vscode.DebugAdapterDescriptorFactory:
 	let factory: vscode.DebugAdapterDescriptorFactory;
     // run the debug adapter inside the extension and directly talk to it
-    factory = new InlineDebugAdapterFactory(context);
+    factory = new InlineDebugAdapterFactory();
 
 
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
@@ -65,14 +65,9 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
 
-	public context: vscode.ExtensionContext;
-
-	public constructor(context: vscode.ExtensionContext){
-		this.context = context;
-	}
 
 	createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
-        let ret = new vscode.DebugAdapterInlineImplementation(new DebugSession(this.context));
+        let ret = new vscode.DebugAdapterInlineImplementation(new DebugSession());
         return ret;
 	}
 }
