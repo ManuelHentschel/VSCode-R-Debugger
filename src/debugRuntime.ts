@@ -78,7 +78,7 @@ export class DebugRuntime extends EventEmitter {
 	 * Start executing the given program.
 	 */
 	public async start(program: string, stopOnEntry: boolean) {
-		
+		console.log('Develop')
 		this._sourceFile = program;
 
 		// print some info about the rSession
