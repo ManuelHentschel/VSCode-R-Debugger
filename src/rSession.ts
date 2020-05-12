@@ -64,9 +64,9 @@ function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=
 
 
     // log output to console.log:
-    // cp.stdout.on("data", data => {
-    //     console.log('stdout:\n' + data);
-    // });
+    cp.stdout.on("data", data => {
+        console.log('stdout:\n' + data);
+    });
     cp.stderr.on("data", data => {
         console.warn('stderr:\n' + data);
     });

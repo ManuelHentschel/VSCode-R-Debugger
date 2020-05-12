@@ -10,6 +10,7 @@ import {getRPath, getTerminalPath } from "./utils";
 import { TextDecoder, isUndefined } from 'util';
 
 import {toRStringLiteral, RSession} from './rSession';
+import { DebugProtocol } from 'vscode-debugprotocol';
 
 // import * as debugadapter from 'vscode-debugadapter';
 
@@ -56,7 +57,9 @@ export class DebugRuntime extends EventEmitter {
 	private restOfStdout: string = "";
 	private restOfStderr: string = "";
 
-	private stdoutIsBrowserInfo = false; // set to true if cp.stdout is currently giving browser()-details
+	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
+	private stdoutIsErrorInfo = false; // set to true if rSession.stdout is currently giving recover()-details
+	private stdoutErrorFrameNumber = 0;
 
 	private scopes: any = undefined;
 	private stack: any = undefined;
@@ -241,6 +244,31 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
+			if(/Enter a frame number, or 0 to exit/.exec(line)){
+				showLine = false
+				this.stdoutIsErrorInfo = true;
+			}
+			matches = /^(\d+): (.*)$/.exec(line);
+			if(this.stdoutIsErrorInfo && matches){
+				showLine = false;
+				// matches = /^(\d+): (.*)#(\d+): .*/.exec(line);
+				// if(matches){
+					this.stdoutErrorFrameNumber = matches[1]
+				// } else {
+					// if(matches){
+						// this.stdoutErrorFrameNumber = matches[1]
+					// }
+				// }
+			}
+			if(this.stdoutIsErrorInfo && /^Selection: $/.exec(line)){
+				this.stdoutIsErrorInfo = false;
+				this.stdoutIsBrowserInfo = true;
+				this.rSession.runCommand(String(this.stdoutErrorFrameNumber));
+				this.requestInfoFromR();
+				this.sendEvent('stopOnException');
+				showLine = false;
+				line = '';
+			}
 			if(this.isRunningMain && promptRegex.test(line)){
 				console.log("matches: <#> (End)");
 				this.sendEvent('end')
@@ -251,7 +279,7 @@ export class DebugRuntime extends EventEmitter {
 				if(isFullLine){
 					line = line + '\n';
 				}
-				this.writeOutput(line, fromStderr);
+				this.writeOutput(line, false, fromStderr);
 			}
 		return line;
 	}
@@ -288,6 +316,12 @@ export class DebugRuntime extends EventEmitter {
 					stack['frames'][0]['line'] = this._currentLine;
 				} catch(error){}
 				this.stack = stack;
+				// for error:
+				// this.stack['frames'] = this.stack['frames'].slice(3)
+				// for(var i = 0; i<this.stack['frames'].length; i++){
+				// 	this.stack['frames'][i]['id'] = i+1;
+				// }
+				//
 				break;
 			case 'eval':
 				const result = body;
@@ -372,7 +406,7 @@ export class DebugRuntime extends EventEmitter {
 	// info for debug session
 	public async getScopes(frameId: number) {
 		await this.waitForMessages();
-		return this.stack['frames'][frameId-1]['scopes'];
+		return this.stack['frames'][frameId]['scopes'];
 	}
 
 	// public async getVariables(scope: string) {
@@ -484,4 +518,5 @@ export class DebugRuntime extends EventEmitter {
 			this.emit(event, ...args);
 		});
 	}
+
 }
