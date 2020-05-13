@@ -145,7 +145,7 @@ export class DebugRuntime extends EventEmitter {
 	// Output-handlers:
 	//////////
 	
-	private handleData(data: any, fromStderr: boolean = false) {
+	private async handleData(data: any, fromStderr: boolean = false) {
 		// handles output from the R child process
 		// splits cp.stdout into lines / waits for complete lines
 		// calls handleLine() on each line
@@ -167,7 +167,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// handle all the complete lines
 		for(var i = 0; i<lines.length - 1; i++){
-			this.handleLine(lines[i], fromStderr);
+			await this.handleLine(lines[i], fromStderr);
 		}
 
 		if(lines.length > 0) {
@@ -175,7 +175,7 @@ export class DebugRuntime extends EventEmitter {
 			// necessary, since e.g. input prompt (">") does not send a newline
 			var remainingText = lines[lines.length - 1];
 			// handleLine returns the parts of a line that were not 'understood'
-			remainingText = this.handleLine(remainingText, fromStderr, false);
+			remainingText = await this.handleLine(remainingText, fromStderr, false);
 			
 			// remember parts that were no understood for next call
 			if(fromStderr){
@@ -187,7 +187,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 	
 
-	private handleLine(line: string, fromStderr = false, isFullLine = true): string{
+	private async handleLine(line: string, fromStderr = false, isFullLine = true) {
 		// handles output-lines from R child process
 		// if(this.isRunningMain) {
 			var matches: any;
@@ -201,7 +201,7 @@ export class DebugRuntime extends EventEmitter {
 			matches = debugRegex.exec(line);
 			if(matches){
 				// is meant for the debugger, not the user
-				this.handleJson(matches[1]);
+				await this.handleJson(matches[1]);
 				line = line.replace(debugRegex, '');
 			}
 
@@ -241,6 +241,9 @@ export class DebugRuntime extends EventEmitter {
 				// is info given by browser()
 				this._currentFile = matches[1];
 				this._currentLine = parseInt(matches[2]);
+				try {
+					this.stack['frames'][0]['line'] = this._currentLine;
+				} catch(error){}
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
@@ -284,7 +287,7 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
-	private handleJson(json: string){
+	private async handleJson(json: string){
 		// handles the json that is printed by .vsc.sendToVsc()
 		const j = JSON.parse(json);
 		const message = j['message'];
@@ -296,9 +299,12 @@ export class DebugRuntime extends EventEmitter {
 		}
 		switch(message){
 			case 'breakpoint':
-				this.step();
-				this.sendEvent('stopOnBreakpoint');
 				this.stdoutIsBrowserInfo = true;
+				// this.step();
+				this.rSession.runCommand('n');
+				this.requestInfoFromR();
+				await this.waitForMessages();
+				this.sendEvent('stopOnBreakpoint');
 				break;
 			case 'end':
 				this.isRunningMain = false;
@@ -371,16 +377,18 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// 1 step:
-	public step(reverse = false, event = 'stopOnStep') {
+	public async step(reverse = false, event = 'stopOnStep') {
 		this.rSession.runCommand('n');
 		this.requestInfoFromR();
+		await this.waitForMessages();
 		this.sendEvent(event);
 	}
 
 	// step into function:
-	public stepIn(event = 'stopOnStep') {
+	public async stepIn(event = 'stopOnStep') {
 		this.rSession.runCommand('s');
 		this.requestInfoFromR();
+		await this.waitForMessages();
 		this.sendEvent(event);
 	}
 
@@ -404,20 +412,19 @@ export class DebugRuntime extends EventEmitter {
 
 
 	// info for debug session
-	public async getScopes(frameId: number) {
-		await this.waitForMessages();
+	public getScopes(frameId: number) {
+		// await this.waitForMessages();
 		return this.stack['frames'][frameId]['scopes'];
 	}
 
 	// public async getVariables(scope: string) {
-	public async getVariables(varRef: number) {
-		await this.waitForMessages();
-
+	public getVariables(varRef: number) {
+		// await this.waitForMessages();
 		return this.stack['varLists'][varRef-1];
 	}
 
-	public async getStack(startFrame: number, endFrame: number) {
-		await this.waitForMessages();
+	public getStack(startFrame: number, endFrame: number) {
+		// await this.waitForMessages();
 		return this.stack;
 	}
 
@@ -425,6 +432,31 @@ export class DebugRuntime extends EventEmitter {
 		const bps: number[] = [];
 		return bps;
 	}
+
+
+	public stack2(startFrame: number, endFrame: number): any {
+
+		// const words = this._sourceLines[this._currentLine].trim().split(/\s+/);
+		// const words = ["The", "Mock", "Debug", "Extension"];
+		const words = [];
+
+		const frames = new Array<any>();
+		// every word of the current line becomes a stack frame.
+		for (let i = startFrame; i < Math.min(endFrame, words.length); i++) {
+			const name = words[i];	// use a word of the line as the stackframe name
+			frames.push({
+				index: i,
+				name: `${name}(${i})`,
+				file: this._sourceFile,
+				line: this._currentLine
+			});
+		}
+		return {
+			frames: frames,
+			count: words.length
+		};
+	}
+
 
 	/*
 	 * Set breakpoint in file with given line.
@@ -514,6 +546,7 @@ export class DebugRuntime extends EventEmitter {
 
 
 	private sendEvent(event: string, ... args: any[]) {
+		console.log('event:' + event);
 		setImmediate(_ => {
 			this.emit(event, ...args);
 		});

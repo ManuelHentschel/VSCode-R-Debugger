@@ -249,7 +249,6 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
-
 		// runtime supports no threads so just return a default thread.
 		response.body = {
 			threads: [
@@ -259,21 +258,73 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
+	// protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
+	// 	const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
+	// 	const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
+	// 	const endFrame = startFrame + maxLevels;
+
+		// const stk = await this._runtime.getStack(startFrame, endFrame);
+
+	// 	response.body = {
+	// 		stackFrames: stk['frames'],
+	// 		totalFrames: stk['frames'].length
+	// 	};
+	// 	this.sendResponse(response);
+	// }
+
+	private hasSentDummy = true;
+
+	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
+		console.log('stackTraceRequest');
+
 		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
 		const endFrame = startFrame + maxLevels;
 
-		const stk = await this._runtime.getStack(startFrame, endFrame);
+		if(this.hasSentDummy){
+			console.log('waiting for proper stack...')
+			// const stk2 = await this._runtime.getStack(startFrame, endFrame);
+			const stk2 = this._runtime.getStack(startFrame, endFrame);
+			// const body2 = {
+			// 	stackFrames: stk2['frames'].map(f => new StackFrame(f.index, f.name, this.createSource(f['source']['path']), this.convertDebuggerLineToClient(f.line))),
+			// 	totalFrames: stk2['frames'].length
+			// };
+			const body = {
+				stackFrames: stk2['frames'],
+				totalFrames: stk2['frames'].length
+			}
+			response.body = body;
+			console.log('sending proper stack...')
+		} else {
+			console.log('sending dummy stack..')
+			this.hasSentDummy = true;
+			const stk = this._runtime.stack2(startFrame, endFrame);
+			response.body = {
+				stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
+				totalFrames: stk.count
+			};
+		}
 
-		response.body = {
-			stackFrames: stk['frames'],
-			totalFrames: stk['frames'].length
-		};
+		// response.body = {
+		// 	stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
+		// 	totalFrames: stk.count
+		// };
+		// response.body = {
+		// 	stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
+		// 	totalFrames: stk.count
+		// };
+		// const body2 = {
+		// 	stackFrames: stk2['frames'].map(f => new StackFrame(f.index, f.name, this.createSource(f['source']['path']), this.convertDebuggerLineToClient(f.line))),
+		// 	totalFrames: stk2['frames'].length
+		// };
+		// response.body = body2;
 		this.sendResponse(response);
 	}
 
+
+
 	protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
+		console.log('scopesRequest');
 		const scopes = await this._runtime.getScopes(args.frameId);
 
 		response.body = {
@@ -283,6 +334,7 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
+		console.log('variablesRequest');
 
 		const variables = await this._runtime.getVariables(args.variablesReference);
 
@@ -303,13 +355,13 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
  	}
 
-	protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): void {
-		this._runtime.step();
+	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
+		await this._runtime.step();
 		this.sendResponse(response);
 	}
 
-	protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): void {
-		this._runtime.stepIn();
+	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments) {
+		await this._runtime.stepIn();
 		this.sendResponse(response);
 	}
 

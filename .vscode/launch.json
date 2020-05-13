@@ -17,6 +17,7 @@
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
 			],
+			"smartStep": true,
 			"preLaunchTask": "${defaultBuildTask}"
 		},
 		{

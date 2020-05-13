@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
 import { DebugSession } from './debugSession';
+import * as Net from 'net';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let factory: vscode.DebugAdapterDescriptorFactory;
     // run the debug adapter inside the extension and directly talk to it
     factory = new InlineDebugAdapterFactory();
+    // factory = new MockDebugAdapterDescriptorFactory();
 
 
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
@@ -62,6 +64,31 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 	}
 }
 
+class MockDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
+
+	private server?: Net.Server;
+
+	createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
+
+		if (!this.server) {
+			// start listening on a random port
+			this.server = Net.createServer(socket => {
+				const session = new DebugSession();
+				session.setRunAsServer(true);
+				session.start(<NodeJS.ReadableStream>socket, socket);
+			}).listen(0);
+		}
+
+		// make VS Code connect to debug server
+		return new vscode.DebugAdapterServer((<Net.AddressInfo>this.server.address()).port);
+	}
+
+	dispose() {
+		if (this.server) {
+			this.server.close();
+		}
+	}
+}
 
 class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
 
