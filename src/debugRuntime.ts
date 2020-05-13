@@ -50,6 +50,7 @@ export class DebugRuntime extends EventEmitter {
 	private hasStartedMain: boolean = false;
 	private isRunningMain: boolean = false;
 	private isPaused: boolean = false;
+	private isCrashed: boolean = false;
 
 	private showUser: boolean = false;
 
@@ -249,6 +250,7 @@ export class DebugRuntime extends EventEmitter {
 			}
 			if(/Enter a frame number, or 0 to exit/.exec(line)){
 				showLine = false
+				this.isCrashed = true;
 				this.stdoutIsErrorInfo = true;
 			}
 			matches = /^(\d+): (.*)$/.exec(line);
@@ -263,11 +265,11 @@ export class DebugRuntime extends EventEmitter {
 					// }
 				// }
 			}
-			if(this.stdoutIsErrorInfo && /^Selection: $/.exec(line)){
+			if(this.stdoutIsErrorInfo && /^Selection: $/.exec(line) && !isFullLine){
 				this.stdoutIsErrorInfo = false;
 				this.stdoutIsBrowserInfo = true;
 				this.rSession.runCommand(String(this.stdoutErrorFrameNumber));
-				this.requestInfoFromR();
+				await this.requestInfoFromR({'isError': 1});
 				this.sendEvent('stopOnException');
 				showLine = false;
 				line = '';
@@ -302,8 +304,7 @@ export class DebugRuntime extends EventEmitter {
 				this.stdoutIsBrowserInfo = true;
 				// this.step();
 				this.rSession.runCommand('n');
-				this.requestInfoFromR();
-				await this.waitForMessages();
+				await this.requestInfoFromR();
 				this.sendEvent('stopOnBreakpoint');
 				break;
 			case 'end':
@@ -319,7 +320,9 @@ export class DebugRuntime extends EventEmitter {
 			case 'stack':
 				const stack = body;
 				try {
-					stack['frames'][0]['line'] = this._currentLine;
+					if(stack['frames'][0]['line'] === 0){
+						stack['frames'][0]['line'] = this._currentLine;
+					}
 				} catch(error){}
 				this.stack = stack;
 				// for error:
@@ -363,40 +366,60 @@ export class DebugRuntime extends EventEmitter {
 	// step-control
 	///////////////////////////////////////////////
 
-	private requestInfoFromR(): number {
+	private requestInfoFromR(args = {}) {
 		// requests info about the stack and workspace from R
-		// this.rSession.callFunction('.vsc.describeLs2', {'id': ++this.requestId});
-		this.rSession.callFunction('.vsc.getStack', {'id': ++this.requestId});
-		return(this.requestId);
+		args = {...args, 'id': ++this.requestId}
+		this.rSession.callFunction('.vsc.getStack', args);
+		return this.waitForMessages()
 	}
 
 	// continue script execution:
 	public continue(reverse = false) {
-		this.isPaused = false;
-		this.rSession.runCommand('c');
+		if(this.isCrashed){
+			this.rSession.runCommand('Q');
+			this.terminate();
+		} else{
+			this.isPaused = false;
+			this.rSession.runCommand('c');
+		}
 	}
 
 	// 1 step:
 	public async step(reverse = false, event = 'stopOnStep') {
-		this.rSession.runCommand('n');
-		this.requestInfoFromR();
-		await this.waitForMessages();
-		this.sendEvent(event);
+		if(this.isCrashed){
+			this.rSession.runCommand('Q');
+			this.terminate();
+		} else {
+			this.rSession.runCommand('n');
+			this.requestInfoFromR();
+			await this.waitForMessages();
+			this.sendEvent(event);
+		}
 	}
 
 	// step into function:
 	public async stepIn(event = 'stopOnStep') {
-		this.rSession.runCommand('s');
-		this.requestInfoFromR();
-		await this.waitForMessages();
-		this.sendEvent(event);
+		if(this.isCrashed){
+			this.rSession.runCommand('Q');
+			this.terminate();
+		} else {
+			this.rSession.runCommand('s');
+			this.requestInfoFromR();
+			await this.waitForMessages();
+			this.sendEvent(event);
+		}
 	}
 
 	// execute rest of function:
 	public stepOut(reverse = false, event = 'stopOnStep') {
-		this.rSession.runCommand('f');
-		this.requestInfoFromR();
-		this.sendEvent(event);
+		if(this.isCrashed){
+			this.rSession.runCommand('Q');
+			this.terminate();
+		} else {
+			this.rSession.runCommand('f');
+			this.requestInfoFromR();
+			this.sendEvent(event);
+		}
 	}
 	
 	// forward an expression entered into the debug window to R
@@ -520,7 +543,14 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public cancel(): void {
-		this.cp.kill();
+		// this.cp.kill();
+		this.rSession.cp.kill();
+	}
+
+	public terminate(): void {
+		// this.cp.kill();
+		this.rSession.cp.kill();
+		this.sendEvent('end');
 	}
 
 

@@ -86,7 +86,7 @@ export class DebugSession extends LoggingDebugSession {
 			this.sendEvent(new StoppedEvent('data breakpoint', DebugSession.THREAD_ID));
 		});
 		this._runtime.on('stopOnException', () => {
-			this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID));
+			this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID, 'Informative exception text'));
 		});
 		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>{ verified: bp.verified, id: bp.id }));
@@ -171,6 +171,9 @@ export class DebugSession extends LoggingDebugSession {
 
 		// make VS Code send the breakpointLocations request
 		response.body.supportsBreakpointLocationsRequest = true;
+
+		response.body.supportsExceptionInfoRequest = true;
+        response.body.supportsExceptionOptions = true;
 
 		this.sendResponse(response);
 
@@ -258,22 +261,6 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	// protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-	// 	const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
-	// 	const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
-	// 	const endFrame = startFrame + maxLevels;
-
-		// const stk = await this._runtime.getStack(startFrame, endFrame);
-
-	// 	response.body = {
-	// 		stackFrames: stk['frames'],
-	// 		totalFrames: stk['frames'].length
-	// 	};
-	// 	this.sendResponse(response);
-	// }
-
-	private hasSentDummy = true;
-
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
 		console.log('stackTraceRequest');
 
@@ -281,51 +268,20 @@ export class DebugSession extends LoggingDebugSession {
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
 		const endFrame = startFrame + maxLevels;
 
-		if(this.hasSentDummy){
-			console.log('waiting for proper stack...')
-			// const stk2 = await this._runtime.getStack(startFrame, endFrame);
-			const stk2 = this._runtime.getStack(startFrame, endFrame);
-			// const body2 = {
-			// 	stackFrames: stk2['frames'].map(f => new StackFrame(f.index, f.name, this.createSource(f['source']['path']), this.convertDebuggerLineToClient(f.line))),
-			// 	totalFrames: stk2['frames'].length
-			// };
-			const body = {
-				stackFrames: stk2['frames'],
-				totalFrames: stk2['frames'].length
-			}
-			response.body = body;
-			console.log('sending proper stack...')
-		} else {
-			console.log('sending dummy stack..')
-			this.hasSentDummy = true;
-			const stk = this._runtime.stack2(startFrame, endFrame);
-			response.body = {
-				stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
-				totalFrames: stk.count
-			};
-		}
+		const stack = this._runtime.getStack(startFrame, endFrame);
+		response.body = {
+			stackFrames: stack['frames'],
+			totalFrames: stack['frames'].length
+		};
 
-		// response.body = {
-		// 	stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
-		// 	totalFrames: stk.count
-		// };
-		// response.body = {
-		// 	stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
-		// 	totalFrames: stk.count
-		// };
-		// const body2 = {
-		// 	stackFrames: stk2['frames'].map(f => new StackFrame(f.index, f.name, this.createSource(f['source']['path']), this.convertDebuggerLineToClient(f.line))),
-		// 	totalFrames: stk2['frames'].length
-		// };
-		// response.body = body2;
 		this.sendResponse(response);
 	}
 
 
 
-	protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
+	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
 		console.log('scopesRequest');
-		const scopes = await this._runtime.getScopes(args.frameId);
+		const scopes = this._runtime.getScopes(args.frameId);
 
 		response.body = {
 			scopes: scopes
@@ -333,16 +289,45 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendResponse(response)
 	}
 
-	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
+	protected variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
 		console.log('variablesRequest');
 
-		const variables = await this._runtime.getVariables(args.variablesReference);
+		const variables = this._runtime.getVariables(args.variablesReference);
 
 		response.body = {
 			variables: variables
 		};
 		this.sendResponse(response);
-		return;
+	}
+
+    protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
+		console.log('exceptionInfoRequest')
+		const details: DebugProtocol.ExceptionDetails = {
+			/** Message contained in the exception. */
+			message: 'messageasdf',
+			/** Short type name of the exception object. */
+			typeName: 'typeNameqwer'
+			/** Fully-qualified type name of the exception object. */
+			// fullTypeName: 'fullTypeName',
+			/** Optional expression that can be evaluated in the current scope to obtain the exception object. */
+			// evaluateName: 'evaluateName',
+			/** Stack trace at the time the exception was thrown. */
+			// stackTrace: 'stackTrace'
+			/** Details of the exception contained by this exception, if any. */
+			// innerException?: ExceptionDetails[];
+		};
+		response.body = {
+            /** ID of the exception that was thrown. */
+            exceptionId: 'exceptionId',
+            /** Descriptive text for the exception provided by the debug adapter. */
+            description: 'description text for the exception',
+            /** Mode that caused the exception notification to be raised. */
+            breakMode: 'always',
+            /** Detailed information about the exception. */
+            // details: details
+		}
+
+		this.sendResponse(response);
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
@@ -382,22 +367,7 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
 
-		response.body = {
-            dataId: null,
-            description: "cannot break on data access",
-            accessTypes: undefined,
-            canPersist: false
-        };
 
-		if (args.variablesReference && args.name) {
-			const id = this._variableHandles.get(args.variablesReference);
-			if (id.startsWith("global_")) {
-				response.body.dataId = args.name;
-				response.body.description = args.name;
-				response.body.accessTypes = [ "read" ];
-				response.body.canPersist = true;
-			}
-		}
 
 		this.sendResponse(response);
 	}
