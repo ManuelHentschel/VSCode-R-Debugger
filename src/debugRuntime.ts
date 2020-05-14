@@ -251,6 +251,9 @@ export class DebugRuntime extends EventEmitter {
 				this.stdoutIsBrowserInfo = true;
 			}
 			if(/Enter a frame number, or 0 to exit/.exec(line)){
+				if(this.isCrashed){
+					this.terminate()
+				}
 				showLine = false
 				this.isCrashed = true;
 				this.stdoutIsErrorInfo = true;
