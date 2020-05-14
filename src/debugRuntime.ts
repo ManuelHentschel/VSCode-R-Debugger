@@ -67,6 +67,8 @@ export class DebugRuntime extends EventEmitter {
 	private requestId = 0;
 	private messageId = 0;
 
+	private variables: Record<number, DebugProtocol.Variable[]> = {};
+
 	// delimiters used when printing info from R which is meant for the debugger
 	// need to occurr on the same line!
 	// are passed to RegExp() -> need to be escaped 'twice'
@@ -318,19 +320,16 @@ export class DebugRuntime extends EventEmitter {
 				this.scopes = body;
 				break;
 			case 'stack':
-				const stack = body;
-				try {
-					if(stack['frames'][0]['line'] === 0){
-						stack['frames'][0]['line'] = this._currentLine;
-					}
-				} catch(error){}
-				this.stack = stack;
+				this.updateStack(body)
 				// for error:
 				// this.stack['frames'] = this.stack['frames'].slice(3)
 				// for(var i = 0; i<this.stack['frames'].length; i++){
 				// 	this.stack['frames'][i]['id'] = i+1;
 				// }
 				//
+				break;
+			case 'variables':
+				this.updateVariables(body)
 				break;
 			case 'eval':
 				const result = body;
@@ -362,15 +361,42 @@ export class DebugRuntime extends EventEmitter {
 		return new Promise(poll);
 	}
 
+
+	private updateStack(stack: any[]){
+		try {
+			if(stack['frames'][0]['line'] === 0){
+				stack['frames'][0]['line'] = this._currentLine;
+			}
+		} catch(error){}
+		this.stack = stack
+		this.updateVariables(stack['varLists']);
+	}
+
+	private updateVariables(varLists: any[]){
+		varLists.forEach(varList => {
+			if(varList['isReady']){
+				this.variables[varList['reference']] = (varList['variables'] as DebugProtocol.Variable[])
+			}
+		});
+		console.log('updated: variables')
+	}
+
 	///////////////////////////////////////////////
 	// step-control
 	///////////////////////////////////////////////
 
 	private requestInfoFromR(args = {}) {
 		// requests info about the stack and workspace from R
-		args = {...args, 'id': ++this.requestId}
+		args = {...args, 'id': ++this.requestId};
 		this.rSession.callFunction('.vsc.getStack', args);
-		return this.waitForMessages()
+		return this.waitForMessages();
+	}
+
+	private requestVariablesFromR(refs: number[]){
+		const refListForR = 'list(' + refs.join(',') + ')';
+		const args = {'refs': refListForR, 'id': ++this.requestId};
+		this.rSession.callFunction('.vsc.getVarLists', args);
+		return this.waitForMessages();
 	}
 
 	// continue script execution:
@@ -441,9 +467,16 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// public async getVariables(scope: string) {
-	public getVariables(varRef: number) {
+	public async getVariables(varRef: number) {
 		// await this.waitForMessages();
-		return this.stack['varLists'][varRef-1];
+		await this.waitForMessages();
+		if(this.variables[varRef]){
+			return this.variables[varRef];
+		} else{
+			this.requestVariablesFromR([varRef]);
+			await this.waitForMessages();
+			return this.variables[varRef];
+		}
 	}
 
 	public getStack(startFrame: number, endFrame: number) {

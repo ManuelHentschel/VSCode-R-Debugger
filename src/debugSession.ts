@@ -289,14 +289,15 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendResponse(response)
 	}
 
-	protected variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
-		console.log('variablesRequest');
+	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
+		console.log('request: variablesRequest');
 
-		const variables = this._runtime.getVariables(args.variablesReference);
+		const variables = await this._runtime.getVariables(args.variablesReference);
 
 		response.body = {
 			variables: variables
 		};
+		console.log('response: variablesResponse')
 		this.sendResponse(response);
 	}
 
