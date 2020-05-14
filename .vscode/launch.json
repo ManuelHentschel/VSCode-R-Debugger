@@ -13,7 +13,6 @@
 			"linux": {
 				"args": [
 					"--extensionDevelopmentPath=${workspaceFolder}",
-					"${workspaceFolder}/../vscode-R-test",
 					"${workspaceFolder}/../hiwijob/v0"
 				]
 			},
@@ -22,7 +21,7 @@
 					"--disable-extensions",
 					"--extensionDevelopmentPath=${workspaceFolder}",
 					"${workspaceFolder}/../vscode-R-test"
-				],
+				]
 			},
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
