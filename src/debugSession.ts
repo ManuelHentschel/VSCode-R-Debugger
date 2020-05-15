@@ -183,6 +183,13 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendEvent(new InitializedEvent());
 	}
 
+	private logRequest(response: DebugProtocol.Response){
+		console.log('request ' + response.request_seq + ': ' + response.command)
+	}
+	private logResponse(response: DebugProtocol.Response){
+		console.log('response ' + response.request_seq + ': ' + response.command)
+	}
+
 	/**
 	 * Called at the end of the configuration sequence.
 	 * Indicates that all breakpoints etc. have been sent to the DA and that the 'launch' can start.
@@ -252,17 +259,19 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
+		this.logRequest(response);
 		// runtime supports no threads so just return a default thread.
 		response.body = {
 			threads: [
 				new Thread(DebugSession.THREAD_ID, "thread 1")
 			]
 		};
+		this.logResponse(response);
 		this.sendResponse(response);
 	}
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-		console.log('stackTraceRequest');
+		this.logRequest(response);
 
 		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
@@ -274,35 +283,38 @@ export class DebugSession extends LoggingDebugSession {
 			totalFrames: stack['frames'].length
 		};
 
+		this.logResponse(response);
 		this.sendResponse(response);
 	}
 
 
 
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
-		console.log('scopesRequest');
+		this.logRequest(response);
 		const scopes = this._runtime.getScopes(args.frameId);
 
 		response.body = {
 			scopes: scopes
 		};
-		this.sendResponse(response)
+		this.logResponse(response);
+		this.sendResponse(response);
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
-		console.log('request: variablesRequest');
+		this.logRequest(response);
 
 		const variables = await this._runtime.getVariables(args.variablesReference);
 
+		
 		response.body = {
 			variables: variables
 		};
-		console.log('response: variablesResponse')
+		this.logResponse(response);
 		this.sendResponse(response);
 	}
 
     protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
-		console.log('exceptionInfoRequest')
+		this.logRequest(response);
 		const details: DebugProtocol.ExceptionDetails = {
 			/** Message contained in the exception. */
 			message: 'messageasdf',
@@ -328,11 +340,14 @@ export class DebugSession extends LoggingDebugSession {
             // details: details
 		}
 
+		this.logResponse(response);
 		this.sendResponse(response);
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
+		this.logRequest(response);
 		this._runtime.continue();
+		this.logResponse(response);
 		this.sendResponse(response);
 	}
 
@@ -342,12 +357,14 @@ export class DebugSession extends LoggingDebugSession {
  	}
 
 	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
-		await this._runtime.step();
+		this.logRequest(response);
+		this.logResponse(response);
 		this.sendResponse(response);
+		this._runtime.step();
 	}
 
 	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments) {
-		await this._runtime.stepIn();
+		// await this._runtime.stepIn();
 		this.sendResponse(response);
 	}
 

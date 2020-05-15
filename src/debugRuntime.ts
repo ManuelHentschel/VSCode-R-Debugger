@@ -51,6 +51,8 @@ export class DebugRuntime extends EventEmitter {
 	private isRunningMain: boolean = false;
 	private isPaused: boolean = false;
 	private isCrashed: boolean = false;
+	private isBusy: boolean = false;
+	private commandQueue: string[] = [];
 
 	private showUser: boolean = false;
 
@@ -66,6 +68,9 @@ export class DebugRuntime extends EventEmitter {
 	private stack: any = undefined;
 	private requestId = 0;
 	private messageId = 0;
+	private lastStackId = 0;
+
+	private zeroCounter: number = 0;
 
 	private variables: Record<number, DebugProtocol.Variable[]> = {};
 
@@ -74,7 +79,7 @@ export class DebugRuntime extends EventEmitter {
 	// are passed to RegExp() -> need to be escaped 'twice'
 	readonly delimiter0 = '<v\\\\s\\\\c>';
 	readonly delimiter1 = '</v\\\\s\\\c>';
-	readonly rprompt = '<#>';
+	readonly rprompt = '<#v\\\\s\\\\c>';
 
 	constructor() {
 		super();
@@ -208,7 +213,7 @@ export class DebugRuntime extends EventEmitter {
 				line = line.replace(debugRegex, '');
 			}
 
-			tmpRegex = /Browse\[\d+\]> /;
+			tmpRegex = /Browse\[\d+\]>/;
 			if(tmpRegex.test(line)){
 				// R has entered the browser (usually caused by a breakpoint)
 				if(!this.isPaused){
@@ -217,6 +222,8 @@ export class DebugRuntime extends EventEmitter {
 				line = line.replace(tmpRegex,'');
 				showLine = false;
 				this.stdoutIsBrowserInfo = false;
+				console.log('shows prompt');
+				this.rSession.showsPrompt();
 			} 
 			if(/Called from: (.*)\n/.test(line)){
 				// part of browser-info
@@ -250,7 +257,7 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
-			if(/Enter a frame number, or 0 to exit/.exec(line)){
+			if(/^Enter a frame number, or 0 to exit$/.exec(line)){
 				if(this.isCrashed){
 					this.terminate()
 				}
@@ -279,7 +286,7 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 				line = '';
 			}
-			if(this.isRunningMain && promptRegex.test(line)){
+			if(this.isRunningMain && promptRegex.test(line) && isFullLine){
 				console.log("matches: <#> (End)");
 				this.sendEvent('end')
 				showLine = false;
@@ -304,12 +311,22 @@ export class DebugRuntime extends EventEmitter {
 		if(id > this.messageId){
 			this.messageId = id;
 		}
+		if(id === 0){
+			this.zeroCounter++;
+		} else{
+			this.zeroCounter = 0;
+		}
+		if(this.zeroCounter > 1){
+			console.log('warning: many 0 messages!')
+			this.zeroCounter = 0;
+		}
 		switch(message){
 			case 'breakpoint':
 				this.stdoutIsBrowserInfo = true;
 				// this.step();
 				this.rSession.runCommand('n');
-				await this.requestInfoFromR();
+				this.requestInfoFromR();
+				await this.waitForMessages();
 				this.sendEvent('stopOnBreakpoint');
 				break;
 			case 'end':
@@ -318,12 +335,14 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'go':
 				this.isRunningMain = true;
+				// this.rSession.useQueue = true;
 				break;
 			case 'ls':
 				this.scopes = body;
 				break;
 			case 'stack':
-				this.updateStack(body)
+				this.lastStackId = id;
+				this.updateStack(body);
 				// for error:
 				// this.stack['frames'] = this.stack['frames'].slice(3)
 				// for(var i = 0; i<this.stack['frames'].length; i++){
@@ -332,7 +351,9 @@ export class DebugRuntime extends EventEmitter {
 				//
 				break;
 			case 'variables':
-				this.updateVariables(body)
+				if(id >= this.lastStackId){
+					this.updateVariables(body);
+				}
 				break;
 			case 'eval':
 				const result = body;
@@ -372,6 +393,7 @@ export class DebugRuntime extends EventEmitter {
 			}
 		} catch(error){}
 		this.stack = stack
+		this.variables = {};
 		this.updateVariables(stack['varLists']);
 	}
 
@@ -419,6 +441,7 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.runCommand('Q');
 			this.terminate();
 		} else {
+			await this.waitForMessages();
 			this.rSession.runCommand('n');
 			this.requestInfoFromR();
 			await this.waitForMessages();
@@ -432,6 +455,7 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.runCommand('Q');
 			this.terminate();
 		} else {
+			await this.waitForMessages();
 			this.rSession.runCommand('s');
 			this.requestInfoFromR();
 			await this.waitForMessages();
@@ -440,11 +464,12 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// execute rest of function:
-	public stepOut(reverse = false, event = 'stopOnStep') {
+	public async stepOut(reverse = false, event = 'stopOnStep') {
 		if(this.isCrashed){
 			this.rSession.runCommand('Q');
 			this.terminate();
 		} else {
+			await this.waitForMessages();
 			this.rSession.runCommand('f');
 			this.requestInfoFromR();
 			this.sendEvent(event);
@@ -471,8 +496,8 @@ export class DebugRuntime extends EventEmitter {
 
 	// public async getVariables(scope: string) {
 	public async getVariables(varRef: number) {
+
 		// await this.waitForMessages();
-		await this.waitForMessages();
 		if(this.variables[varRef]){
 			return this.variables[varRef];
 		} else{
@@ -580,12 +605,12 @@ export class DebugRuntime extends EventEmitter {
 
 	public cancel(): void {
 		// this.cp.kill();
-		this.rSession.cp.kill();
+		this.rSession.killChildProcess();
 	}
 
 	public terminate(): void {
 		// this.cp.kill();
-		this.rSession.cp.kill();
+		this.rSession.killChildProcess();
 		this.sendEvent('end');
 	}
 

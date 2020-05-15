@@ -1,13 +1,22 @@
 
 
 import * as child from 'child_process';
+import * as fs from 'fs';
 
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
+    public isBusy: boolean = false;
+    public cmdQueue: string[] = [];
+    public useQueue: boolean = false;
+    public logStream: fs.WriteStream;
 
     constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[]) {
         // spawn new terminal process (necessary for interactive R session)
         this.cp = spawnChildProcess(terminalPath, cwd)
+
+        this.logStream = fs.createWriteStream('~/log.txt');
+        this.logStream.writable;
+        // this.cp.stdout.pipe(logStream)
 
         // start R in terminal process
         this.runCommand(rPath, rArgs)
@@ -15,7 +24,7 @@ export class RSession {
 
     public runCommand(cmd: string, args: (string|number)[]=[]){
         // remove trailing newline
-		if(cmd.slice(-1) === '\n'){
+		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
         }
 
@@ -27,8 +36,27 @@ export class RSession {
         }
 
         // execute and log command
-		this.cp.stdin.write(cmd);
-		console.log('stdin:\n' + cmd.trim());
+        if(cmd.length === 0){
+            console.log('WARNING: 0 length R-command!');
+        }
+
+        if(this.useQueue && this.isBusy){
+            this.cmdQueue.unshift(cmd)
+        } else{
+            this.isBusy = true;
+            this.cp.stdin.write(cmd);
+            this.logStream.write(cmd);
+            console.log('stdin:\n' + cmd.trim());
+        }
+
+    }
+    public showsPrompt(){
+        this.isBusy = false;
+        if(this.cmdQueue.length>0){
+            const cmd = this.cmdQueue.pop();
+            this.runCommand(cmd)
+            this.isBusy = true;
+        }
     }
     public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number)})=[]){
         // if necessary, convert args form object-form to array, save to args2 to have a unamibuous data type
@@ -43,6 +71,9 @@ export class RSession {
         // construct and execute function-call
         const cmd = fnc + '(' + args2.join(',') + ')';
         this.runCommand(cmd);
+    }
+    public killChildProcess(){
+        this.cp.kill('SIGKILL');
     }
 }
 
