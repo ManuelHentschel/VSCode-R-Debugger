@@ -2,6 +2,7 @@
 
 import * as child from 'child_process';
 import * as fs from 'fs';
+import { trimLastNewline } from 'vscode-debugadapter/lib/logger';
 
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
@@ -22,7 +23,7 @@ export class RSession {
         this.runCommand(rPath, rArgs)
     }
 
-    public runCommand(cmd: string, args: (string|number)[]=[]){
+    public runCommand(cmd: string, args: (string|number)[]=[], force=false){
         // remove trailing newline
 		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
@@ -40,8 +41,9 @@ export class RSession {
             console.log('WARNING: 0 length R-command!');
         }
 
-        if(this.useQueue && this.isBusy){
-            this.cmdQueue.unshift(cmd)
+        if(!force && this.useQueue && this.isBusy){
+            this.cmdQueue.unshift(cmd);
+            console.log('rSession: stored command "' + cmd.trim() + '" to position ' + this.cmdQueue.length);
         } else{
             this.isBusy = true;
             this.cp.stdin.write(cmd);
@@ -51,11 +53,13 @@ export class RSession {
 
     }
     public showsPrompt(){
-        this.isBusy = false;
         if(this.cmdQueue.length>0){
-            const cmd = this.cmdQueue.pop();
-            this.runCommand(cmd)
             this.isBusy = true;
+            const cmd = this.cmdQueue.pop();
+            console.log('rSession: calling from list: "' + cmd.trim() + '"');
+            this.runCommand(cmd, [], true);
+        } else{
+            this.isBusy = false;
         }
     }
     public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number)})=[]){
