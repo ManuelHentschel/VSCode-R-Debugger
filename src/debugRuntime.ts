@@ -69,6 +69,7 @@ export class DebugRuntime extends EventEmitter {
 	private requestId = 0;
 	private messageId = 0;
 	private lastStackId = 0;
+	private sendEventOnStack: string = '';
 
 	private zeroCounter: number = 0;
 
@@ -214,7 +215,7 @@ export class DebugRuntime extends EventEmitter {
 				line = line.replace(debugRegex, '');
 			}
 
-			tmpRegex = /Browse\[\d+\]>/;
+			tmpRegex = /Browse\[\d+\]> /;
 			if(tmpRegex.test(line)){
 				// R has entered the browser (usually caused by a breakpoint)
 				if(!this.isPaused){
@@ -258,7 +259,7 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
-			if(/^Enter a frame number, or 0 to exit$/.exec(line)){
+			if(/^Enter a frame number, or 0 to exit\s*$/.exec(line)){
 				if(this.isCrashed){
 					this.terminate()
 				}
@@ -279,6 +280,7 @@ export class DebugRuntime extends EventEmitter {
 				// }
 			}
 			if(this.stdoutIsErrorInfo && /^Selection: $/.exec(line) && !isFullLine){
+				this.rSession.isBusy = false;
 				this.stdoutIsErrorInfo = false;
 				this.stdoutIsBrowserInfo = true;
 				this.rSession.runCommand(String(this.stdoutErrorFrameNumber));
@@ -328,7 +330,8 @@ export class DebugRuntime extends EventEmitter {
 				this.rSession.runCommand('n');
 				this.requestInfoFromR();
 				// await this.waitForMessages();
-				this.sendEvent('stopOnBreakpoint');
+				// this.sendEvent('stopOnBreakpoint');
+				this.sendEventOnStack = 'stopOnBreakpoint';
 				break;
 			case 'end':
 				this.isRunningMain = false;
@@ -344,6 +347,10 @@ export class DebugRuntime extends EventEmitter {
 			case 'stack':
 				this.lastStackId = id;
 				this.updateStack(body);
+				if(this.sendEventOnStack){
+					this.sendEvent(this.sendEventOnStack);
+					this.sendEventOnStack = '';
+				}
 				// for error:
 				// this.stack['frames'] = this.stack['frames'].slice(3)
 				// for(var i = 0; i<this.stack['frames'].length; i++){
@@ -611,6 +618,7 @@ export class DebugRuntime extends EventEmitter {
 
 	public terminate(): void {
 		// this.cp.kill();
+		this.rSession.runCommand('Q')
 		this.rSession.killChildProcess();
 		this.sendEvent('end');
 	}

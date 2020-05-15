@@ -384,9 +384,6 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
-
-
-
 		this.sendResponse(response);
 	}
 
@@ -410,44 +407,13 @@ export class DebugSession extends LoggingDebugSession {
 		this.sendResponse(response);
 	}
 
-	protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments): void {
-
-		response.body = {
-			targets: [
-				{
-					label: "item 10",
-					sortText: "10"
-				},
-				{
-					label: "item 1",
-					sortText: "01"
-				},
-				{
-					label: "item 2",
-					sortText: "02"
-				},
-				{
-					label: "array[]",
-					selectionStart: 6,
-					sortText: "03"
-				},
-				{
-					label: "func(arg)",
-					selectionStart: 5,
-					selectionLength: 3,
-					sortText: "04"
-				}
-			]
-		};
-		this.sendResponse(response);
-	}
 
 	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
-		this._runtime.cancel();
+		this._runtime.terminate();
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
-		this._runtime.cancel();
+		this._runtime.terminate();
 	}
 
 	protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments) {
@@ -457,12 +423,6 @@ export class DebugSession extends LoggingDebugSession {
 		if (args.progressId) {
 			this._cancelledProgressId= args.progressId;
 		}
-		this._runtime.cancel();
-	}
-
-	//---- helpers
-
-	private createSource(filePath: string): Source {
-		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'r-adapter-data');
+		this._runtime.terminate();
 	}
 }
