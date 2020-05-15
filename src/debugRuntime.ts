@@ -198,6 +198,7 @@ export class DebugRuntime extends EventEmitter {
 	private async handleLine(line: string, fromStderr = false, isFullLine = true) {
 		// handles output-lines from R child process
 		// if(this.isRunningMain) {
+			console.log('handle: ' + line)
 			var matches: any;
 			// onlye show the line to the user if it is complete & relevant
 			var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningMain;
@@ -326,7 +327,7 @@ export class DebugRuntime extends EventEmitter {
 				// this.step();
 				this.rSession.runCommand('n');
 				this.requestInfoFromR();
-				await this.waitForMessages();
+				// await this.waitForMessages();
 				this.sendEvent('stopOnBreakpoint');
 				break;
 			case 'end':
@@ -335,7 +336,7 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'go':
 				this.isRunningMain = true;
-				// this.rSession.useQueue = true;
+				this.rSession.useQueue = true;
 				break;
 			case 'ls':
 				this.scopes = body;
