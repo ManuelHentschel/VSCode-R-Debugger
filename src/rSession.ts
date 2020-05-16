@@ -3,7 +3,7 @@
 import * as child from 'child_process';
 import * as fs from 'fs';
 import { trimLastNewline } from 'vscode-debugadapter/lib/logger';
-import { isUndefined } from 'util';
+import { isUndefined, isBoolean } from 'util';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -59,12 +59,15 @@ export class RSession {
                 await timeout(this.waitBetweenCommands);
             }
             this.cp.stdin.write(cmd);
-            this.logStream.write(cmd);
             if(this.logLevel>=3){
                 console.log('cp.stdin:\n' + cmd.trim());
             }
         }
 
+    }
+
+    public clearQueue(){
+        this.cmdQueue = [];
     }
 
     // Call this function to indicate that the previous command is done and the R-Process idle:
@@ -80,14 +83,22 @@ export class RSession {
     }
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number)})=[]){
+    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[]){
         // if necessary, convert args form object-form to array, save to args2 to have a unamibuous data type
         var args2: (string|number)[] = [];
         if(Array.isArray(args)){
             args2 = args;
         } else {
-            for(const arg in args){
-                args2.push(arg + '=' + args[arg]);
+            for(var arg in args){
+                var value = args[arg]
+                if(isBoolean(value)){
+                    if(value){
+                        value = 'TRUE'
+                    } else{
+                        value = 'FALSE'
+                    }
+                }
+                args2.push(arg + '=' + value);
             }
         }
         // construct and execute function-call

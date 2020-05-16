@@ -58,8 +58,6 @@ export class DebugRuntime extends EventEmitter {
 	private restOfStderr: string = "";
 
 	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
-	private stdoutIsErrorInfo = false; // set to true if rSession.stdout is currently giving recover()-details
-	private stdoutErrorFrameNumber = 0; // store the index of the R-stack-frame, in which an error occurred
 
 	private stack: any = undefined; //TODO specify type!
 	private requestId = 0; // id of the last function call made to R (not all function calls need to be numbered)
@@ -257,36 +255,6 @@ export class DebugRuntime extends EventEmitter {
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
 			}
-			if(/^Enter a frame number, or 0 to exit\s*$/.exec(line)){
-				if(this.isCrashed){
-					this.terminate()
-				}
-				showLine = false
-				this.isCrashed = true;
-				this.stdoutIsErrorInfo = true;
-			}
-			matches = /^(\d+): (.*)$/.exec(line);
-			if(this.stdoutIsErrorInfo && matches){
-				showLine = false;
-				// matches = /^(\d+): (.*)#(\d+): .*/.exec(line);
-				// if(matches){
-					this.stdoutErrorFrameNumber = matches[1]
-				// } else {
-					// if(matches){
-						// this.stdoutErrorFrameNumber = matches[1]
-					// }
-				// }
-			}
-			if(this.stdoutIsErrorInfo && /^Selection: $/.exec(line) && !isFullLine){
-				this.rSession.isBusy = false;
-				this.stdoutIsErrorInfo = false;
-				this.stdoutIsBrowserInfo = true;
-				this.rSession.runCommand(String(this.stdoutErrorFrameNumber));
-				await this.requestInfoFromR({'isError': 1});
-				this.sendEvent('stopOnException');
-				showLine = false;
-				line = '';
-			}
 			if(this.isRunningMain && promptRegex.test(line) && isFullLine){
 				console.log("matches: <#> (End)");
 				this.sendEvent('end')
@@ -330,6 +298,11 @@ export class DebugRuntime extends EventEmitter {
 				// await this.waitForMessages();
 				// this.sendEvent('stopOnBreakpoint');
 				this.sendEventOnStack = 'stopOnBreakpoint';
+				break;
+			case 'error':
+				this.stdoutIsBrowserInfo = true;
+				this.requestInfoFromR({isError: true});
+				this.sendEventOnStack = 'stopOnException';
 				break;
 			case 'end':
 				this.isRunningMain = false;
@@ -606,9 +579,10 @@ export class DebugRuntime extends EventEmitter {
 		// this._breakAddresses.clear();
 	}
 
-	public cancel(): void {
+	public killR(): void {
 		// this.cp.kill();
 		this.rSession.killChildProcess();
+		this.sendEvent('end');
 	}
 
 	public terminate(): void {
