@@ -6,6 +6,7 @@
 import { EventEmitter } from 'events';
 // import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
+import { workspace } from 'vscode';
 import {getRPath, getTerminalPath } from "./utils";
 import { TextDecoder, isUndefined } from 'util';
 
@@ -26,14 +27,11 @@ export interface DebugBreakpoint {
 export class DebugRuntime extends EventEmitter {
 
 	// the initial file we are 'debugging'
-	private _sourceFile!: string;
-	public get sourceFile() {
-		return this._sourceFile;
-	}
+	private sourceFile: string;
 
 	// This is the next line that will be 'executed'
-	private _currentLine = 0;
-	private _currentFile = this._sourceFile;
+	private currentLine = 0;
+	private currentFile = this.sourceFile;
 
 	// maps from sourceFile to array of breakpoints
 	private _breakPoints = new Map<string, DebugBreakpoint[]>();
@@ -42,19 +40,18 @@ export class DebugRuntime extends EventEmitter {
 	// so that the frontend can match events with breakpoints.
 	private _breakpointId = 1;
 
-	private _breakAddresses = new Set<string>();
 
 	private cp!: child.ChildProcessWithoutNullStreams;
 	private rSession!: RSession;
 
-	private hasStartedMain: boolean = false;
 	private isRunningMain: boolean = false;
 	private isPaused: boolean = false;
 	private isCrashed: boolean = false;
-	private isBusy: boolean = false;
-	private commandQueue: string[] = [];
+	private useRCommandQueue: boolean = true;
+	private waitBetweenRCommands: number = 0;
 
-	private showUser: boolean = false;
+	// debugging
+	private logLevel = 3;
 
 	// used to store text if only part of a line is read form cp.stdout/cp.sterr
 	private restOfStdout: string = "";
@@ -62,22 +59,22 @@ export class DebugRuntime extends EventEmitter {
 
 	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
 	private stdoutIsErrorInfo = false; // set to true if rSession.stdout is currently giving recover()-details
-	private stdoutErrorFrameNumber = 0;
+	private stdoutErrorFrameNumber = 0; // store the index of the R-stack-frame, in which an error occurred
 
-	private scopes: any = undefined;
-	private stack: any = undefined;
-	private requestId = 0;
-	private messageId = 0;
-	private lastStackId = 0;
-	private sendEventOnStack: string = '';
+	private stack: any = undefined; //TODO specify type!
+	private requestId = 0; // id of the last function call made to R (not all function calls need to be numbered)
+	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
+	private lastStackId = 0; // id of the last stack-message received from R
+	private sendEventOnStack: string = ''; // send this event upon receiving the next Stack-message
 
-	private zeroCounter: number = 0;
+	private zeroCounter: number = 0; // counts the number of message-ids = 0 in a row (used for debugging)
 
 	private variables: Record<number, DebugProtocol.Variable[]> = {};
 
 	// delimiters used when printing info from R which is meant for the debugger
 	// need to occurr on the same line!
 	// are passed to RegExp() -> need to be escaped 'twice'
+	// need to match those used in the R-package
 	readonly delimiter0 = '<v\\\\s\\\\c>';
 	readonly delimiter1 = '</v\\\\s\\\c>';
 	readonly rprompt = '<#v\\\\s\\\\c>';
@@ -90,7 +87,12 @@ export class DebugRuntime extends EventEmitter {
 	 * Start executing the given program.
 	 */
 	public async start(program: string, stopOnEntry: boolean) {
-		this._sourceFile = program;
+		this.sourceFile = program;
+		
+		// read settings from vsc-settings
+		const config = workspace.getConfiguration('rdebugger');
+		this.useRCommandQueue = config.get<boolean>('useRCommandQueue', true);
+		this.waitBetweenRCommands = config.get<number>('waitBetweenRCommands', 0);
 
 		// print some info about the rSession
 		this.sendEvent('output', 'startCollapsed: Starting R session...');
@@ -100,19 +102,15 @@ export class DebugRuntime extends EventEmitter {
 		this.isRunningMain = false;
 		
 		// start R
-		// const Rpath = '"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe"';
 		const terminalPath = getTerminalPath();
 		const rPath = getRPath();
 		const cwd = path.dirname(program);
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
 		this.rSession = new RSession(terminalPath, rPath, cwd, rArgs);
+		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 
 
 		// load helper functions etc.
-		// const fileNamePrep = "prep.R"
-		// const fileNamePrep = vscode.workspace.getConfiguration().get<string>('rdebugger.prep.r','');
-		// const fileNamePrep = this.prepRPath;
-		// this.rSession.callFunction('source', [toRStringLiteral(fileNamePrep)]);
 		const packageName = 'vscDebugger'
 		this.rSession.callFunction('library', [packageName])
 
@@ -251,10 +249,10 @@ export class DebugRuntime extends EventEmitter {
 			matches = /^debug at (.*)#(\d+): .*$/.exec(line);
 			if(matches){
 				// is info given by browser()
-				this._currentFile = matches[1];
-				this._currentLine = parseInt(matches[2]);
+				this.currentFile = matches[1];
+				this.currentLine = parseInt(matches[2]);
 				try {
-					this.stack['frames'][0]['line'] = this._currentLine;
+					this.stack['frames'][0]['line'] = this.currentLine;
 				} catch(error){}
 				showLine = false;
 				this.stdoutIsBrowserInfo = true;
@@ -339,10 +337,7 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'go':
 				this.isRunningMain = true;
-				this.rSession.useQueue = true;
-				break;
-			case 'ls':
-				this.scopes = body;
+				this.rSession.useQueue = this.useRCommandQueue;
 				break;
 			case 'stack':
 				this.lastStackId = id;
@@ -397,7 +392,7 @@ export class DebugRuntime extends EventEmitter {
 	private updateStack(stack: any[]){
 		try {
 			if(stack['frames'][0]['line'] === 0){
-				stack['frames'][0]['line'] = this._currentLine;
+				stack['frames'][0]['line'] = this.currentLine;
 			}
 		} catch(error){}
 		this.stack = stack
@@ -539,8 +534,8 @@ export class DebugRuntime extends EventEmitter {
 			frames.push({
 				index: i,
 				name: `${name}(${i})`,
-				file: this._sourceFile,
-				line: this._currentLine
+				file: this.sourceFile,
+				line: this.currentLine
 			});
 		}
 		return {

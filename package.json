@@ -115,6 +115,16 @@
           "type": "string",
           "default": "/usr/bin/R",
           "description": "R path for Linux"
+        },
+        "rdebugger.useRCommandQueue": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to queue R commands and send them only if the R-process is idle"
+        },
+        "rdebugger.waitBetweenRCommands": {
+          "type": "integer",
+          "default": 0,
+          "description": "The time (in ms) to wait between R commands"
         }
       }
     }

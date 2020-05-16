@@ -58,6 +58,8 @@ export class DebugSession extends LoggingDebugSession {
 
 	private _evalResponse!: DebugProtocol.EvaluateResponse;
 
+	private _logLevel = 3;
+
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
 	 * We configure the default implementation of a debug adapter here.
@@ -133,7 +135,7 @@ export class DebugSession extends LoggingDebugSession {
 			} else {
 				response.success = false;
 			}
-			this.sendResponse(response);
+			this.logAndSendResponse(response);
 		});
 	}
 
@@ -175,7 +177,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body.supportsExceptionInfoRequest = true;
         response.body.supportsExceptionOptions = true;
 
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 
 		// since this debug adapter can accept configuration requests like 'setBreakpoint' at any time,
 		// we request them early by sending an 'initializeRequest' to the frontend.
@@ -184,10 +186,18 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	private logRequest(response: DebugProtocol.Response){
-		console.log('request ' + response.request_seq + ': ' + response.command)
+		if(this._logLevel>=3){
+			console.log('request ' + response.request_seq + ': ' + response.command);
+		}
 	}
 	private logResponse(response: DebugProtocol.Response){
-		console.log('response ' + response.request_seq + ': ' + response.command)
+		if(this._logLevel>=3){
+			console.log('response ' + response.request_seq + ': ' + response.command);
+		}
+	}
+	private logAndSendResponse(response: DebugProtocol.Response){
+		this.logResponse(response);
+		this.sendResponse(response);
 	}
 
 	/**
@@ -212,7 +222,7 @@ export class DebugSession extends LoggingDebugSession {
 		// start the program in the runtime
 		this._runtime.start(args.program, !!args.stopOnEntry);
 
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
@@ -235,7 +245,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			breakpoints: actualBreakpoints
 		};
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
@@ -255,7 +265,7 @@ export class DebugSession extends LoggingDebugSession {
 				breakpoints: []
 			};
 		}
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
@@ -266,8 +276,7 @@ export class DebugSession extends LoggingDebugSession {
 				new Thread(DebugSession.THREAD_ID, "thread 1")
 			]
 		};
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
@@ -283,8 +292,7 @@ export class DebugSession extends LoggingDebugSession {
 			totalFrames: stack['frames'].length
 		};
 
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 
@@ -296,8 +304,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			scopes: scopes
 		};
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
@@ -309,8 +316,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			variables: variables
 		};
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
     protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
@@ -340,42 +346,39 @@ export class DebugSession extends LoggingDebugSession {
             // details: details
 		}
 
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
 		this.logRequest(response);
 		this._runtime.continue();
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments) : void {
 		this._runtime.continue(true);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
  	}
 
 	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
 		this.logRequest(response);
-		this.logResponse(response);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 		this._runtime.step();
 	}
 
 	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments) {
 		// await this._runtime.stepIn();
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): void {
 		this._runtime.stepOut();
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments): void {
 		this._runtime.step(true);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
@@ -384,7 +387,7 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected setDataBreakpointsRequest(response: DebugProtocol.SetDataBreakpointsResponse, args: DebugProtocol.SetDataBreakpointsArguments): void {
@@ -404,7 +407,7 @@ export class DebugSession extends LoggingDebugSession {
 			});
 		}
 
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 

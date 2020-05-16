@@ -3,27 +3,38 @@
 import * as child from 'child_process';
 import * as fs from 'fs';
 import { trimLastNewline } from 'vscode-debugadapter/lib/logger';
+import { isUndefined } from 'util';
 
+function timeout(ms: number) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
     public isBusy: boolean = false;
-    public cmdQueue: string[] = [];
     public useQueue: boolean = false;
-    public logStream: fs.WriteStream;
+    public cmdQueue: string[] = [];
+    public readonly logStream: fs.WriteStream;
+    public logLevel: number = 3;
+    public readonly logLevelCP: number = 4;
+    public waitBetweenCommands: number = 0;
 
-    constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[]) {
+    constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[], logLevel=undefined, logLevelCP=undefined) {
         // spawn new terminal process (necessary for interactive R session)
-        this.cp = spawnChildProcess(terminalPath, cwd)
 
-        this.logStream = fs.createWriteStream('~/log.txt');
-        this.logStream.writable;
-        // this.cp.stdout.pipe(logStream)
+        if(!logLevel === undefined){
+            this.logLevel = logLevel;
+        }
+        if(!logLevelCP === undefined){
+            this.logLevelCP = logLevelCP;
+        }
+
+        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP)
 
         // start R in terminal process
         this.runCommand(rPath, rArgs)
     }
 
-    public runCommand(cmd: string, args: (string|number)[]=[], force=false){
+    public async runCommand(cmd: string, args: (string|number)[]=[], force=false){
         // remove trailing newline
 		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
@@ -36,32 +47,39 @@ export class RSession {
             cmd = cmd + '\n';
         }
 
-        // execute and log command
-        if(cmd.length === 0){
-            console.log('WARNING: 0 length R-command!');
-        }
-
+        // execute command or add to command queue
         if(!force && this.useQueue && this.isBusy){
-            this.cmdQueue.unshift(cmd);
-            console.log('rSession: stored command "' + cmd.trim() + '" to position ' + this.cmdQueue.length);
+            this.cmdQueue.push(cmd);
+            if(this.logLevel>=3){
+                console.log('rSession: stored command "' + cmd.trim() + '" to position ' + this.cmdQueue.length);
+            }
         } else{
             this.isBusy = true;
+            if(this.waitBetweenCommands>0){
+                await timeout(this.waitBetweenCommands);
+            }
             this.cp.stdin.write(cmd);
             this.logStream.write(cmd);
-            console.log('stdin:\n' + cmd.trim());
+            if(this.logLevel>=3){
+                console.log('cp.stdin:\n' + cmd.trim());
+            }
         }
 
     }
+
+    // Call this function to indicate that the previous command is done and the R-Process idle:
     public showsPrompt(){
         if(this.cmdQueue.length>0){
             this.isBusy = true;
-            const cmd = this.cmdQueue.pop();
+            const cmd = this.cmdQueue.shift();
             console.log('rSession: calling from list: "' + cmd.trim() + '"');
             this.runCommand(cmd, [], true);
         } else{
             this.isBusy = false;
         }
     }
+
+    // Call an R-function (constructs and calls the command)
     public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number)})=[]){
         // if necessary, convert args form object-form to array, save to args2 to have a unamibuous data type
         var args2: (string|number)[] = [];
@@ -76,6 +94,8 @@ export class RSession {
         const cmd = fnc + '(' + args2.join(',') + ')';
         this.runCommand(cmd);
     }
+
+    // Kill the child process
     public killChildProcess(){
         this.cp.kill('SIGKILL');
     }
@@ -84,33 +104,33 @@ export class RSession {
 
 
 
-
-function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=[]) {
+function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=[], logLevel=3){
     const options = {
         cwd: cwd
     };
-    // const cmdTerminal = getRpath()
-    // const cmdArgs = ['--no-save', '--quiet', '--interactive']
     const cp = child.spawn(terminalPath, cmdArgs, options);
-    // const Rpath = '"C:\\Program Files\\R\\R-3.6.1\\bin\\R.exe"';
-    // const cp = child.spawn(Rpath, ['--no-save', '--interactive'], options)
-    // console.log("Spawned Process with PID: " + cp.pid);
-    // const cp = child.spawn("cmd", ['/K', 'Rterminal', '--no-save']);
-
 
     // log output to console.log:
-    cp.stdout.on("data", data => {
-        console.log('stdout:\n' + data);
-    });
-    cp.stderr.on("data", data => {
-        console.warn('stderr:\n' + data);
-    });
-    cp.on("error", (error) => {
-        console.log('error:\n' + error.message);
-    });
-    cp.on("close", code => {
-        console.log('Child process exited with code: ' + code);
-    });
+    if(logLevel>=4){
+        cp.stdout.on("data", data => {
+            console.log('cp.stdout:\n' + data);
+        });
+    }
+    if(logLevel>=3){
+        cp.stderr.on("data", data => {
+            console.warn('cp.stderr:\n' + data);
+        });
+    }
+    if(logLevel>=2){
+        cp.on("close", code => {
+            console.log('Child process exited with code: ' + code);
+        });
+    }
+    if(logLevel>=1){
+        cp.on("error", (error) => {
+            console.log('cp.error:\n' + error.message);
+        });
+    }
     return cp;
 }
 
