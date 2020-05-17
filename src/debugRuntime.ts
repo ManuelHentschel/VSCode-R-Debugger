@@ -598,6 +598,10 @@ export class DebugRuntime extends EventEmitter {
 		this.sendEvent('end');
 	}
 
+	public cancel(): void {
+		this.rSession.clearQueue();
+	}
+
 
 	/**
 	 * Run through the file.

@@ -15,7 +15,7 @@ export class RSession {
     public cmdQueue: string[] = [];
     public readonly logStream: fs.WriteStream;
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 4;
+    public readonly logLevelCP: number = 3;
     public waitBetweenCommands: number = 0;
 
     constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[], logLevel=undefined, logLevelCP=undefined) {

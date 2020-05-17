@@ -417,19 +417,16 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
 		this._runtime.terminate();
+		// no response to be sent (?)
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
 		this._runtime.terminate();
+		// no response to be sent (?)
 	}
 
 	protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments) {
-		if (args.requestId) {
-			this._cancelationTokens.set(args.requestId, true);
-		}
-		if (args.progressId) {
-			this._cancelledProgressId= args.progressId;
-		}
-		// this._runtime.terminate();
+		this._runtime.cancel();
+		this.logAndSendResponse(response);
 	}
 }
