@@ -132,8 +132,12 @@ export class DebugRuntime extends EventEmitter {
 
 		// call main()
 		// TODO: replace runMain() with direct main() call?
-		this.rSession.callFunction('.vsc.runMain');
-		this.sendEvent('output', 'end: ');
+		const options = {
+			overwritePrint: config.get<boolean>('overwritePrint', false),
+			overwriteCat: config.get<boolean>('overwriteCat', false)
+		}
+		this.rSession.callFunction('.vsc.runMain', options);
+		this.sendEvent('output', 'end: '); // end info group
 	}
 
 	private writeOutput(text: any, addNewline = false, toStderr = false, filePath = '', line = 1){
@@ -581,14 +585,16 @@ export class DebugRuntime extends EventEmitter {
 
 	public killR(): void {
 		// this.cp.kill();
+		this.rSession.clearQueue();
 		this.rSession.killChildProcess();
-		this.sendEvent('end');
+		// this.sendEvent('end');
 	}
 
 	public terminate(): void {
 		// this.cp.kill();
-		this.rSession.runCommand('Q')
-		this.rSession.killChildProcess();
+		this.rSession.clearQueue();
+		this.rSession.runCommand('Q', [], true);
+		// this.rSession.killChildProcess();
 		this.sendEvent('end');
 	}
 

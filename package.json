@@ -125,6 +125,16 @@
           "type": "integer",
           "default": 0,
           "description": "The time (in ms) to wait between R commands"
+        },
+        "rdebugger.overwritePrint": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to write a new print() function to .GlobalEnv (base::print is not affected)"
+        },
+        "rdebugger.overwriteCat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to write a new cat() function to .GlobalEnv (base::cat is not affected)"
         }
       }
     }

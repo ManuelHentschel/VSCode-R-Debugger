@@ -175,7 +175,10 @@ export class DebugSession extends LoggingDebugSession {
 		response.body.supportsBreakpointLocationsRequest = true;
 
 		response.body.supportsExceptionInfoRequest = true;
-        response.body.supportsExceptionOptions = true;
+		response.body.supportsExceptionOptions = true;
+		
+		// enable saving variables to clipboard
+		response.body.supportsClipboardContext = true;
 
 		this.logAndSendResponse(response);
 
@@ -384,6 +387,7 @@ export class DebugSession extends LoggingDebugSession {
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
 		this._evalResponse = response;
 		this._runtime.evaluate(args.expression, args.frameId);
+		// this.logAndSendResponse(response);
 	}
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
