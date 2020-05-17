@@ -430,6 +430,6 @@ export class DebugSession extends LoggingDebugSession {
 		if (args.progressId) {
 			this._cancelledProgressId= args.progressId;
 		}
-		this._runtime.terminate();
+		// this._runtime.terminate();
 	}
 }
