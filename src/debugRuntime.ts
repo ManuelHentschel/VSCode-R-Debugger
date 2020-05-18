@@ -2,17 +2,18 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-import { readFileSync, write } from 'fs';
+// import { readFileSync, write } from 'fs';
 import { EventEmitter } from 'events';
-import { Terminal, window } from 'vscode';
+// import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
-import {ToRStringLiteral, getRPath, getTerminalPath } from "./rUtils";
+import { workspace } from 'vscode';
+import {getRPath, getTerminalPath, escapeForRegex, toRStringLiteral } from "./utils";
 import { TextDecoder, isUndefined } from 'util';
 
-import * as debugadapter from 'vscode-debugadapter';
+import { RSession } from './rSession';
+import { DebugProtocol } from 'vscode-debugprotocol';
 
-import { spawnChildProcess, createPseudoTerminal } from './pseudoTerminal';
-import * as child from 'child_process';
+
 const path = require('path');
 export interface DebugBreakpoint {
 	id: number;
@@ -22,174 +23,216 @@ export interface DebugBreakpoint {
 
 export class DebugRuntime extends EventEmitter {
 
-	// the initial file we are 'debugging'
-	private _sourceFile!: string;
-	public get sourceFile() {
-		return this._sourceFile;
-	}
+	// delimiters used when printing info from R which is meant for the debugger
+	// need to occurr on the same line!
+	// need to match those used in the R-package
+	// TODO: replace with a dedicated pipe between R and vsc?
+	readonly delimiter0 = '<v\\s\\c>';
+	readonly delimiter1 = '</v\\s\\c>';
+	readonly rprompt = '<#v\\s\\c>'; //actual prompt is followed by a newline to make easier to identify
+	readonly rStartup = '<v\\s\\c\\R\\STARTUP>'
+	readonly libraryNotFoundString = '<v\\s\\c\\LIBRARY\\NOT\\FOUND>';
+	readonly packageName = 'vscDebugger';
 
-	// the contents (= lines) of the one and only file
-	private _sourceLines!: string[];
+	// The file we are debugging
+	private sourceFile: string;
 
-	// This is the next line that will be 'executed'
-	private _currentLine = 0;
-	private _currentFile = this._sourceFile;
+	// The current line
+	private currentLine = 0;
 
 	// maps from sourceFile to array of breakpoints
-	private _breakPoints = new Map<string, DebugBreakpoint[]>();
+	// TODO: rework breakpoints entirely
+	private breakPoints = new Map<string, DebugBreakpoint[]>();
+
+	// debugging
+	private logLevel = 3;
+
+	// The rSession used to run the code
+	private rSession: RSession;
+
+	// Whether to use a queue for R commands (makes debugging slower but 'safer')
+	private useRCommandQueue: boolean = true;
+
+	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
+	private waitBetweenRCommands: number = 0;
 
 	// since we want to send breakpoint events, we will assign an id to every event
 	// so that the frontend can match events with breakpoints.
-	private _breakpointId = 1;
+	private breakpointId = 1;
 
-	private _breakAddresses = new Set<string>();
-
-	private cp!: child.ChildProcessWithoutNullStreams;
-	private pt!: vscode.Terminal;
-	private writeEmitter!: vscode.EventEmitter<string>;
-
-	private hasStartedMain: boolean = false;
-	private isRunningMain: boolean = false;
-	private isPaused: boolean = false;
-
-	private showUser: boolean = false;
+	// possible states of the R session
+	private isReady: boolean = false; // is set to true after executing the first R command successfully
+	private isRunningMain: boolean = false; // is set to true after receiving a message 'go'
+	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
+	private isCrashed: boolean = false; // is set to true upon encountering an error (in R)
+	private ignoreOutput: boolean = false; // is set to true after terminating the session
 
 	// used to store text if only part of a line is read form cp.stdout/cp.sterr
 	private restOfStdout: string = "";
 	private restOfStderr: string = "";
 
-	private stdoutIsBrowserInfo = false; // set to true if cp.stdout is currently giving browser()-details
+	// info about the R stack, variables etc.
+	private stack: any = undefined; //TODO specify type!
+	private variables: Record<number, DebugProtocol.Variable[]> = {}; // stores info about variables of the R process
+	private requestId = 0; // id of the last function call made to R (not all function calls need to be numbered)
+	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
+	private lastStackId = 0; // id of the last stack-message received from R
+	private sendEventOnStack: string = ''; // send this event upon receiving the next Stack-message
 
-	private variables: any = undefined;
-	private scopes: any = undefined;
-	private stack: any = undefined;
-	private requestId = 0;
-	private messageId = 0;
 
-	// delimiters used when printing info from R which is meant for the debugger
-	// currently need to occurr on the same line!
-	// are passed to RegExp() -> need to be escaped 'double'
-	readonly delimiter0 = '<v\\\\s\\\\c>';
-	readonly delimiter1 = '</v\\\\s\\\c>';
-	readonly rprompt = '<#>';
+	////////////////////////////////////////////////////
+	// METHODS
+	////////////////////////////////////////////////////
 
+	// constructor
 	constructor() {
 		super();
 	}
 
-	/**
-	 * Start executing the given program.
-	 */
-	public async start(program: string, stopOnEntry: boolean) {
+	// start
+	public async start(program: string) {
+		// set sourcefile
+		this.sourceFile = program;
 		
-		console.log('go!');
+		// read settings from vsc-settings
+		const config = workspace.getConfiguration('rdebugger');
+		this.useRCommandQueue = config.get<boolean>('useRCommandQueue', true);
+		this.waitBetweenRCommands = config.get<number>('waitBetweenRCommands', 0);
 
-		// //Create output channel
-		// let orange = vscode.window.createOutputChannel("Orange");
-		// //Write to output.
-		// orange.appendLine("I am a banana.");
-
-		this._sourceFile = program;
-
+		// print some info about the rSession
+		// everything following this is printed in (collapsed) group
+		// group ends by outputting 'end: '
 		this.sendEvent('output', 'startCollapsed: Starting R session...');
+		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rprompt}`);
 
-		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rprompt}`)
+		// start R in child process
+		const terminalPath = getTerminalPath(); // read OS-specific terminal path from config
+		const rPath = getRPath(); // read OS-specific R path from config
+		const cwd = path.dirname(program);
+		// essential R args: --interactive (linux) and --ess (windows) to force an interactive session:
+		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
 
-		// is set to true, once main() is called in R
-		this.isRunningMain = false;
-		
-		this.cp = spawnChildProcess(path.dirname(program));
-
-		// handles input to the R process
-		const inputHandler = (data: any) => {
-			this.cp.stdin.write(data);
-			console.log('stdin: ' + data)
+		this.sendEvent('output', 'terminalPath: ' + terminalPath + '\ncwd: ' + cwd + '\nrPath: ' + rPath + '\nrArgs: ' + rArgs.join(' '))
+		this.rSession = new RSession(terminalPath, rPath, cwd, rArgs);
+		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
+		if(!this.rSession.successTerminal){
+            vscode.window.showErrorMessage('Terminal path not valid!');
+			this.terminate();
+			return;
 		}
-
-		// writes output to the pseudoterminal
-		this.writeEmitter = new vscode.EventEmitter<string>();
-
-		// pseudoterminal shown to the user
-		this.pt = createPseudoTerminal(inputHandler, this.writeEmitter);
-		this.pt.show(false);
-
-		// start R
-		// const Rpath = '"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe"';
-		const Rpath = getRPath();
-		const cmdStartR = Rpath + " --ess --quiet --interactive --no-save\n";
-		this.runCommand(cmdStartR, true, true);
-
-		// load helper functions etc.
-		// const fileNamePrep = "prep.R"
-		const fileNamePrep = vscode.workspace.getConfiguration().get<string>('rdebugger.prep.r','prep.R');
-		const cmdSourcePrep = 'source(' + ToRStringLiteral(fileNamePrep, '"') + ')';
-		this.runCommand(cmdSourcePrep, true, true)
-
-		// source file that is being debugged
-		const cmdSourceProgram = 'source(' + ToRStringLiteral(program, '"') + ')';
-		this.runCommand(cmdSourceProgram, true, true)
-
-		// set breakpoints in R
-		this._breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
-			bps.forEach((bp: DebugBreakpoint) => {
-				var command = '.vsc.mySetBreakpoint(' + ToRStringLiteral(path, '"') + ', ' + bp.line + ')\n';
-				this.runCommand(command, true, true)
-			})
-		})
 		
 		// handle output from the R-process
-		this.cp.stdout.on("data", data => {
-			this.handleData(data);
+		this.rSession.cp.stdout.on("data", data => {
+			this.handleData(data, false);
 		});
-		this.cp.stderr.on("data", data => {
+		this.rSession.cp.stderr.on("data", data => {
 			this.handleData(data, true);
+		});
+
+		// check if R has started
+		// cat message from R
+		this.rSession.callFunction('cat', [toRStringLiteral(this.rStartup), '"\\n"']);
+
+		// set timeout
+		const ms = 1000;
+		let timeout = new Promise((resolve, reject) => {
+			let id = setTimeout(() => {
+			clearTimeout(id);
+			resolve(false)
+			}, ms)
 		})
 
-		// call main()
-		// TODO: replace runMain() with direct main() call
-		const cmdRunMain = '.vsc.runMain()';
-		// command = 'browser()'
-		this.runCommand(cmdRunMain, true, true)
-		this.sendEvent('output', 'end: ')
+		// wait for message from R (or for the timeout)
+		// the timeout resolves to false, this.waitForR() resolves to true
+		const successR = await Promise.race([timeout, this.waitForR()])
+
+		// abort if the terminal does not print the message (--> R has not started!)
+		if(!successR){
+            vscode.window.showErrorMessage('R path not valid!');
+			this.terminate();
+			return;
+		}
+
+		// load R package, wrapped in a try-catch-function
+		// missing R package will be handled by this.handleData()
+		this.sendEvent('output', 'library: ' + this.packageName);
+		const libraryCommandArgs = {
+			expr: 'base::library(' + this.packageName + ')',
+			error: 'function(e){base::cat(' + toRStringLiteral(this.libraryNotFoundString) + ',"\\n")}'
+		}
+		this.rSession.callFunction('tryCatch', libraryCommandArgs, 'base')
+
+		// source file that is being debugged
+		this.sendEvent('output', 'program: ' + program)
+		this.rSession.callFunction('source', [toRStringLiteral(program)], 'base');
+
+		// all R function calls from here on are meant for functions from the vsc-extension:
+		this.rSession.defaultLibrary = this.packageName;
+
+		// set breakpoints in R
+		this.breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
+			bps.forEach((bp: DebugBreakpoint) => {
+				this.rSession.callFunction('.vsc.mySetBreakpoint', [toRStringLiteral(path), bp.line]);
+			});
+		});
+
+
+		// call .vsc.runMain, which looks for a main() function in the .GlobalEnv
+		// in case main() is missing, it is reported by the R-package and handled by this.handleData()
+		const options = {
+			overwritePrint: config.get<boolean>('overwritePrint', false),
+			overwriteCat: config.get<boolean>('overwriteCat', false)
+		}
+		this.rSession.callFunction('.vsc.runMain', options);
+		this.sendEvent('output', 'end: '); // end info group
 	}
 
-	private runCommand(command: string, addNewline = true, logToDebugConsole = false){
-		// runs a give command in the R child process
-		// adds newline if necessary
-		if(logToDebugConsole){
-			this.sendEvent('output', command)
-		}
-		if(command.slice(-1) != '\n' && addNewline){
-			command = command + '\n'
-		}
-		this.cp.stdin.write(command);
-		console.log('stdin:\n' + command.trim());
+	// async method to wait for R to be ready
+	// needs to be raced against a timeout to avoid stalling the application
+	private async waitForR(){
+		const poll = (resolve: (boolean) => void) => {
+			if(this.isReady){
+				resolve(true);
+			} else {
+				setTimeout(_ => poll(resolve), 100);
+			}
+		};
+		return new Promise(poll);
 	}
 
-	private writeOutput(text: any, addNewline = true, toStderr = false){
-		if(text.slice(-1) != '\n' && addNewline){
-			text = text + '\n'
-		}
-		if(toStderr){
-			this.writeEmitter.fire("\x1b[31m");
-			this.writeEmitter.fire(text);
-			// this.writeEmitter.fire('\r\n');
-			this.writeEmitter.fire("\x1b[0m");
-		} else { // stdout
-			this.writeEmitter.fire(text);
-			// this.writeEmitter.fire('\r\n');
-		}
-		const category = (toStderr ? "stderr" : "stdout")
-		this.sendEvent("output", text, category)
+	// send event to the debugSession
+	private sendEvent(event: string, ... args: any[]) {
+		console.log('event:' + event);
+		setImmediate(_ => {
+			this.emit(event, ...args);
+		});
 	}
 
-	private handleData(data: any, fromStderr: boolean = false) {
+	private writeOutput(text: any, addNewline = false, toStderr = false, filePath = '', line = 1){
+		// writes output to the debug console (of the vsc instance runnning the R code)
+		if(text.slice(-1) !== '\n' && addNewline){
+			text = text + '\n';
+		}
+
+		const category = (toStderr ? "stderr" : "stdout");
+		this.sendEvent("output", text, category, filePath, line);
+	}
+
+
+	//////////
+	// Output-handlers: (for output of the R process to stdout/stderr)
+	//////////
+	
+	private async handleData(data: any, fromStderr: boolean = false) {
 		// handles output from the R child process
 		// splits cp.stdout into lines / waits for complete lines
 		// calls handleLine() on each line
-		const dec = new TextDecoder
+
+		const dec = new TextDecoder;
 		var s = dec.decode(data);
-		s = s.replace(/\r/g,'');
+		s = s.replace(/\r/g,''); //keep only \n as linebreak
+
+		// join with rest text from previous call(s)
 		if(fromStderr){
 			s = this.restOfStderr + s;
 			this.restOfStderr = "";
@@ -197,20 +240,32 @@ export class DebugRuntime extends EventEmitter {
 			s = this.restOfStdout + s;
 			this.restOfStdout = "";
 		}
-		const lines = s.split(/\n/)
 
+		// split into lines
+		const lines = s.split(/\n/);
+
+		// handle all the complete lines
 		for(var i = 0; i<lines.length - 1; i++){
-			var line = lines[i]
-			this.handleLine(line, fromStderr);
+			// abort output handling if ignoreOutput has been set to true
+			// used to avoid handling remaining output after debugging has been stopped
+			if(this.ignoreOutput){
+				return;
+			}
+			await this.handleLine(lines[i], fromStderr);
 		}
 
 		if(lines.length > 0) {
-			var remainingText = lines[lines.length - 1]
-			const isHandled = this.handleLine(remainingText, fromStderr, false);
-			// const isHandled = false;
-			if(isHandled){
-				remainingText = "";
+			// abort output handling if ignoreOutput has been set to true
+			if(this.ignoreOutput){
+				return;
 			}
+
+			// calls this.handleLine on the remainder of the last line
+			// necessary, since e.g. an input prompt does not send a newline
+			// handleLine returns the parts of a line that were not 'understood'
+			const remainingText = await this.handleLine(lines[lines.length - 1], fromStderr, false);
+			
+			// remember parts that were no understood for next call
 			if(fromStderr){
 				this.restOfStderr = remainingText;
 			} else {
@@ -220,101 +275,181 @@ export class DebugRuntime extends EventEmitter {
 	}
 	
 
-	private handleLine(line: string, fromStderr = false, isFullLine = true): boolean{
-		// handles output-lines from R child process
-		// if(this.isRunningMain) {
-			var matches: any;
-			var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningMain;
+	private async handleLine(line: string, fromStderr = false, isFullLine = true) {
+		// handle output from the R process line by line
+		// is called by this.handleData()
 
-			const debugRegex = new RegExp(this.delimiter0 + '(.*)' + this.delimiter1)
-			
-			matches = debugRegex.exec(line);
-			if(matches){
-				console.log('matches: <vsc>')
-				this.handleJson(matches[1]);
-				line = line.replace(debugRegex, '');
-			}
+		// onlye show the line to the user if it is complete & relevant
+		var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningMain;
 
-			if(/Browse\[\d+\]>/.test(line)){
-				if(!this.isPaused){
-					this.isPaused = true;
-				}
-				showLine = false;
-				this.stdoutIsBrowserInfo = false;
-				return true;
-			} 
-			if(/Called from: /.test(line)){
-				showLine = false;
+		// temp variables for regexes and matches
+		var tmpRegex: RegExp;
+		var tmpMatches: any;
+		
+		// regex to identify info meant for vsc
+		const debugRegex = new RegExp(escapeForRegex(this.delimiter0) + '(.*)' + escapeForRegex(this.delimiter1));
+
+		// filter out info meant for vsc:
+		tmpMatches = debugRegex.exec(line);
+		if(tmpMatches){
+			// is meant for the debugger, not the user
+			await this.handleJson(tmpMatches[1]);
+			line = line.replace(debugRegex, '');
+		}
+
+		// Check for R-Startup message
+		if(!this.isRunningMain && RegExp(escapeForRegex(this.rStartup)).test(line)){
+			this.isReady = true;
+		}
+
+		// Check for Library-Not-Found-Message
+		if(!this.isRunningMain && RegExp(escapeForRegex(this.libraryNotFoundString)).test(line)){
+			console.error('R-Library not found!');
+			vscode.window.showErrorMessage('Please install the R package "' + this.packageName + '"!');
+			this.terminate();
+		}
+
+		// read info about the browser/debugger
+		tmpRegex = /Browse\[\d+\]> /;
+		if(tmpRegex.test(line)){
+			// R has entered the browser (usually caused by a breakpoint or step)
+			line = line.replace(tmpRegex,'');
+			showLine = false;
+			// this.stdoutIsBrowserInfo is set to true by a message to vsc with message 'breakpoint'
+			this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
+			console.log('shows prompt');
+			this.rSession.showsPrompt();
+		} 
+		if(/Called from: (.*)\n/.test(line)){
+			// part of browser-info
+			showLine = false;
+		}
+		if(isFullLine && (/debug: /.test(line) ||
+				/exiting from: /.test(line) ||
+				/debugging in: /.test(line))){
+			// part of browser-info
+			showLine = false;
+			this.stdoutIsBrowserInfo = true;
+		}
+		tmpMatches = /^debug at (.*)#(\d+): .*$/.exec(line);
+		if(tmpMatches){
+			// part of browser-info
+			// this.currentFile = tmpMatches[1];
+			this.currentLine = parseInt(tmpMatches[2]);
+			try {
+				this.stack['frames'][0]['line'] = this.currentLine;
+			} catch(error){}
+			showLine = false;
+			this.stdoutIsBrowserInfo = true;
+		}
+
+		// identify echo of commands sent by vsc
+		if(isFullLine && /^[ncsfQ]$/.test(line)) {
+			// commands used to control the browser
+			console.log('matches: [ncsfQ]');
+			showLine = false;
+		}
+		tmpRegex = new RegExp(this.packageName + '::')
+		if(isFullLine && tmpRegex.test(line)) {
+			// was a command sent to R by the debugger
+			console.log('matches: vscDebugger::');
+			showLine = false;
+		}
+
+		// check for prompt
+		const promptRegex = new RegExp(escapeForRegex(this.rprompt));
+		if(this.isRunningMain && promptRegex.test(line) && isFullLine){
+			console.log("matches: prompt (->End)");
+			this.sendEvent('end')
+			showLine = false;
+			return '';
+		} //else {
+		if(showLine && line.length>0){
+			if(isFullLine){
+				line = line + '\n';
 			}
-			if(isFullLine && /^[ncsfQ]$/.test(line)) {
-				console.log('matches: [ncsfQ]')
-				showLine = false;
-			}
-			if(isFullLine && /^\.vsc\./.test(line)) {
-				console.log('matches: .vsc')
-				showLine = false;
-			}
-			if(isFullLine && (/debug: /.test(line) ||
-					/exiting from: /.test(line) ||
-					/debugging in: /.test(line))){
-				showLine = false;
-				this.stdoutIsBrowserInfo = true;
-			}
-			matches = /^debug at (.*)#(\d+): .*$/.exec(line)
-			if(matches){
-				this._currentFile = matches[1];
-				this._currentLine = parseInt(matches[2]);
-				showLine = false;
-				this.stdoutIsBrowserInfo = true;
-			}
-			// if(this.isRunningMain && /<#>$/.test(line)){
-			// 	console.log("matches: <#> (End)");
-			// 	this.sendEvent('end')
-			// 	return true;
-			// } //else {
-			if(showLine){
-				if(isFullLine && line.length>0){
-					line = line + '\n'
-				}
-				this.writeOutput(line, fromStderr)
-			}
-		return false
+			this.writeOutput(line, false, fromStderr);
+		}
+		return line;
 	}
 
-	private handleJson(json: string){
+	private async handleJson(json: string){
+		// handles the json that is printed by .vsc.sendToVsc()
+		// is called by this.handleLine() if the line contains a json enclosed by this.delimiter0 and this.delimiter1
 		const j = JSON.parse(json);
 		const message = j['message'];
 		const body = j['body'];
 		const id = j['id'];
-		console.log('message ' + id + ': ' + message)
-		if(id > this.messageId){
-			this.messageId = id;
-		}
+		console.log('message ' + id + ': ' + message);
+
+		// update Id of latest message
+		// requests are handled sequentially by R --> no need to check fro previous message Ids
+		// use max() since unrequested are sent with id=0
+		this.messageId = Math.max(this.messageId, this.messageId)
+
 		switch(message){
 			case 'breakpoint':
-				this.requestInfoFromR();
-				this.step();
-				this.sendEvent('stopOnBreakpoint');
 				this.stdoutIsBrowserInfo = true;
+				this.rSession.runCommand('n');
+				this.requestInfoFromR();
+				// event is sent after receiving stack from R in order to answer stack-request synchrnously:
+				// (apparently required by vsc?)
+				this.sendEventOnStack = 'stopOnBreakpoint'; 
+				break;
+			case 'error':
+				this.stdoutIsBrowserInfo = true;
+				this.isCrashed = true;
+				this.requestInfoFromR();
+				// event is sent after receiving stack from R in order to answer stack-request synchrnously:
+				// (apparently required by vsc?)
+				this.sendEventOnStack = 'stopOnException';
 				break;
 			case 'end':
-				this.isRunningMain = false;
-				this.sendEvent('end');
+				this.terminate();
 				break;
 			case 'go':
 				this.isRunningMain = true;
-				break;
-			case 'ls':
-				this.scopes = body;
+				this.rSession.useQueue = this.useRCommandQueue;
 				break;
 			case 'stack':
-				this.stack = body;
+				this.lastStackId = id;
+				this.updateStack(body);
+				if(this.sendEventOnStack){
+					this.sendEvent(this.sendEventOnStack);
+					this.sendEventOnStack = '';
+				}
+				break;
+			case 'variables':
+				if(id >= this.lastStackId){
+					this.updateVariables(body);
+				}
+				break;
+			case 'eval':
+				const result = body;
+				this.sendEvent('evalResponse', result);
+				// relies on fast execution by R (--> only one evalResponse outstanding at any time)
+				break;
+			case 'print':
+				// also used by .vsc.cat()
+				const output = body['output'];
+				const file = body['file'];
+				const line = body['line'];
+				this.writeOutput(output, true, false, file, line);
+				break;
+			case 'noMain':
+				// is sent by .vsc.runMain() if no main() is found
+				vscode.window.showErrorMessage('No main() function found in .GlobalEnv!')
+				this.terminate();
 				break;
 			default:
-				console.warn('Unknown message: ' + message)
+				console.warn('Unknown message: ' + message);
 		}
 	}
-	
+
+	// Async function to wait for responses from R
+	// waits for this.messageId to catch up with this.requestId
+	// this.requestId is incremented by calls to e.g. this.requestInfoFromR()
+	// this.messageId is incremented by messages from R that contain an Id>0
 	private async waitForMessages(){
 		const poll = (resolve: () => void) => {
 			if(this.messageId >= this.requestId){
@@ -322,128 +457,157 @@ export class DebugRuntime extends EventEmitter {
 			} else {
 				setTimeout(_ => poll(resolve), 100);
 			}
-		}
+		};
 		return new Promise(poll);
 	}
 
-	private requestInfoFromR(): number {
-		this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ')');
-		this.runCommand('.vsc.getStack(id=' + ++this.requestId + ')');
-		return(this.requestId)
+
+	// handle new stack info
+	private updateStack(stack: any[]){
+		try {
+			if(stack['frames'][0]['line'] === 0){
+				stack['frames'][0]['line'] = this.currentLine;
+			}
+		} catch(error){}
+		this.stack = stack
+		this.variables = {};
+		this.updateVariables(stack['varLists']);
 	}
+
+	// handle new variable info
+	private updateVariables(varLists: any[]){
+		varLists.forEach(varList => {
+			if(varList['isReady']){
+				this.variables[varList['reference']] = (varList['variables'] as DebugProtocol.Variable[])
+			}
+		});
+		console.log('updated: variables')
+	}
+
+	// request info about the stack and workspace from R:
+	private requestInfoFromR(args = {}) {
+		args = {
+			...args,
+			'id': ++this.requestId,
+			'isError': this.isCrashed
+		};
+		this.rSession.callFunction('.vsc.getStack', args);
+		return this.waitForMessages();
+	}
+
+	// request info about specific variables from R:
+	private requestVariablesFromR(refs: number[]){
+		const refListForR = 'list(' + refs.join(',') + ')';
+		const args = {'refs': refListForR, 'id': ++this.requestId};
+		this.rSession.callFunction('.vsc.getVarLists', args);
+		return this.waitForMessages();
+	}
+
 
 	///////////////////////////////////////////////
 	// step-control
 	///////////////////////////////////////////////
 
+	// continue script execution:
 	public continue(reverse = false) {
-		this.isPaused = false;
-		this.runCommand('c');
+		if(this.isCrashed){
+			this.terminateFromBrowser();
+		} else{
+			this.rSession.runCommand('c');
+		}
 	}
 
-	public step(reverse = false, event = 'stopOnStep') {
-		this.runCommand('n');
-		this.requestInfoFromR()
-		this.sendEvent(event);
+	// step:
+	public async step(reverse = false, event = 'stopOnStep') {
+		if(this.isCrashed){
+			this.terminateFromBrowser();
+		} else {
+			// await this.waitForMessages();
+			this.rSession.runCommand('n');
+			this.requestInfoFromR();
+			await this.waitForMessages();
+			this.sendEvent(event);
+		}
 	}
 
-	public stepIn(event = 'stopOnStep') {
-		this.runCommand('s');
-		this.requestInfoFromR()
-		this.sendEvent(event);
+	// step into function:
+	public async stepIn(event = 'stopOnStep') {
+		if(this.isCrashed){
+			this.terminateFromBrowser();
+		} else {
+			await this.waitForMessages();
+			this.rSession.runCommand('s');
+			this.requestInfoFromR();
+			await this.waitForMessages();
+			this.sendEvent(event);
+		}
 	}
 
-	public stepOut(reverse = false, event = 'stopOnStep') {
-		this.runCommand('f');
-		this.requestInfoFromR()
-		this.sendEvent(event);
+	// execute rest of function:
+	public async stepOut(reverse = false, event = 'stopOnStep') {
+		if(this.isCrashed){
+			this.terminateFromBrowser();
+		} else {
+			await this.waitForMessages();
+			this.rSession.runCommand('f');
+			this.requestInfoFromR();
+			this.sendEvent(event);
+		}
+	}
+	
+	// forward an expression entered into the debug window to R
+	public async evaluate(expr: string, frameId: number | undefined) {
+		if(isUndefined(frameId)){
+			frameId = 0;
+		}
+		expr = toRStringLiteral(expr, '"');
+		this.rSession.callFunction('.vsc.evalInFrame', [expr, frameId]);
+		this.requestInfoFromR();
+		// await this.waitForMessages();
 	}
 
 
 	// info for debug session
-	public async getScopes(frameId: number) {
-		const envString = this.stack['frames'][frameId]
-		if(isUndefined(this.scopes) || this.scopes[0][0] != envString){
-			this.runCommand('.vsc.describeLs2(id=' + ++this.requestId + ', envString=' + ToRStringLiteral(envString, '"') + ')');
-			await this.waitForMessages();
-		}
-		// wrapper to access scopes
-		return this.scopes;
+	public getScopes(frameId: number) {
+		// await this.waitForMessages();
+		return this.stack['frames'][frameId]['scopes'];
 	}
 
-	public async getVariables(scope: string) {
-		for(var i=0; i<this.scopes[0].length; i++){
-			if(this.scopes[0][i] == scope){
-				return this.scopes[1][i];
-			}
+	// public async getVariables(scope: string) {
+	public async getVariables(varRef: number) {
+		// await this.waitForMessages();
+		if(this.variables[varRef]){
+			return this.variables[varRef];
+		} else{
+			this.requestVariablesFromR([varRef]);
+			await this.waitForMessages();
+			return this.variables[varRef];
 		}
-		return [];
 	}
 
-	public async getStack(startFrame: number, endFrame: number) {
-		const frames = new Array<any>();
-
-		if(isUndefined(this.stack)){
-			this.requestInfoFromR();
-			await this.waitForMessages();
-		}
-
-		for(var i=0; i<this.stack['calls'].length; i++){
-			var line: number;
-			if(i<this.stack['calls'].length-1){
-				line = this.stack['lineNumbers'][i+1];
-			} else {
-				line = this._currentLine;
-			}
-			frames.unshift({
-				index: i,
-				name: this.stack['calls'][i],
-				// file: this._sourceFile, // TODO: get correct file!
-				// file: this._currentFile,
-				file: this.stack['fileNames'][i],
-				line: line
-				// line: this.stack['lineNumbers'][i]
-				// line: this._currentLine //TODO: get correct line!
-			})
-		}
-
-		return {
-			frames: frames,
-			count: frames.length
-		};
+	public getStack(startFrame: number, endFrame: number) {
+		// await this.waitForMessages();
+		// can be returned synchronously since step-events are sent only after receiving stack info
+		return this.stack;
 	}
 
 	public getBreakpoints(path: string, line: number): number[] {
-
-	// 	const l = this._sourceLines[line];
-
-	// 	let sawSpace = true;
+		// dummy
 		const bps: number[] = [];
-	// 	for (let i = 0; i < l.length; i++) {
-	// 		if (l[i] !== ' ') {
-	// 			if (sawSpace) {
-	// 				bps.push(i);
-	// 				sawSpace = false;
-	// 			}
-	// 		} else {
-	// 			sawSpace = true;
-	// 		}
-	// 	}
-
 		return bps;
 	}
 
-	/*
-	 * Set breakpoint in file with given line.
-	 */
 
+
+	////////////////////////////
+	// breakpoint control
 	public setBreakPoint(path: string, line: number) : DebugBreakpoint {
 
-		const bp = <DebugBreakpoint> { verified: false, line, id: this._breakpointId++ };
-		let bps = this._breakPoints.get(path);
+		const bp = <DebugBreakpoint> { verified: false, line, id: this.breakpointId++ };
+		let bps = this.breakPoints.get(path);
 		if (!bps) {
 			bps = new Array<DebugBreakpoint>();
-			this._breakPoints.set(path, bps);
+			this.breakPoints.set(path, bps);
 		}
 		bps.push(bp);
 
@@ -453,111 +617,12 @@ export class DebugRuntime extends EventEmitter {
 		return bp;
 	}
 
-	/*
-	 * Clear breakpoint in file with given line.
-	 */
-	public clearBreakPoint(path: string, line: number) : DebugBreakpoint | undefined {
-	// 	let bps = this._breakPoints.get(path);
-	// 	if (bps) {
-	// 		const index = bps.findIndex(bp => bp.line === line);
-	// 		if (index >= 0) {
-	// 			const bp = bps[index];
-	// 			bps.splice(index, 1);
-	// 			return bp;
-	// 		}
-	// 	}
-		return undefined;
-	}
-
-	/*
-	 * Clear all breakpoints for file.
-	 */
-	public clearBreakpoints(path: string): void {
-		this._breakPoints.delete(path);
-	}
-
-	/*
-	 * Set data breakpoint.
-	 */
-	public setDataBreakpoint(address: string): boolean {
-		// if (address) {
-		// 	this._breakAddresses.add(address);
-		// 	return true;
-		// }
-		return false;
-	}
-
-	/*
-	 * Clear all data breakpoints.
-	 */
-	public clearAllDataBreakpoints(): void {
-		// this._breakAddresses.clear();
-	}
-
-	public cancel(): void {
-		this.cp.kill()
-		this.pt.dispose()
-	}
-
-
-
-
-
-	// private methods
-
-	private loadSource(file: string) {
-		if (this._sourceFile !== file) {
-			this._sourceFile = file;
-			this._sourceLines = readFileSync(this._sourceFile).toString().split('\n');
-		}
-	}
-
-	/**
-	 * Run through the file.
-	 * If stepEvent is specified only run a single step and emit the stepEvent.
-	 */
-	private run(reverse = false, stepEvent?: string) {
-		// if (reverse) {
-		// 	for (let ln = this._currentLine-1; ln >= 0; ln--) {
-		// 		if (this.fireEventsForLine(ln, stepEvent)) {
-		// 			this._currentLine = ln;
-		// 			return;
-		// 		}
-		// 	}
-		// 	// no more lines: stop at first line
-		// 	this._currentLine = 0;
-		// 	this.sendEvent('stopOnEntry');
-		// } else {
-		// 	for (let ln = this._currentLine+1; ln < this._sourceLines.length; ln++) {
-		// 		if (this.fireEventsForLine(ln, stepEvent)) {
-		// 			this._currentLine = ln;
-		// 			return true;
-		// 		}
-		// 	}
-		// 	// no more lines: run to end
-		// 	this.sendEvent('end');
-		// }
-	}
-
 	private verifyBreakpoints(path: string) : void {
-		let bps = this._breakPoints.get(path);
+		// dummy
+		let bps = this.breakPoints.get(path);
 		if (bps) {
 			// this.loadSource(path);
 			bps.forEach(bp => {
-				// if (!bp.verified && bp.line < this._sourceLines.length) {
-				// 	const srcLine = this._sourceLines[bp.line].trim();
-
-				// 	// if a line is empty or starts with '+' we don't allow to set a breakpoint but move the breakpoint down
-				// 	if (srcLine.length === 0 || srcLine.indexOf('+') === 0) {
-				// 		bp.line++;
-				// 	}
-				// 	// if a line starts with '-' we don't allow to set a breakpoint but move the breakpoint up
-				// 	if (srcLine.indexOf('-') === 0) {
-				// 		bp.line--;
-				// 	}
-				// 	// don't set 'verified' to true if the line contains the word 'lazy'
-				// 	// in this case the breakpoint will be verified 'lazy' after hitting it once.
-				// 	if (srcLine.indexOf('lazy') < 0) {
 						bp.verified = true;
 						this.sendEvent('breakpointValidated', bp);
 				// 	}
@@ -566,67 +631,57 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	/**
-	 * Fire events if line has a breakpoint or the word 'exception' is found.
-	 * Returns true is execution needs to stop.
+	/*
+	 * Clear breakpoint in file with given line.
 	 */
-	// private fireEventsForLine(ln: number, stepEvent?: string): boolean {
+	public clearBreakPoint(path: string, line: number) : DebugBreakpoint | undefined {
+		// dummy
+		return undefined;
+	}
 
-	// 	const line = this._sourceLines[ln].trim();
+	public clearBreakpoints(path: string): void {
+		this.breakPoints.delete(path);
+	}
 
-	// 	// if 'log(...)' found in source -> send argument to debug console
-	// 	const matches = /log\((.*)\)/.exec(line);
-	// 	if (matches && matches.length === 2) {
-	// 		this.sendEvent('output', matches[1], this._sourceFile, ln, matches.index)
-	// 	}
+	public setDataBreakpoint(address: string): boolean {
+		// dummy
+		return false;
+	}
 
-	// 	// if a word in a line matches a data breakpoint, fire a 'dataBreakpoint' event
-	// 	const words = line.split(" ");
-	// 	for (let word of words) {
-	// 		if (this._breakAddresses.has(word)) {
-	// 			this.sendEvent('stopOnDataBreakpoint');
-	// 			return true;
-	// 		}
-	// 	}
+	public clearAllDataBreakpoints(): void {
+		// dummy
+	}
 
-	// 	// if word 'exception' found in source -> throw exception
-	// 	if (line.indexOf('exception') >= 0) {
-	// 		this.sendEvent('stopOnException');
-	// 		return true;
-	// 	}
 
-	// 	// is there a breakpoint?
-	// 	const breakpoints = this._breakPoints.get(this._sourceFile);
-	// 	if (breakpoints) {
-	// 		const bps = breakpoints.filter(bp => bp.line === ln);
-	// 		if (bps.length > 0) {
 
-	// 			// send 'stopped' event
-	// 			this.sendEvent('stopOnBreakpoint');
+	///////////////////////////////
+	// functions to terminate the debug session
 
-	// 			// the following shows the use of 'breakpoint' events to update properties of a breakpoint in the UI
-	// 			// if breakpoint is not yet verified, verify it now and send a 'breakpoint' update event
-	// 			if (!bps[0].verified) {
-	// 				bps[0].verified = true;
-	// 				this.sendEvent('breakpointValidated', bps[0]);
-	// 			}
-	// 			return true;
-	// 		}
-	// 	}
+	public killR(): void {
+		this.ignoreOutput = true;
+		this.isRunningMain = false;
+		this.rSession.clearQueue();
+		this.rSession.killChildProcess();
+		// this.sendEvent('end');
+	}
 
-	// 	// non-empty line
-	// 	if (stepEvent && line.length > 0) {
-	// 		this.sendEvent(stepEvent);
-	// 		return true;
-	// 	}
+	public terminateFromBrowser(): void {
+		this.ignoreOutput = true;
+		this.isRunningMain = false;
+		this.rSession.clearQueue();
+		this.rSession.runCommand('Q', [], true);
+		this.sendEvent('end');
+	}
 
-	// 	// nothing interesting found -> continue
-	// 	return false;
-	// }
+	public terminate(): void {
+		this.ignoreOutput = true;
+		this.isRunningMain = false;
+		this.rSession.clearQueue();
+		this.rSession.killChildProcess();
+		this.sendEvent('end');
+	}
 
-	private sendEvent(event: string, ... args: any[]) {
-		setImmediate(_ => {
-			this.emit(event, ...args);
-		});
+	public cancel(): void {
+		this.rSession.clearQueue();
 	}
 }

@@ -1,4 +1,7 @@
 out
 node_modules
 .vscode-test/
-*.vsix
+testR
+R/test*
+temp*
+*.temp

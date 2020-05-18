@@ -1,10 +1,6 @@
-/*---------------------------------------------------------
- * Copyright (C) Microsoft Corporation. All rights reserved.
- *--------------------------------------------------------*/
-
 import {
 	Logger, logger,
-	LoggingDebugSession,
+	LoggingDebugSession, ErrorDestination,
 	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
 	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent,
 	Thread, StackFrame, Scope, Source, Handles, Breakpoint
@@ -13,10 +9,6 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
 import { DebugRuntime, DebugBreakpoint } from './debugRuntime';
 const { Subject } = require('await-notify');
-
-function timeout(ms: number) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 
 /**
@@ -28,10 +20,6 @@ function timeout(ms: number) {
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
 	program: string;
-	/** Automatically stop target after launch. If not specified, target does not stop. */
-	stopOnEntry?: boolean;
-	/** enable logging the Debug Adapter Protocol */
-	trace?: boolean;
 }
 
 export class DebugSession extends LoggingDebugSession {
@@ -42,17 +30,11 @@ export class DebugSession extends LoggingDebugSession {
 	// a runtime (or debugger)
 	private _runtime: DebugRuntime;
 
-	private _variableHandles = new Handles<string>();
-
 	private _configurationDone = new Subject();
 
-	private _cancelationTokens = new Map<number, boolean>();
-	private _isLongrunning = new Map<number, boolean>();
+	private _evalResponse!: DebugProtocol.EvaluateResponse;
 
-	private _reportProgress = false;
-	private _progressId = 10000;
-	private _cancelledProgressId: string | undefined = undefined;
-	private _isProgressCancellable = true;
+	private _logLevel = 3;
 
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
@@ -62,7 +44,6 @@ export class DebugSession extends LoggingDebugSession {
 		// super("r-debugger.txt");
 		super();
 
-		console.log("Constructing Debug Session...")
 
 		// this debugger uses zero-based lines and columns
 		this.setDebuggerLinesStartAt1(true);
@@ -84,14 +65,14 @@ export class DebugSession extends LoggingDebugSession {
 			this.sendEvent(new StoppedEvent('data breakpoint', DebugSession.THREAD_ID));
 		});
 		this._runtime.on('stopOnException', () => {
-			this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID));
+			this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID, 'Informative exception text'));
 		});
 		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>{ verified: bp.verified, id: bp.id }));
 		});
 		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line=1, column=1) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-			const matches = /(start|startCollapsed|end): (.*)/.exec(text);
+			const matches = /(start|startCollapsed|end): ?(.*)/.exec(text);
 			if (matches) {
 				switch(matches[1]){
 					case "start":
@@ -108,7 +89,12 @@ export class DebugSession extends LoggingDebugSession {
 				e.body.output = text;
 			}
 			e.body.category = category;
-			e.body.source = filePath;
+			if(filePath !== ''){
+				var source: DebugProtocol.Source = new Source(basename(filePath), filePath);
+				e.body.source = source;
+			} else {
+				// e.body.source = new Source('');
+			}
 			e.body.line = line;
 			e.body.column = column;
 			this.sendEvent(e);
@@ -116,8 +102,18 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('end', () => {
 			this.sendEvent(new TerminatedEvent());
 		});
-
-		console.log("Done constructing.")
+		this._runtime.on('evalResponse', (result: string) => {
+			const response = this._evalResponse;
+			if(result.length>0){
+				response.body = {
+					result: result,
+					variablesReference: 0
+				};
+			} else {
+				response.success = false;
+			}
+			this.logAndSendResponse(response);
+		});
 	}
 
 	/**
@@ -125,10 +121,6 @@ export class DebugSession extends LoggingDebugSession {
 	 * to interrogate the features the debug adapter provides.
 	 */
 	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
-
-		if (args.supportsProgressReporting) {
-			this._reportProgress = true;
-		}
 
 		// build and return the capabilities of this debug adapter:
 		response.body = response.body || {};
@@ -155,12 +147,39 @@ export class DebugSession extends LoggingDebugSession {
 		// make VS Code send the breakpointLocations request
 		response.body.supportsBreakpointLocationsRequest = true;
 
-		this.sendResponse(response);
+		// enable exception-info (not working???)
+		response.body.supportsExceptionInfoRequest = true;
+		response.body.supportsExceptionOptions = true;
+		const exceptionBreakpointFilters: DebugProtocol.ExceptionBreakpointsFilter[] = [{
+			filter: 'dummyFilter',
+			label: 'dummyFilterLabel',
+			default: true
+		}];
+		response.body.exceptionBreakpointFilters = exceptionBreakpointFilters;
+		
+		// enable saving variables to clipboard
+		response.body.supportsClipboardContext = true;
 
-		// since this debug adapter can accept configuration requests like 'setBreakpoint' at any time,
+		this.logAndSendResponse(response);
+
 		// we request them early by sending an 'initializeRequest' to the frontend.
 		// The frontend will end the configuration sequence by calling 'configurationDone' request.
 		this.sendEvent(new InitializedEvent());
+	}
+
+	private logRequest(response: DebugProtocol.Response){
+		if(this._logLevel>=3){
+			console.log('request ' + response.request_seq + ': ' + response.command);
+		}
+	}
+	private logResponse(response: DebugProtocol.Response){
+		if(this._logLevel>=3){
+			console.log('response ' + response.request_seq + ': ' + response.command);
+		}
+	}
+	private logAndSendResponse(response: DebugProtocol.Response){
+		this.logResponse(response);
+		this.sendResponse(response);
 	}
 
 	/**
@@ -168,6 +187,7 @@ export class DebugSession extends LoggingDebugSession {
 	 * Indicates that all breakpoints etc. have been sent to the DA and that the 'launch' can start.
 	 */
 	protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments): void {
+		this.logRequest(response)
 		super.configurationDoneRequest(response, args);
 
 		// notify the launchRequest that configuration has finished
@@ -176,17 +196,34 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
 
+		const trace = false
+		const logPath = '';
+		logger.init(undefined, logPath, true)
+
 		// make sure to 'Stop' the buffered logging if 'trace' is not set
-		logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop, false);
+		// logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop, false);
+		logger.setup(trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop,logPath, true);
 
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
 
 		// start the program in the runtime
-		this._runtime.start(args.program, !!args.stopOnEntry);
+		this._runtime.start(args.program);
 
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
+
+	// protected setExceptionBreakpointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
+	// protected setExceptionBreakpointsRequest(response: any=undefined, args: any=undefined, args2: any=undefined): void {
+    protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request): void {
+		this.logRequest(response);
+		this.logAndSendResponse(response);
+	}
+
+	// protected setExceptionBreakpointsRequest(response: DebugProtocol.SetExceptionBreakpointsRequest, args: DebugProtocol.SetBreakpointsArguments): void {
+		// this.logRequest(response);
+		// this.logAndSendResponse(response);
+	// }
 
 	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
 
@@ -208,7 +245,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			breakpoints: actualBreakpoints
 		};
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
@@ -220,7 +257,7 @@ export class DebugSession extends LoggingDebugSession {
 					return {
 						line: args.line,
 						column: this.convertDebuggerColumnToClient(col)
-					}
+					};
 				})
 			};
 		} else {
@@ -228,354 +265,198 @@ export class DebugSession extends LoggingDebugSession {
 				breakpoints: []
 			};
 		}
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
-
+		this.logRequest(response);
 		// runtime supports no threads so just return a default thread.
 		response.body = {
 			threads: [
 				new Thread(DebugSession.THREAD_ID, "thread 1")
 			]
 		};
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
-	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-		console.log('request: stackTraceRequest')
+	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
+		this.logRequest(response);
+
+		//apparently this needs to be answered synchronously to work properly
+		//therefore step-responses are sent only after getting stack-info from R
 
 		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
 		const endFrame = startFrame + maxLevels;
 
-		const stk = await this._runtime.getStack(startFrame, endFrame);
-
+		const stack = this._runtime.getStack(startFrame, endFrame);
 		response.body = {
-			stackFrames: stk.frames.map(f => new StackFrame(f.index, f.name, this.createSource(f.file), this.convertDebuggerLineToClient(f.line))),
-			totalFrames: stk.count
+			stackFrames: stack['frames'],
+			totalFrames: stack['frames'].length
 		};
-		this.sendResponse(response);
+
+		this.logAndSendResponse(response);
 	}
 
-	protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
-		console.log('request: scopesRequest')
-		var scopes = await this._runtime.getScopes(args.frameId);
 
-		var newScopes: Scope[] = [];
-		for(var i=0; i<scopes[0].length; i++){
-			const scopeName = scopes[0][i];
-			const nextHandle = this._variableHandles.create(scopeName)
-			const nextScope = new Scope(scopeName, nextHandle, false);
-			newScopes.push(nextScope) 
-		}
+
+	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
+		this.logRequest(response);
+		const scopes = this._runtime.getScopes(args.frameId);
+
 		response.body = {
-			scopes: newScopes
-		}
-
-		// for(var i=0; i<sc)
-		// response.body = {
-		// 	scopes: [
-		// 		new Scope("Local", this._variableHandles.create("local"), false),
-		// 		new Scope("Global", this._variableHandles.create("global"), true),
-		// 		new Scope("Allencompassing", this._variableHandles.create("ae"), true)
-		// 	]
-		// };
-		this.sendResponse(response);
+			scopes: scopes
+		};
+		this.logAndSendResponse(response);
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
+		this.logRequest(response);
 
-		console.log('request: variablesRequest')
-
-		const id = this._variableHandles.get(args.variablesReference);
-		const variables: DebugProtocol.Variable[] = [];
-		const Rvariables: DebugProtocol.Variable[] = await this._runtime.getVariables(id);
-
-		for (var i = 0; i<Rvariables.length; i++) {
-			const v = Rvariables[i];
-			variables.push({
-				name: v['name'],
-				// type: v['type'],
-				type: "string",
-				value: v['value'],
-				variablesReference: 0
-			})
-		}
-
-		// if (this._isLongrunning.get(args.variablesReference)) {
-		// 	// long running
-
-		// 	// if (request) {
-		// 	// 	this._cancelationTokens.set(request.seq, false);
-		// 	// }
-
-		// 	// for (let i = 0; i < 100; i++) {
-		// 	// 	await timeout(1000);
-		// 	// 	variables.push({
-		// 	// 		name: `i_${i}`,
-		// 	// 		type: "integer",
-		// 	// 		value: `${i}`,
-		// 	// 		variablesReference: 0
-		// 	// 	});
-		// 	// 	if (request && this._cancelationTokens.get(request.seq)) {
-		// 	// 		break;
-		// 	// 	}
-		// 	// }
-
-		// 	// if (request) {
-		// 	// 	this._cancelationTokens.delete(request.seq);
-		// 	// }
-
-		// } else {
-
-			
-
-		// 	if (id) {
-		// 		variables.push({
-		// 			name: id + "_i",
-		// 			type: "integer",
-		// 			value: "123456789",
-		// 			variablesReference: 0
-		// 		});
-		// 		variables.push({
-		// 			name: id + "_f",
-		// 			type: "float",
-		// 			value: "3.1415926535",
-		// 			variablesReference: 0
-		// 		});
-		// 		variables.push({
-		// 			name: id + "_s",
-		// 			type: "string",
-		// 			value: "hello world",
-		// 			variablesReference: 0
-		// 		});
-		// 		variables.push({
-		// 			name: id + "_o",
-		// 			type: "object",
-		// 			value: "Object",
-		// 			variablesReference: this._variableHandles.create(id + "_o")
-		// 		});
-
-		// 		// // cancelation support for long running requests
-		// 		// const nm = id + "_long_running";
-		// 		// const ref = this._variableHandles.create(id + "_lr");
-		// 		// variables.push({
-		// 		// 	name: nm,
-		// 		// 	type: "object",
-		// 		// 	value: "Object",
-		// 		// 	variablesReference: ref
-		// 		// });
-		// 		// this._isLongrunning.set(ref, true);
-		// 	}
-		// }
-
+		const variables = await this._runtime.getVariables(args.variablesReference);
 		response.body = {
 			variables: variables
 		};
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
+	}
+
+    protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
+		// DUMMY
+		// NOT WORKING
+		this.logRequest(response);
+		const details: DebugProtocol.ExceptionDetails = {
+			/** Message contained in the exception. */
+			message: 'messageasdf',
+			/** Short type name of the exception object. */
+			typeName: 'typeNameqwer'
+			/** Fully-qualified type name of the exception object. */
+			// fullTypeName: 'fullTypeName',
+			/** Optional expression that can be evaluated in the current scope to obtain the exception object. */
+			// evaluateName: 'evaluateName',
+			/** Stack trace at the time the exception was thrown. */
+			// stackTrace: 'stackTrace'
+			/** Details of the exception contained by this exception, if any. */
+			// innerException?: ExceptionDetails[];
+		};
+		response.body = {
+            /** ID of the exception that was thrown. */
+            exceptionId: 'dummyFilter',
+            /** Descriptive text for the exception provided by the debug adapter. */
+            description: 'description text for the exception',
+            /** Mode that caused the exception notification to be raised. */
+            breakMode: 'unhandled',
+            /** Detailed information about the exception. */
+            details: details
+		}
+
+		this.logAndSendResponse(response);
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
+		this.logRequest(response);
 		this._runtime.continue();
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments) : void {
 		this._runtime.continue(true);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
  	}
 
-	protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): void {
+	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
+		this.logRequest(response);
+		this.logAndSendResponse(response);
 		this._runtime.step();
-		this.sendResponse(response);
 	}
 
-	protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): void {
-		this._runtime.stepIn();
-		this.sendResponse(response);
+	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments) {
+		await this._runtime.stepIn();
+		this.logAndSendResponse(response);
 	}
 
 	protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): void {
 		this._runtime.stepOut();
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments): void {
 		this._runtime.step(true);
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
-
-		let reply: string | undefined = undefined;
-
-		if (args.context === 'repl') {
-			// 'evaluate' supports to create and delete breakpoints from the 'repl':
-			const matches = /new +([0-9]+)/.exec(args.expression);
-			if (matches && matches.length === 2) {
-				const mbp = this._runtime.setBreakPoint(this._runtime.sourceFile, this.convertClientLineToDebugger(parseInt(matches[1])));
-				const bp = <DebugProtocol.Breakpoint> new Breakpoint(mbp.verified, this.convertDebuggerLineToClient(mbp.line), undefined, this.createSource(this._runtime.sourceFile));
-				bp.id= mbp.id;
-				this.sendEvent(new BreakpointEvent('new', bp));
-				reply = `breakpoint created`;
-			} else {
-				const matches = /del +([0-9]+)/.exec(args.expression);
-				if (matches && matches.length === 2) {
-					const mbp = this._runtime.clearBreakPoint(this._runtime.sourceFile, this.convertClientLineToDebugger(parseInt(matches[1])));
-					if (mbp) {
-						const bp = <DebugProtocol.Breakpoint> new Breakpoint(false);
-						bp.id= mbp.id;
-						this.sendEvent(new BreakpointEvent('removed', bp));
-						reply = `breakpoint deleted`;
-					}
-				} else {
-					const matches = /progress/.exec(args.expression);
-					if (matches && matches.length === 1) {
-						if (this._reportProgress) {
-							reply = `progress started`;
-							this.progressSequence();
-						} else {
-							reply = `frontend doesn't support progress (capability 'supportsProgressReporting' not set)`;
-						}
-					}
-				}
-			}
-		}
-
-		response.body = {
-			result: reply ? reply : `evaluate(context: '${args.context}', '${args.expression}')`,
-			variablesReference: 0
-		};
-		this.sendResponse(response);
-	}
-
-	private async progressSequence() {
-
-		const ID = '' + this._progressId++;
-
-		await timeout(100);
-
-		const title = this._isProgressCancellable ? 'Cancellable operation' : 'Long running operation';
-		const startEvent: DebugProtocol.ProgressStartEvent = new ProgressStartEvent(ID, title);
-		startEvent.body.cancellable = this._isProgressCancellable;
-		this._isProgressCancellable = !this._isProgressCancellable;
-		this.sendEvent(startEvent);
-		this.sendEvent(new OutputEvent(`start progress: ${ID}\n`));
-
-		let endMessage = 'progress ended';
-
-		for (let i = 0; i < 100; i++) {
-			await timeout(500);
-			this.sendEvent(new ProgressUpdateEvent(ID, `progress: ${i}`));
-			if (this._cancelledProgressId === ID) {
-				endMessage = 'progress cancelled';
-				this._cancelledProgressId = undefined;
-				this.sendEvent(new OutputEvent(`cancel progress: ${ID}\n`));
-				break;
-			}
-		}
-		this.sendEvent(new ProgressEndEvent(ID, endMessage));
-		this.sendEvent(new OutputEvent(`end progress: ${ID}\n`));
-
-		this._cancelledProgressId = undefined;
+		this._evalResponse = response;
+		this._runtime.evaluate(args.expression, args.frameId);
+		// this.logAndSendResponse(response);
 	}
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
-
-		response.body = {
-            dataId: null,
-            description: "cannot break on data access",
-            accessTypes: undefined,
-            canPersist: false
-        };
-
-		if (args.variablesReference && args.name) {
-			const id = this._variableHandles.get(args.variablesReference);
-			if (id.startsWith("global_")) {
-				response.body.dataId = args.name;
-				response.body.description = args.name;
-				response.body.accessTypes = [ "read" ];
-				response.body.canPersist = true;
-			}
-		}
-
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
 	protected setDataBreakpointsRequest(response: DebugProtocol.SetDataBreakpointsResponse, args: DebugProtocol.SetDataBreakpointsArguments): void {
-
-		// clear all data breakpoints
-		this._runtime.clearAllDataBreakpoints();
-
-		response.body = {
-			breakpoints: []
-		};
-
-		for (let dbp of args.breakpoints) {
-			// assume that id is the "address" to break on
-			const ok = this._runtime.setDataBreakpoint(dbp.dataId);
-			response.body.breakpoints.push({
-				verified: ok
-			});
-		}
-
-		this.sendResponse(response);
+		this.logAndSendResponse(response);
 	}
 
-	protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments): void {
-
-		response.body = {
-			targets: [
-				{
-					label: "item 10",
-					sortText: "10"
-				},
-				{
-					label: "item 1",
-					sortText: "01"
-				},
-				{
-					label: "item 2",
-					sortText: "02"
-				},
-				{
-					label: "array[]",
-					selectionStart: 6,
-					sortText: "03"
-				},
-				{
-					label: "func(arg)",
-					selectionStart: 5,
-					selectionLength: 3,
-					sortText: "04"
-				}
-			]
-		};
-		this.sendResponse(response);
-	}
 
 	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
-		this._runtime.cancel()
+		this._runtime.terminateFromBrowser();
+		// no response to be sent (?)
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
-		this._runtime.cancel()
+		this._runtime.terminateFromBrowser();
+		// no response to be sent (?)
 	}
 
 	protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments) {
-		if (args.requestId) {
-			this._cancelationTokens.set(args.requestId, true);
-		}
-		if (args.progressId) {
-			this._cancelledProgressId= args.progressId;
-		}
-		this._runtime.cancel()
+		this._runtime.cancel();
+		this.logAndSendResponse(response);
 	}
 
-	//---- helpers
 
-	private createSource(filePath: string): Source {
-		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'r-adapter-data');
-	}
-}
+	// Dummy code used for debugging:
+
+    protected sendErrorResponse(response: DebugProtocol.Response, codeOrMessage: number | DebugProtocol.Message, format?: string, variables?: any, dest?: ErrorDestination): void {this.logRequest(response)};
+    runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void): void {console.log('request: runInTerminalRequest')};
+    // protected dispatchRequest(request: DebugProtocol.Request): void {console.log('request: dispatchRequest')};
+    // protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {};
+    // protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request): void {};
+    // protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {};
+    protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request): void {};
+    protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request): void {};
+    protected setFunctionBreakPointsRequest(response: DebugProtocol.SetFunctionBreakpointsResponse, args: DebugProtocol.SetFunctionBreakpointsArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request): void {};
+    // protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request?: DebugProtocol.Request): void {};
+    // protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments, request?: DebugProtocol.Request): void {};
+    // protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request): void {};
+    // protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request): void {};
+    // protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments, request?: DebugProtocol.Request): void {};
+    // protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments, request?: DebugProtocol.Request): void {};
+    protected restartFrameRequest(response: DebugProtocol.RestartFrameResponse, args: DebugProtocol.RestartFrameArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected gotoRequest(response: DebugProtocol.GotoResponse, args: DebugProtocol.GotoArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected sourceRequest(response: DebugProtocol.SourceResponse, args: DebugProtocol.SourceArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected threadsRequest(response: DebugProtocol.ThreadsResponse, request?: DebugProtocol.Request): void {};
+    protected terminateThreadsRequest(response: DebugProtocol.TerminateThreadsResponse, args: DebugProtocol.TerminateThreadsArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments, request?: DebugProtocol.Request): void {};
+    // protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments, request?: DebugProtocol.Request): void {};
+    // protected variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request): void {};
+    protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected setExpressionRequest(response: DebugProtocol.SetExpressionResponse, args: DebugProtocol.SetExpressionArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments, request?: DebugProtocol.Request): void {};
+    protected stepInTargetsRequest(response: DebugProtocol.StepInTargetsResponse, args: DebugProtocol.StepInTargetsArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {};
+    protected loadedSourcesRequest(response: DebugProtocol.LoadedSourcesResponse, args: DebugProtocol.LoadedSourcesArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments, request?: DebugProtocol.Request): void {};
+    // protected setDataBreakpointsRequest(response: DebugProtocol.SetDataBreakpointsResponse, args: DebugProtocol.SetDataBreakpointsArguments, request?: DebugProtocol.Request): void {};
+    protected readMemoryRequest(response: DebugProtocol.ReadMemoryResponse, args: DebugProtocol.ReadMemoryArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    protected disassembleRequest(response: DebugProtocol.DisassembleResponse, args: DebugProtocol.DisassembleArguments, request?: DebugProtocol.Request): void {this.logRequest(response)};
+    // protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments, request?: DebugProtocol.Request): void {};
+    // protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {};
+} 

@@ -1,4 +1,3 @@
-"use strict";
 
 import { window, workspace } from "vscode";
 let config = workspace.getConfiguration();
@@ -31,7 +30,13 @@ export function getTerminalPath() {
     return "";
 }
 
-export function ToRStringLiteral(s: string, quote: string) {
+
+export function escapeForRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+
+export function toRStringLiteral(s: string, quote: string='"') {
     if (s === undefined) {
         return "NULL";
     } else {
