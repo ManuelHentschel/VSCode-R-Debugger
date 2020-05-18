@@ -1,7 +1,3 @@
-/*---------------------------------------------------------
- * Copyright (C) Microsoft Corporation. All rights reserved.
- *--------------------------------------------------------*/
-
 import {
 	Logger, logger,
 	LoggingDebugSession, ErrorDestination,
@@ -13,14 +9,6 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
 import { DebugRuntime, DebugBreakpoint } from './debugRuntime';
 const { Subject } = require('await-notify');
-import * as vscode from 'vscode';
-import { isUndefined } from 'util';
-import { Readable, Writable } from 'stream';
-import { WriteStream } from 'fs';
-
-function timeout(ms: number) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 
 /**
@@ -32,10 +20,6 @@ function timeout(ms: number) {
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
 	program: string;
-	/** Automatically stop target after launch. If not specified, target does not stop. */
-	stopOnEntry?: boolean;
-	/** enable logging the Debug Adapter Protocol */
-	trace?: boolean;
 }
 
 export class DebugSession extends LoggingDebugSession {
@@ -46,17 +30,7 @@ export class DebugSession extends LoggingDebugSession {
 	// a runtime (or debugger)
 	private _runtime: DebugRuntime;
 
-	private _variableHandles = new Handles<string>();
-
 	private _configurationDone = new Subject();
-
-	private _cancelationTokens = new Map<number, boolean>();
-	private _isLongrunning = new Map<number, boolean>();
-
-	private _reportProgress = false;
-	private _progressId = 10000;
-	private _cancelledProgressId: string | undefined = undefined;
-	private _isProgressCancellable = true;
 
 	private _evalResponse!: DebugProtocol.EvaluateResponse;
 
@@ -98,7 +72,7 @@ export class DebugSession extends LoggingDebugSession {
 		});
 		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line=1, column=1) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-			const matches = /(start|startCollapsed|end): (.*)/.exec(text);
+			const matches = /(start|startCollapsed|end): ?(.*)/.exec(text);
 			if (matches) {
 				switch(matches[1]){
 					case "start":
@@ -148,10 +122,6 @@ export class DebugSession extends LoggingDebugSession {
 	 */
 	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
 
-		if (args.supportsProgressReporting) {
-			this._reportProgress = true;
-		}
-
 		// build and return the capabilities of this debug adapter:
 		response.body = response.body || {};
 
@@ -192,7 +162,6 @@ export class DebugSession extends LoggingDebugSession {
 
 		this.logAndSendResponse(response);
 
-		// since this debug adapter can accept configuration requests like 'setBreakpoint' at any time,
 		// we request them early by sending an 'initializeRequest' to the frontend.
 		// The frontend will end the configuration sequence by calling 'configurationDone' request.
 		this.sendEvent(new InitializedEvent());
@@ -227,20 +196,19 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
 
-		args.trace = true;
-
+		const trace = false
 		const logPath = '';
 		logger.init(undefined, logPath, true)
 
 		// make sure to 'Stop' the buffered logging if 'trace' is not set
 		// logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop, false);
-		logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop,logPath, true);
+		logger.setup(trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop,logPath, true);
 
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
 
 		// start the program in the runtime
-		this._runtime.start(args.program, !!args.stopOnEntry);
+		this._runtime.start(args.program);
 
 		this.logAndSendResponse(response);
 	}
@@ -346,8 +314,6 @@ export class DebugSession extends LoggingDebugSession {
 		this.logRequest(response);
 
 		const variables = await this._runtime.getVariables(args.variablesReference);
-
-		
 		response.body = {
 			variables: variables
 		};
@@ -355,6 +321,8 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
     protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
+		// DUMMY
+		// NOT WORKING
 		this.logRequest(response);
 		const details: DebugProtocol.ExceptionDetails = {
 			/** Message contained in the exception. */
@@ -446,6 +414,8 @@ export class DebugSession extends LoggingDebugSession {
 		this.logAndSendResponse(response);
 	}
 
+
+	// Dummy code used for debugging:
 
     protected sendErrorResponse(response: DebugProtocol.Response, codeOrMessage: number | DebugProtocol.Message, format?: string, variables?: any, dest?: ErrorDestination): void {this.logRequest(response)};
     runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void): void {console.log('request: runInTerminalRequest')};

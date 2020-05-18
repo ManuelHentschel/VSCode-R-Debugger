@@ -162,21 +162,3 @@ function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=
     }
     return cp;
 }
-
-export function toRStringLiteral(s: string, quote: string='"') {
-    if (s === undefined) {
-        return "NULL";
-    } else {
-        return (quote +
-            s.replace(/\\/g, "\\\\")
-                .replace(/"""/g, `\\${quote}`)
-                .replace(/\\n/g, "\\n")
-                .replace(/\\r/g, "\\r")
-                .replace(/\\t/g, "\\t")
-                .replace(/\\b/g, "\\b")
-                .replace(/\\a/g, "\\a")
-                .replace(/\\f/g, "\\f")
-                .replace(/\\v/g, "\\v") +
-            quote);
-    }
-}
