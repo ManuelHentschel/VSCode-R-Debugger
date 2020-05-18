@@ -59,16 +59,6 @@
                 "type": "string",
                 "description": "Absolute path to a text file.",
                 "default": "${file}"
-              },
-              "stopOnEntry": {
-                "type": "boolean",
-                "description": "Automatically stop after launch (currently not implemented).",
-                "default": false
-              },
-              "trace": {
-                "type": "boolean",
-                "description": "Enable logging of the Debug Adapter Protocol (currently not implemented).",
-                "default": false
               }
             }
           }
@@ -78,8 +68,7 @@
             "type": "R-Debugger",
             "request": "launch",
             "name": "R Debugger",
-            "program": "${file}",
-            "stopOnEntry": false
+            "program": "${file}"
           }
         ],
         "configurationSnippets": [
@@ -90,8 +79,7 @@
               "type": "R-Debugger",
               "request": "launch",
               "name": "R Debugger",
-              "program": "${file}",
-              "stopOnEntry": false
+              "program": "${file}"
             }
           }
         ]

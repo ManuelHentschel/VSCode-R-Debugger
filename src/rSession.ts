@@ -2,6 +2,7 @@
 
 import * as child from 'child_process';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 import { trimLastNewline } from 'vscode-debugadapter/lib/logger';
 import { isUndefined, isBoolean } from 'util';
 
@@ -15,8 +16,10 @@ export class RSession {
     public cmdQueue: string[] = [];
     public readonly logStream: fs.WriteStream;
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 3;
+    public readonly logLevelCP: number = 4;
     public waitBetweenCommands: number = 0;
+    public defaultLibrary: string = '';
+    public readonly successTerminal: boolean = false;
 
     constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[], logLevel=undefined, logLevelCP=undefined) {
         // spawn new terminal process (necessary for interactive R session)
@@ -28,10 +31,20 @@ export class RSession {
             this.logLevelCP = logLevelCP;
         }
 
+
         this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP)
+
+        if(this.cp.pid === undefined){
+            return;
+        }
 
         // start R in terminal process
         this.runCommand(rPath, rArgs)
+
+        // vscode.window.showErrorMessage('R path not valid!');
+        // return;
+
+        this.successTerminal = true;
     }
 
     public async runCommand(cmd: string, args: (string|number)[]=[], force=false){
@@ -83,8 +96,8 @@ export class RSession {
     }
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[]){
-        // if necessary, convert args form object-form to array, save to args2 to have a unamibuous data type
+    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[], library: string = this.defaultLibrary){
+        // if necessary, convert args form object-form to array, save to args2 to have a unambiguous data type
         var args2: (string|number)[] = [];
         if(Array.isArray(args)){
             args2 = args;
@@ -101,8 +114,13 @@ export class RSession {
                 args2.push(arg + '=' + value);
             }
         }
+
+        if(library != ''){
+            library = library + '::'
+        }
+
         // construct and execute function-call
-        const cmd = fnc + '(' + args2.join(',') + ')';
+        const cmd = library + fnc + '(' + args2.join(',') + ')';
         this.runCommand(cmd);
     }
 

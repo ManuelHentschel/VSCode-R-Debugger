@@ -30,3 +30,7 @@ export function getTerminalPath() {
     return "";
 }
 
+
+export function escapeForRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
