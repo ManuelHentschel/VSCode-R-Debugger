@@ -410,7 +410,7 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments) {
-		this._runtime.cancel();
+		// this._runtime.cancel();
 		this.logAndSendResponse(response);
 	}
 
