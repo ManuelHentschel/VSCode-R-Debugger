@@ -91,3 +91,4 @@ General
 * Improve error handling
 * Implement debugging of normal script files (similiar to RStudio's `debugsource()`)
 * Graphical output etc.?
+* Source line info does not work for modified `print()` when called from a line with breakpoint
