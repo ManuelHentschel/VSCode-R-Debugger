@@ -385,7 +385,7 @@ export class DebugRuntime extends EventEmitter {
 		// update Id of latest message
 		// requests are handled sequentially by R --> no need to check fro previous message Ids
 		// use max() since unrequested are sent with id=0
-		this.messageId = Math.max(this.messageId, this.messageId)
+		this.messageId = Math.max(this.messageId, id)
 
 		switch(message){
 			case 'breakpoint':
