@@ -556,12 +556,16 @@ export class DebugRuntime extends EventEmitter {
 	}
 	
 	// forward an expression entered into the debug window to R
-	public async evaluate(expr: string, frameId: number | undefined) {
+	public async evaluate(expr: string, frameId: number | undefined, context: string|undefined) {
+		var silent: boolean = false;
+		if(context==='watch'){
+			silent = true;
+		}
 		if(isUndefined(frameId)){
 			frameId = 0;
 		}
 		expr = toRStringLiteral(expr, '"');
-		this.rSession.callFunction('.vsc.evalInFrame', [expr, frameId]);
+		this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent});
 		this.requestInfoFromR();
 		// await this.waitForMessages();
 	}

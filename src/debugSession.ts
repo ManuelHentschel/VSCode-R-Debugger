@@ -32,7 +32,7 @@ export class DebugSession extends LoggingDebugSession {
 
 	private _configurationDone = new Subject();
 
-	private _evalResponse!: DebugProtocol.EvaluateResponse;
+	private _evalResponse: DebugProtocol.EvaluateResponse[] = [];
 
 	private _logLevel = 3;
 
@@ -103,7 +103,7 @@ export class DebugSession extends LoggingDebugSession {
 			this.sendEvent(new TerminatedEvent());
 		});
 		this._runtime.on('evalResponse', (result: string) => {
-			const response = this._evalResponse;
+			const response = this._evalResponse.shift();
 			if(result.length>0){
 				response.body = {
 					result: result,
@@ -385,8 +385,9 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
-		this._evalResponse = response;
-		this._runtime.evaluate(args.expression, args.frameId);
+		this.logRequest(response);
+		this._evalResponse.push(response);
+		this._runtime.evaluate(args.expression, args.frameId, args.context);
 		// this.logAndSendResponse(response);
 	}
 

@@ -94,3 +94,4 @@ General
 * Graphical output etc.?
 * Source line info does not work for modified `print()` when called from a line with breakpoint
 * Debug files in the current workspace? (attach to currently open R process instead of spawning a new one?)
+* Nested formatting of output in the debug console (use existing functionality from variables view)
