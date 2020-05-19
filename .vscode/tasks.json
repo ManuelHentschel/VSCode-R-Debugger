@@ -11,10 +11,6 @@
 			"isBackground": true,
 			"presentation": {
 				"reveal": "never"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
 			}
 		},
 		{
@@ -22,6 +18,10 @@
 			"type": "shell",
 			"problemMatcher": [],
 			"command": "vsce package",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
 		}
 	]
 }

@@ -28,7 +28,7 @@
 				"${workspaceFolder}/out/**/*.js"
 			],
 			"smartStep": true,
-			"preLaunchTask": "${defaultBuildTask}"
+			"preLaunchTask": "npm:watch"
 		},
 		{
 			"name": "Extension Tests",
@@ -42,7 +42,7 @@
 			"outFiles": [
 				"${workspaceFolder}/out/test/**/*.js"
 			],
-			"preLaunchTask": "${defaultBuildTask}"
+			"preLaunchTask": "npm:watch"
 		}
 	]
 }

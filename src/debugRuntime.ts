@@ -116,7 +116,7 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession = new RSession(terminalPath, rPath, cwd, rArgs);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		if(!this.rSession.successTerminal){
-            vscode.window.showErrorMessage('Terminal path not valid!');
+            vscode.window.showErrorMessage('Terminal path not working:\n' + terminalPath);
 			this.terminate();
 			return;
 		}
@@ -148,7 +148,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// abort if the terminal does not print the message (--> R has not started!)
 		if(!successR){
-            vscode.window.showErrorMessage('R path not valid!');
+            vscode.window.showErrorMessage('R path not working:\n' + rPath);
 			this.terminate();
 			return;
 		}
@@ -556,12 +556,16 @@ export class DebugRuntime extends EventEmitter {
 	}
 	
 	// forward an expression entered into the debug window to R
-	public async evaluate(expr: string, frameId: number | undefined) {
+	public async evaluate(expr: string, frameId: number | undefined, context: string|undefined) {
+		var silent: boolean = false;
+		if(context==='watch'){
+			silent = true;
+		}
 		if(isUndefined(frameId)){
 			frameId = 0;
 		}
 		expr = toRStringLiteral(expr, '"');
-		this.rSession.callFunction('.vsc.evalInFrame', [expr, frameId]);
+		this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent});
 		this.requestInfoFromR();
 		// await this.waitForMessages();
 	}
