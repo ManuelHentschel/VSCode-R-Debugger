@@ -7,6 +7,7 @@ This extension adds debugging capabilities for the R programming language.
 ## Using the Debugger
 * Install the **R Debugger** extension in VS Code.
 * Install the **vscDebugger** package in R (https://github.com/ManuelHentschel/vscodeRPackage).
+* Make sure the settings `rdebugger.rterm.XXX` and `rdebugger.terminal.XXX` contain valid paths to R and a terminal program
 * Create an R file containing a function `main()` that can be called without any arguments
 * **Warning:** For this extension to work, a functional project structure must be used. For details see below.
 * Press F5 and select `R Debugger` as debugger
@@ -92,3 +93,4 @@ General
 * Implement debugging of normal script files (similiar to RStudio's `debugsource()`)
 * Graphical output etc.?
 * Source line info does not work for modified `print()` when called from a line with breakpoint
+* Debug files in the current workspace? (attach to currently open R process instead of spawning a new one?)
