@@ -310,6 +310,10 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// read info about the browser/debugger
+		if(/Tracing (.*)step \d+/.test(line)){
+			showLine = false;
+			this.hitBreakpoint()
+		}
 		tmpRegex = /Browse\[\d+\]> /;
 		if(tmpRegex.test(line)){
 			// R has entered the browser (usually caused by a breakpoint or step)
@@ -373,6 +377,16 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
+	private hitBreakpoint(){
+		this.stdoutIsBrowserInfo = true;
+		this.rSession.callFunction('.vsc.getLineNumberAtBreakpoint')
+		this.rSession.runCommand('n');
+		this.requestInfoFromR();
+		// event is sent after receiving stack from R in order to answer stack-request synchrnously:
+		// (apparently required by vsc?)
+		this.sendEventOnStack = 'stopOnBreakpoint';
+	}
+
 	private async handleJson(json: string){
 		// handles the json that is printed by .vsc.sendToVsc()
 		// is called by this.handleLine() if the line contains a json enclosed by this.delimiter0 and this.delimiter1
@@ -389,12 +403,13 @@ export class DebugRuntime extends EventEmitter {
 
 		switch(message){
 			case 'breakpoint':
-				this.stdoutIsBrowserInfo = true;
-				this.rSession.runCommand('n');
-				this.requestInfoFromR();
-				// event is sent after receiving stack from R in order to answer stack-request synchrnously:
-				// (apparently required by vsc?)
-				this.sendEventOnStack = 'stopOnBreakpoint'; 
+				// should not occurr anymore
+				this.hitBreakpoint();
+				break;
+			case 'lineAtBreakpoint':
+				if(body>0){
+					this.currentLine = body;
+				}
 				break;
 			case 'error':
 				this.stdoutIsBrowserInfo = true;
