@@ -93,8 +93,5 @@ General
 * Implement debugging of normal script files (similiar to RStudio's `debugsource()`)
 * Graphical output etc.?
 * Source line info does not work for modified `print()` when called from a line with breakpoint
-<<<<<<< HEAD
-=======
 * Debug files in the current workspace? (attach to currently open R process instead of spawning a new one?)
 * Nested formatting of output in the debug console (use existing functionality from variables view)
->>>>>>> develop
