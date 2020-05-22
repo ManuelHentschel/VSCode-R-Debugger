@@ -138,6 +138,11 @@
           "type": "boolean",
           "default": true,
           "description": "Whether to write a new cat() function to .GlobalEnv (base::cat is not affected)"
+        },
+        "rdebugger.setBreakpointsInPackages": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to enable breakpoints in packages. Can impact performance if set to true."
         }
       }
     }

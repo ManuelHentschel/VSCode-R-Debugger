@@ -76,6 +76,7 @@ Variables/Stack view
 * Summarize large lists (min, max, mean, ...)
 * Load large workspaces/lists in chunks (currently hardcoded 1000 items maximum)
 * Enable copying from variables list
+* Customize numbering for unnamed lists, vectors etc. (e.g. [[1]] for lists, [1] for vectors, [1,1] for matrices)
 
 Exception handling
 * Properly display exception info (how do I show the large red box?)

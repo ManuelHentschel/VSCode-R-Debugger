@@ -32,7 +32,8 @@ export class DebugSession extends LoggingDebugSession {
 
 	private _configurationDone = new Subject();
 
-	private _evalResponse: DebugProtocol.EvaluateResponse[] = [];
+	private _evalResponses: DebugProtocol.EvaluateResponse[] = [];
+	private _breakpointsResponses: DebugProtocol.SetBreakpointsResponse[] = [];
 
 	private _logLevel = 3;
 
@@ -68,7 +69,7 @@ export class DebugSession extends LoggingDebugSession {
 			this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID, 'Informative exception text'));
 		});
 		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
-			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>{ verified: bp.verified, id: bp.id }));
+			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>bp));
 		});
 		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line=1, column=1) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
@@ -103,7 +104,7 @@ export class DebugSession extends LoggingDebugSession {
 			this.sendEvent(new TerminatedEvent());
 		});
 		this._runtime.on('evalResponse', (result: string) => {
-			const response = this._evalResponse.shift();
+			const response = this._evalResponses.shift();
 			if(result.length>0){
 				response.body = {
 					result: result,
@@ -114,6 +115,9 @@ export class DebugSession extends LoggingDebugSession {
 			}
 			this.logAndSendResponse(response);
 		});
+		this._runtime.on('breakpointResponse', (breakpoints: any) => {
+
+		})
 	}
 
 	/**
@@ -245,6 +249,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			breakpoints: actualBreakpoints
 		};
+		this._breakpointsResponses.push(response)
 		this.logAndSendResponse(response);
 	}
 
@@ -386,7 +391,7 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
 		this.logRequest(response);
-		this._evalResponse.push(response);
+		this._evalResponses.push(response);
 		this._runtime.evaluate(args.expression, args.frameId, args.context);
 		// this.logAndSendResponse(response);
 	}

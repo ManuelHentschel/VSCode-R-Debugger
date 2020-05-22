@@ -10,7 +10,7 @@ import { workspace } from 'vscode';
 import {getRPath, getTerminalPath, escapeForRegex, toRStringLiteral } from "./utils";
 import { TextDecoder, isUndefined } from 'util';
 
-import { RSession } from './rSession';
+import { RSession, makeFunctionCall } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
 
 
@@ -20,6 +20,7 @@ export interface DebugBreakpoint {
 	line: number;
 	verified: boolean;
 }
+
 
 export class DebugRuntime extends EventEmitter {
 
@@ -157,23 +158,36 @@ export class DebugRuntime extends EventEmitter {
 		// missing R package will be handled by this.handleData()
 		this.sendEvent('output', 'library: ' + this.packageName);
 		const libraryCommandArgs = {
-			expr: 'base::library(' + this.packageName + ')',
-			error: 'function(e){base::cat(' + toRStringLiteral(this.libraryNotFoundString) + ',"\\n")}'
+			expr: makeFunctionCall('library', this.packageName, [], 'base'),
+			error: 'function(e){' + makeFunctionCall('cat', toRStringLiteral(this.libraryNotFoundString), toRStringLiteral('\n'), 'base') + '}',
+			silent: true
+			// expr: 'base::library(' + this.packageName + ')',
+			// error: 'function(e){base::cat(' + toRStringLiteral(this.libraryNotFoundString) + ',"\\n")}'
 		}
-		this.rSession.callFunction('tryCatch', libraryCommandArgs, 'base')
+		this.rSession.callFunction('tryCatch', libraryCommandArgs, [], 'base')
 
 		// source file that is being debugged
 		this.sendEvent('output', 'program: ' + program)
-		this.rSession.callFunction('source', [toRStringLiteral(program)], 'base');
+		this.rSession.callFunction('source', [toRStringLiteral(program)], [], 'base');
 
 		// all R function calls from here on are meant for functions from the vsc-extension:
 		this.rSession.defaultLibrary = this.packageName;
 
 		// set breakpoints in R
+		const setBreakPointsInPackages = config.get<boolean>('setBreakpointsInPackages', false)
 		this.breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
-			bps.forEach((bp: DebugBreakpoint) => {
-				this.rSession.callFunction('.vsc.mySetBreakpoint', [toRStringLiteral(path), bp.line]);
-			});
+			const lines = bps.map(bp => bp.line)
+			const ids = bps.map(bp => bp.id)
+			const rArgs = {
+				srcfile: toRStringLiteral(path),
+				lines: 'list(' + lines.join(',') + ')',
+				includePackages: setBreakPointsInPackages,
+				ids: 'list(' + ids.join(',') + ')'
+			}
+			this.rSession.callFunction('.vsc.setBreakpoint', rArgs)
+			// bps.forEach((bp: DebugBreakpoint) => {
+				// this.rSession.callFunction('.vsc.mySetBreakpoint', [toRStringLiteral(path), bp.line]);
+			// });
 		});
 
 
@@ -406,6 +420,10 @@ export class DebugRuntime extends EventEmitter {
 				// should not occurr anymore
 				this.hitBreakpoint();
 				break;
+			case 'breakpointVerification':
+				const bp = body;
+				this.sendEvent('breakpointValidated', bp);
+				break;
 			case 'lineAtBreakpoint':
 				if(body>0){
 					this.currentLine = body;
@@ -455,6 +473,9 @@ export class DebugRuntime extends EventEmitter {
 				// is sent by .vsc.runMain() if no main() is found
 				vscode.window.showErrorMessage('No main() function found in .GlobalEnv!')
 				this.terminate();
+				break;
+			case 'acknowledge':
+				// ignore, just update this.messageId
 				break;
 			default:
 				console.warn('Unknown message: ' + message);
@@ -631,10 +652,11 @@ export class DebugRuntime extends EventEmitter {
 		bps.push(bp);
 
 
-		this.verifyBreakpoints(path); //currently dummy
+		// this.verifyBreakpoints(path); //currently dummy
 
 		return bp;
 	}
+
 
 	private verifyBreakpoints(path: string) : void {
 		// dummy

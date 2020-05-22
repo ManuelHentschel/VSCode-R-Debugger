@@ -3,12 +3,17 @@
 import * as child from 'child_process';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { trimLastNewline } from 'vscode-debugadapter/lib/logger';
-import { isUndefined, isBoolean } from 'util';
+import { isUndefined, isBoolean, isNumber, isArray, isObject } from 'util';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+export type unnamedRArg = (number|string|boolean);
+export type unnamedRArgs = unnamedRArg[];
+export type namedRArgs = {[arg:string]: unnamedRArg};
+export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
+
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
     public isBusy: boolean = false;
@@ -96,31 +101,9 @@ export class RSession {
     }
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[], library: string = this.defaultLibrary){
-        // if necessary, convert args form object-form to array, save to args2 to have a unambiguous data type
-        var args2: (string|number)[] = [];
-        if(Array.isArray(args)){
-            args2 = args;
-        } else {
-            for(var arg in args){
-                var value = args[arg]
-                if(isBoolean(value)){
-                    if(value){
-                        value = 'TRUE'
-                    } else{
-                        value = 'FALSE'
-                    }
-                }
-                args2.push(arg + '=' + value);
-            }
-        }
-
-        if(library != ''){
-            library = library + '::'
-        }
-
-        // construct and execute function-call
-        const cmd = library + fnc + '(' + args2.join(',') + ')';
+    // public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[], library: string = this.defaultLibrary){
+    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = this.defaultLibrary){
+        const cmd = makeFunctionCall(fnc, args, args2, library)
         this.runCommand(cmd);
     }
 
@@ -130,6 +113,56 @@ export class RSession {
     }
 }
 
+
+export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = ''): string{
+    // if necessary, convert args form object-form to array, save to args2 to have a unambiguous data type
+    args = convertToUnnamedArgs(args);
+    args2 = convertToUnnamedArgs(args2);
+    args = args.concat(args2)
+    const argString = unnamedRArgsToString(args)
+
+    if(library != ''){
+        library = library + '::'
+    }
+
+    // construct and execute function-call
+    const cmd = library + fnc + '(' + argString + ')';
+    return cmd;
+}
+
+
+function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
+    var ret: unnamedRArgs
+    if(isArray(args)){
+        ret = <unnamedRArgs>args;
+    } else if(isObject(args)){
+        ret = [];
+        for(const arg in <namedRArgs>args){
+            ret.push(arg + '=' + unnamedRArgToString(args[arg]))
+        }
+    } else{
+        ret = [<unnamedRArg>args]
+    }
+    return ret;
+}
+
+function unnamedRArgsToString(args: unnamedRArgs): string{
+    return args.map(unnamedRArgToString).join(',')
+}
+
+function unnamedRArgToString(arg: unnamedRArg): string{
+    var ret: string;
+    if(typeof arg === 'boolean'){
+        if(arg){
+            ret = 'TRUE';
+        } else{
+            ret = 'FALSE';
+        }
+    } else {
+        ret = '' + arg;
+    }
+    return ret;
+}
 
 
 
