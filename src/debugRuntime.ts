@@ -67,6 +67,7 @@ export class DebugRuntime extends EventEmitter {
 	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
 	private isCrashed: boolean = false; // is set to true upon encountering an error (in R)
 	private ignoreOutput: boolean = false; // is set to true after terminating the session
+	private expectBrowser: boolean = false;
 
 	// used to store text if only part of a line is read form cp.stdout/cp.sterr
 	private restOfStdout: string = "";
@@ -335,6 +336,11 @@ export class DebugRuntime extends EventEmitter {
 			showLine = false;
 			// this.stdoutIsBrowserInfo is set to true by a message to vsc with message 'breakpoint'
 			this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
+			if(!this.expectBrowser){
+				// unexpected breakpoint:
+				this.hitUnexpectedBreakpoint();
+			}
+			
 			console.log('shows prompt');
 			this.rSession.showsPrompt();
 		} 
@@ -393,11 +399,20 @@ export class DebugRuntime extends EventEmitter {
 
 	private hitBreakpoint(){
 		this.stdoutIsBrowserInfo = true;
-		this.rSession.callFunction('.vsc.getLineNumberAtBreakpoint')
+		this.expectBrowser = true;
+		this.rSession.callFunction('.vsc.getLineAtBreakpoint')
 		this.rSession.runCommand('n');
 		this.requestInfoFromR();
-		// event is sent after receiving stack from R in order to answer stack-request synchrnously:
+		// event is sent after receiving stack from R in order to answer stack-request synchronously:
 		// (apparently required by vsc?)
+		this.sendEventOnStack = 'stopOnBreakpoint';
+	}
+
+	private hitUnexpectedBreakpoint(){
+		this.stdoutIsBrowserInfo = false;
+		this.expectBrowser = true;
+		this.rSession.callFunction('.vsc.getLineAtBrowser');
+		this.requestInfoFromR();
 		this.sendEventOnStack = 'stopOnBreakpoint';
 	}
 
@@ -426,7 +441,7 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'lineAtBreakpoint':
 				if(body>0){
-					this.currentLine = body;
+					this.currentLine = body.line;
 				}
 				break;
 			case 'error':
@@ -549,6 +564,7 @@ export class DebugRuntime extends EventEmitter {
 		if(this.isCrashed){
 			this.terminateFromBrowser();
 		} else{
+			this.expectBrowser = false;
 			this.rSession.runCommand('c');
 		}
 	}
