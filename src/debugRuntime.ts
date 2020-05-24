@@ -10,7 +10,7 @@ import { workspace } from 'vscode';
 import {getRPath, getTerminalPath, escapeForRegex, toRStringLiteral } from "./utils";
 import { TextDecoder, isUndefined } from 'util';
 
-import { RSession, makeFunctionCall } from './rSession';
+import { RSession, makeFunctionCall, anyRArgs } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
 
 
@@ -30,9 +30,9 @@ export class DebugRuntime extends EventEmitter {
 	// TODO: replace with a dedicated pipe between R and vsc?
 	readonly delimiter0 = '<v\\s\\c>';
 	readonly delimiter1 = '</v\\s\\c>';
-	readonly rprompt = '<#v\\s\\c>'; //actual prompt is followed by a newline to make easier to identify
+	readonly rPrompt = '<#v\\s\\c>'; //actual prompt is followed by a newline to make easier to identify
 	readonly rStartup = '<v\\s\\c\\R\\STARTUP>'
-	readonly libraryNotFoundString = '<v\\s\\c\\LIBRARY\\NOT\\FOUND>';
+	readonly libraryNotFound = '<v\\s\\c\\LIBRARY\\NOT\\FOUND>';
 	readonly packageName = 'vscDebugger';
 
 	// The file we are debugging
@@ -40,6 +40,7 @@ export class DebugRuntime extends EventEmitter {
 
 	// The current line
 	private currentLine = 0;
+	private currentFile = '';
 
 	// maps from sourceFile to array of breakpoints
 	// TODO: rework breakpoints entirely
@@ -83,9 +84,9 @@ export class DebugRuntime extends EventEmitter {
 
 	// debugMode
 	private mainFunction: string = 'main';
+	private callMain: boolean = true;
 	private allowDebugGlobal: boolean = false;
 	private debugMode: ('function'|'global');
-	private tmpDebugMode: ('function'|'global');
 
 
 	////////////////////////////////////////////////////
@@ -96,8 +97,8 @@ export class DebugRuntime extends EventEmitter {
 	constructor() {
 		super();
 		this.allowDebugGlobal = true;
+		this.callMain = false;
 		this.debugMode = 'global';
-		this.tmpDebugMode = 'global';
 	}
 
 	// start
@@ -112,9 +113,9 @@ export class DebugRuntime extends EventEmitter {
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
-		// group ends by outputting 'end: '
+		// group ends by outputting 'end:'
 		this.sendEvent('output', 'startCollapsed: Starting R session...');
-		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rprompt}`);
+		this.sendEvent('output',`delimiter0: ${this.delimiter0}\ndelimiter1:${this.delimiter1}\nR-Prompt: ${this.rPrompt}`);
 
 		// start R in child process
 		const terminalPath = getTerminalPath(); // read OS-specific terminal path from config
@@ -169,7 +170,7 @@ export class DebugRuntime extends EventEmitter {
 		this.sendEvent('output', 'library: ' + this.packageName);
 		const libraryCommandArgs = {
 			expr: makeFunctionCall('library', this.packageName, [], 'base'),
-			error: 'function(e){' + makeFunctionCall('cat', toRStringLiteral(this.libraryNotFoundString), toRStringLiteral('\n'), 'base') + '}',
+			error: 'function(e)' + makeFunctionCall('cat', toRStringLiteral(this.libraryNotFound), toRStringLiteral('\n'), 'base'),
 			silent: true
 		}
 		this.rSession.callFunction('tryCatch', libraryCommandArgs, [], 'base')
@@ -177,7 +178,7 @@ export class DebugRuntime extends EventEmitter {
 		if(this.debugMode === 'function'){
 			// source file that is being debugged
 			this.sendEvent('output', 'program: ' + program)
-			this.rSession.callFunction('source', [toRStringLiteral(program)], [], 'base');
+			this.rSession.callFunction('source', toRStringLiteral(program), [], 'base');
 		}
 
 		// all R function calls from here on are meant for functions from the vsc-extension:
@@ -191,14 +192,11 @@ export class DebugRuntime extends EventEmitter {
 				const ids = bps.map(bp => bp.id)
 				const rArgs = {
 					srcfile: toRStringLiteral(path),
-					lines: 'list(' + lines.join(',') + ')',
+					lines: lines,
 					includePackages: setBreakPointsInPackages,
-					ids: 'list(' + ids.join(',') + ')'
+					ids: ids
 				}
 				this.rSession.callFunction('.vsc.setBreakpoint', rArgs)
-				// bps.forEach((bp: DebugBreakpoint) => {
-					// this.rSession.callFunction('.vsc.mySetBreakpoint', [toRStringLiteral(path), bp.line]);
-				// });
 			});
 		}
 
@@ -211,22 +209,11 @@ export class DebugRuntime extends EventEmitter {
 			debugGlobal: this.allowDebugGlobal
 		}
 
-		// if(this.debugMode === 'function'){
-		// 	// call .vsc.runMain, which looks for a main() function in the .GlobalEnv
-		// 	// in case main() is missing, it is reported by the R-package and handled by this.handleData()
-		// 	this.rSession.callFunction('.vsc.runMain', options);
-		// }
-
-		// if(this.debugMode === 'global'){
-		// 	this.requestInfoFromR();
-		// 	this.sendEventOnStack = 'stopOnBreakpoint'
-		// }
-
 		this.rSession.callFunction('.vsc.prepGlobalEnv', options);
 
 
 
-		this.sendEvent('output', 'end: '); // end info group
+		this.sendEvent('output', 'end:'); // end info group
 	}
 
 	// async method to wait for R to be ready
@@ -345,47 +332,44 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// Check for Library-Not-Found-Message
-		if(!this.isRunningMain && RegExp(escapeForRegex(this.libraryNotFoundString)).test(line)){
+		if(!this.isRunningMain && RegExp(escapeForRegex(this.libraryNotFound)).test(line)){
 			console.error('R-Library not found!');
 			vscode.window.showErrorMessage('Please install the R package "' + this.packageName + '"!');
 			this.terminate();
 		}
 
-		// read info about the browser/debugger
+		// Breakpoints set with trace() are preceded by this:
 		if(/Tracing (.*)step \d+/.test(line)){
 			showLine = false;
+			this.stdoutIsBrowserInfo = true;
 			this.hitBreakpoint()
 		}
+
+		// Upon hitting a breakpoint/browser():
 		tmpRegex = /Browse\[\d+\]> /;
 		if(tmpRegex.test(line)){
-			// R has entered the browser (usually caused by a breakpoint or step)
+			// R has entered the browser
 			line = line.replace(tmpRegex,'');
 			showLine = false;
-			// this.stdoutIsBrowserInfo is set to true by a message to vsc with message 'breakpoint'
 			this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
 			if(!this.expectBrowser){
 				// unexpected breakpoint:
-				this.hitUnexpectedBreakpoint();
+				this.hitBreakpoint(false);
 			}
-			
-			console.log('shows prompt');
+			console.log('matches: browser prompt');
 			this.rSession.showsPrompt();
 		} 
-		if(/Called from: (.*)\n/.test(line)){
-			// part of browser-info
-			showLine = false;
-		}
-		if(isFullLine && (/debug: /.test(line) ||
-				/exiting from: /.test(line) ||
-				/debugging in: /.test(line))){
-			// part of browser-info
-			showLine = false;
+
+		// filter out additional browser info:
+		if(isFullLine && (/(?:debug|exiting from|debugging|Called from): /.test(line))){
+			showLine = false; // part of browser-info
 			this.stdoutIsBrowserInfo = true;
 		}
+
+		// get current line from browser:
 		tmpMatches = /^debug at (.*)#(\d+): .*$/.exec(line);
 		if(tmpMatches){
-			// part of browser-info
-			// this.currentFile = tmpMatches[1];
+			this.currentFile = tmpMatches[1];
 			this.currentLine = parseInt(tmpMatches[2]);
 			try {
 				this.stack['frames'][0]['line'] = this.currentLine;
@@ -401,6 +385,7 @@ export class DebugRuntime extends EventEmitter {
 			showLine = false;
 		}
 		tmpRegex = new RegExp(this.packageName + '::')
+		//matches all calls to 'our' R package. (Refine in case the user makes such calls?)
 		if(isFullLine && tmpRegex.test(line)) {
 			// was a command sent to R by the debugger
 			console.log('matches: vscDebugger::');
@@ -408,18 +393,21 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// check for prompt
-		const promptRegex = new RegExp(escapeForRegex(this.rprompt));
+		const promptRegex = new RegExp(escapeForRegex(this.rPrompt));
 		if(promptRegex.test(line) && isFullLine){
-			console.log("matches: prompt (->End)");
+			console.log("matches: prompt");
 			if(this.allowDebugGlobal){
-				this.tmpDebugMode = 'global';
+				this.debugMode = 'global';
 				this.rSession.showsPrompt();
+				this.expectBrowser = false;
 			} else if(this.isRunningMain){
 				this.sendEvent('end')
 			}
 			showLine = false;
 			return '';
-		} //else {
+		}
+
+		// output any part of the line that was not parsed
 		if(showLine && line.length>0){
 			if(isFullLine){
 				line = line + '\n';
@@ -433,22 +421,21 @@ export class DebugRuntime extends EventEmitter {
 	private async handleJson(json: string){
 		// handles the json that is printed by .vsc.sendToVsc()
 		// is called by this.handleLine() if the line contains a json enclosed by this.delimiter0 and this.delimiter1
+		// TODO: send json via separate pipe?
+
+		// jsons are of the form: {message: string; body: any; id: number}
 		const j = JSON.parse(json);
 		const message = j['message'];
 		const body = j['body'];
 		const id = j['id'];
-		console.log('message ' + id + ': ' + message);
+		console.log('message (#' + id + '): ' + message);
 
 		// update Id of latest message
-		// requests are handled sequentially by R --> no need to check fro previous message Ids
-		// use max() since unrequested are sent with id=0
+		// requests are handled sequentially by R --> no need to check for previous message Ids
+		// use max() since unrequested messages are sent with id=0
 		this.messageId = Math.max(this.messageId, id)
 
 		switch(message){
-			case 'breakpoint':
-				// should not occurr anymore
-				this.hitBreakpoint();
-				break;
 			case 'breakpointVerification':
 				const bp = body;
 				this.sendEvent('breakpointValidated', bp);
@@ -471,7 +458,7 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'go':
 				this.isRunningMain = true;
-				this.sendEventOnStack = 'stopOnBreakpoint';
+				this.sendEventOnStack = 'stopOnEntry';
 				this.rSession.useQueue = this.useRCommandQueue;
 				this.requestInfoFromR();
 				break;
@@ -495,6 +482,7 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'eval':
 				const result = body;
+				await this.waitForMessages();
 				this.sendEvent('evalResponse', result);
 				// relies on fast execution by R (--> only one evalResponse outstanding at any time)
 				break;
@@ -518,26 +506,24 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	private hitBreakpoint(){
-		this.stdoutIsBrowserInfo = true;
-		this.expectBrowser = true;
-		this.tmpDebugMode = 'function';
-		this.rSession.callFunction('.vsc.getLineAtBreakpoint')
-		this.rSession.runCommand('n');
+	private hitBreakpoint(expected: boolean = true){
+		this.expectBrowser = true; //indicates that following browser statements are no 'new' breakpoint
+		this.debugMode = 'function';
+		if(expected){
+			this.stdoutIsBrowserInfo = true; 
+			this.rSession.clearQueue()
+			this.rSession.callFunction('.vsc.getLineAtBreakpoint')
+			this.rSession.runCommand('n');
+		} else{
+			this.rSession.clearQueue()
+			this.rSession.callFunction('.vsc.getLineAtBrowser');
+		}
 		this.requestInfoFromR();
 		// event is sent after receiving stack from R in order to answer stack-request synchronously:
 		// (apparently required by vsc?)
 		this.sendEventOnStack = 'stopOnBreakpoint';
 	}
 
-	private hitUnexpectedBreakpoint(){
-		this.stdoutIsBrowserInfo = false;
-		this.expectBrowser = true;
-		this.tmpDebugMode = 'function';
-		this.rSession.callFunction('.vsc.getLineAtBrowser');
-		this.requestInfoFromR();
-		this.sendEventOnStack = 'stopOnBreakpoint';
-	}
 
 	// Async function to wait for responses from R
 	// waits for this.messageId to catch up with this.requestId
@@ -578,43 +564,55 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// request info about the stack and workspace from R:
-	private requestInfoFromR(args = {}) {
-		args = {
-			...args,
+	private requestInfoFromR(args: anyRArgs = []) {
+		const args2 = {
 			'id': ++this.requestId,
 			'isError': this.isCrashed
 		};
-		this.rSession.callFunction('.vsc.getStack', args);
+		this.rSession.callFunction('.vsc.getStack', args, args2);
 		return this.waitForMessages();
 	}
 
 	// request info about specific variables from R:
 	private requestVariablesFromR(refs: number[]){
-		const refListForR = 'list(' + refs.join(',') + ')';
-		const args = {'refs': refListForR, 'id': ++this.requestId};
+		const args = {'refs': refs, 'id': ++this.requestId};
 		this.rSession.callFunction('.vsc.getVarLists', args);
 		return this.waitForMessages();
 	}
 
 
 	///////////////////////////////////////////////
-	// step-control
+	// FLOW CONTROL
 	///////////////////////////////////////////////
 
 	// continue script execution:
 	public continue(reverse = false) {
 		if(this.isCrashed){
-			this.terminateFromBrowser();
-		} else{
+			this.terminateFromPrompt();
+		} else if(this.debugMode === 'function'){
 			this.expectBrowser = false;
 			this.rSession.runCommand('c');
+		} else{
+			const filename = vscode.window.activeTextEditor.document.fileName;
+			const filenameR = toRStringLiteral(filename);
+			const bps = this.breakPoints.get(filename);
+			var lines: number[];
+			if(bps === undefined){
+				lines = [];
+			} else{
+				lines = bps.map((bp: DebugBreakpoint) => bp.line);
+			}
+			this.rSession.callFunction('.vsc.debugSource', {file: filenameR, breakpoints: lines});
+			this.requestInfoFromR({dummyFile: filenameR});
+			// this.sendEventOnStack = 'stopOnStepPreserveFocus';
+			this.sendEventOnStack = 'stopOnStep';
 		}
 	}
 
 	// step:
 	public async step(reverse = false, event = 'stopOnStep') {
 		if(this.isCrashed){
-			this.terminateFromBrowser();
+			this.terminateFromPrompt();
 		} else {
 			// await this.waitForMessages();
 			this.rSession.runCommand('n');
@@ -627,7 +625,7 @@ export class DebugRuntime extends EventEmitter {
 	// step into function:
 	public async stepIn(event = 'stopOnStep') {
 		if(this.isCrashed){
-			this.terminateFromBrowser();
+			this.terminateFromPrompt();
 		} else {
 			await this.waitForMessages();
 			this.rSession.runCommand('s');
@@ -640,7 +638,7 @@ export class DebugRuntime extends EventEmitter {
 	// execute rest of function:
 	public async stepOut(reverse = false, event = 'stopOnStep') {
 		if(this.isCrashed){
-			this.terminateFromBrowser();
+			this.terminateFromPrompt();
 		} else {
 			await this.waitForMessages();
 			this.rSession.runCommand('f');
@@ -649,9 +647,9 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 	
-	// forward an expression entered into the debug window to R
+	// evaluate an expression entered into the debug window in R
 	public async evaluate(expr: string, frameId: number | undefined, context: string|undefined) {
-		if(this.tmpDebugMode==='function'){
+		if(this.debugMode==='function'){
 			var silent: boolean = false;
 			if(context==='watch'){
 				silent = true;
@@ -661,22 +659,29 @@ export class DebugRuntime extends EventEmitter {
 			}
 			expr = toRStringLiteral(expr, '"');
 			this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent});
+			this.requestInfoFromR();
 		} else{
+			//debugMode==='global'
 			this.rSession.runCommand(expr)
+			await this.requestInfoFromR();
 			this.sendEvent('evalResponse', []);
 		}
-		this.requestInfoFromR();
+		
 		// await this.waitForMessages();
 	}
 
 
-	// info for debug session
+	public getStack(startFrame: number, endFrame: number) {
+		// can be returned synchronously since step-events are sent only after receiving stack info
+		return this.stack;
+	}
+
 	public getScopes(frameId: number) {
-		// await this.waitForMessages();
+		// can be returned synchronously since step-events are sent only after receiving stack info
+		// stack info includes scopes
 		return this.stack['frames'][frameId]['scopes'];
 	}
 
-	// public async getVariables(scope: string) {
 	public async getVariables(varRef: number) {
 		// await this.waitForMessages();
 		if(this.variables[varRef]){
@@ -686,12 +691,6 @@ export class DebugRuntime extends EventEmitter {
 			await this.waitForMessages();
 			return this.variables[varRef];
 		}
-	}
-
-	public getStack(startFrame: number, endFrame: number) {
-		// await this.waitForMessages();
-		// can be returned synchronously since step-events are sent only after receiving stack info
-		return this.stack;
 	}
 
 	public getBreakpoints(path: string, line: number): number[] {
@@ -714,9 +713,6 @@ export class DebugRuntime extends EventEmitter {
 		}
 		bps.push(bp);
 
-
-		// this.verifyBreakpoints(path); //currently dummy
-
 		return bp;
 	}
 
@@ -735,9 +731,6 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	/*
-	 * Clear breakpoint in file with given line.
-	 */
 	public clearBreakPoint(path: string, line: number) : DebugBreakpoint | undefined {
 		// dummy
 		return undefined;
@@ -769,11 +762,15 @@ export class DebugRuntime extends EventEmitter {
 		// this.sendEvent('end');
 	}
 
-	public terminateFromBrowser(): void {
+	public terminateFromPrompt(): void {
 		this.ignoreOutput = true;
 		this.isRunningMain = false;
 		this.rSession.clearQueue();
-		this.rSession.runCommand('Q', [], true);
+		if(this.debugMode === 'function'){
+			this.rSession.runCommand('Q', [], true);
+		} else{
+			this.rSession.callFunction('quit', {save: '"no"'}, [], 'base')
+		}
 		this.sendEvent('end');
 	}
 
