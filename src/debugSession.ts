@@ -200,22 +200,20 @@ export class DebugSession extends LoggingDebugSession {
 	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
 
 		const path = <string>args.source.path;
-		const clientLines = args.lines || [];
+		const lines = args.lines || [];
 
-		// clear all breakpoints for this file
-		this._runtime.clearBreakpoints(path);
+		// clear old breakpoints
+		this._runtime.clearBreakpoints(path)
 
-		// set and verify breakpoint locations
-		const actualBreakpoints = clientLines.map(l => {
-			let { verified, line, id } = this._runtime.setBreakPoint(path, l);
-			const bp = <DebugProtocol.Breakpoint> new Breakpoint(verified, l);
-			bp.id = id;
+		// set breakpoint locations
+		const bps = lines.map(l => {
+			const bp = <DebugProtocol.Breakpoint>this._runtime.setBreakPoint(path, l);
 			return bp;
 		});
 
 		// send back the actual breakpoint positions
 		response.body = {
-			breakpoints: actualBreakpoints
+			breakpoints: bps
 		};
 		this._breakpointsResponses.push(response)
 		this.sendResponse(response);

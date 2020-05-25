@@ -184,20 +184,21 @@ export class DebugRuntime extends EventEmitter {
 		// all R function calls from here on are meant for functions from the vsc-extension:
 		this.rSession.defaultLibrary = this.packageName;
 
-		if(this.debugMode === 'function'){
-			// set breakpoints in R
-			const setBreakPointsInPackages = config.get<boolean>('setBreakpointsInPackages', false)
-			this.breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
-				const lines = bps.map(bp => bp.line)
-				const ids = bps.map(bp => bp.id)
-				const rArgs = {
-					srcfile: toRStringLiteral(path),
-					lines: lines,
-					includePackages: setBreakPointsInPackages,
-					ids: ids
-				}
-				this.rSession.callFunction('.vsc.setBreakpoint', rArgs)
-			});
+		// set breakpoints in R
+		const setBreakPointsInPackages = config.get<boolean>('setBreakpointsInPackages', false)
+		this.breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
+			const lines = bps.map(bp => bp.line)
+			const ids = bps.map(bp => bp.id)
+			const rArgs = {
+				file: toRStringLiteral(path),
+				lines: lines,
+				includePackages: setBreakPointsInPackages,
+				ids: ids
+			}
+			this.rSession.callFunction('.vsc.addBreakpoints', rArgs)
+		});
+		if(this.debugMode=='function'){
+			this.rSession.callFunction('.vsc.setStoredBreakpoints');
 		}
 
 
@@ -397,7 +398,11 @@ export class DebugRuntime extends EventEmitter {
 		if(promptRegex.test(line) && isFullLine){
 			console.log("matches: prompt");
 			if(this.allowDebugGlobal){
-				this.debugMode = 'global';
+				if(this.debugMode == 'function'){
+					this.sendEventOnStack = 'stopOnEntry';
+					this.requestInfoFromR();
+					this.debugMode = 'global';
+				}
 				this.rSession.showsPrompt();
 				this.expectBrowser = false;
 			} else if(this.isRunningMain){
@@ -595,14 +600,7 @@ export class DebugRuntime extends EventEmitter {
 		} else{
 			const filename = vscode.window.activeTextEditor.document.fileName;
 			const filenameR = toRStringLiteral(filename);
-			const bps = this.breakPoints.get(filename);
-			var lines: number[];
-			if(bps === undefined){
-				lines = [];
-			} else{
-				lines = bps.map((bp: DebugBreakpoint) => bp.line);
-			}
-			this.rSession.callFunction('.vsc.debugSource', {file: filenameR, breakpoints: lines});
+			this.rSession.callFunction('.vsc.debugSource', {file: filenameR});
 			this.requestInfoFromR({dummyFile: filenameR});
 			// this.sendEventOnStack = 'stopOnStepPreserveFocus';
 			this.sendEventOnStack = 'stopOnStep';
@@ -705,13 +703,27 @@ export class DebugRuntime extends EventEmitter {
 	// breakpoint control
 	public setBreakPoint(path: string, line: number) : DebugBreakpoint {
 
-		const bp = <DebugBreakpoint> { verified: false, line, id: this.breakpointId++ };
+		const bp = <DebugBreakpoint> {verified: false, line: line, id: this.breakpointId++};
 		let bps = this.breakPoints.get(path);
 		if (!bps) {
 			bps = new Array<DebugBreakpoint>();
-			this.breakPoints.set(path, bps);
 		}
 		bps.push(bp);
+		this.breakPoints.set(path, bps);
+
+		const setBreakPointsInPackages = false;
+		const lines: number[] = bps.map(bp => bp.line)
+		const ids: number[] = bps.map(bp => bp.id)
+		const rArgs = {
+			file: toRStringLiteral(path),
+			lines: lines,
+			includePackages: setBreakPointsInPackages,
+			ids: ids
+		}
+
+		if(this.isRunningMain){
+			this.rSession.callFunction('.vsc.addBreakpoints', rArgs)
+		}
 
 		return bp;
 	}
@@ -738,6 +750,9 @@ export class DebugRuntime extends EventEmitter {
 
 	public clearBreakpoints(path: string): void {
 		this.breakPoints.delete(path);
+		if(this.isRunningMain){
+			this.rSession.callFunction('.vsc.clearBreakpointsByFile', {file: toRStringLiteral(path)})
+		}
 	}
 
 	public setDataBreakpoint(address: string): boolean {
