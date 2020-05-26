@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/semi */
 import {
 	Logger, logger,
 	LoggingDebugSession, ErrorDestination,
@@ -24,6 +25,7 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	allowGlobalDebugging: boolean;
 	mainFunction: string|undefined;
 }
+
 
 export class DebugSession extends LoggingDebugSession {
 
@@ -75,25 +77,19 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>bp));
 		});
-		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line=1, column=1) => {
+		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line=1, column=1, group?: ("start"|"startCollapsed"|"end")) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-			const matches = /(start|startCollapsed|end): *(.*)/.exec(text);
-			if (matches) {
-				const group = <"start"|"startCollapsed"|"end">matches[1];
-				e.body.group = group;
-				e.body.output = matches[2];
-			} else {
-				e.body.output = text;
+			e.body = {
+				category: category,
+				output: text,
+				group: group,
+				line: line,
+				column: column
 			}
-			e.body.category = category;
 			if(filePath !== ''){
 				var source: DebugProtocol.Source = new Source(basename(filePath), filePath);
 				e.body.source = source;
-			} else {
-				// e.body.source = new Source('');
 			}
-			e.body.line = line;
-			e.body.column = column;
 			this.sendEvent(e);
 		});
 		this._runtime.on('end', () => {
@@ -115,7 +111,7 @@ export class DebugSession extends LoggingDebugSession {
 		});
 		this._runtime.on('breakpointResponse', (breakpoints: any) => {
 
-		})
+		});
 	}
 
 
@@ -179,9 +175,9 @@ export class DebugSession extends LoggingDebugSession {
 	// LAUNCH
 	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
 
-		const trace = false
+		const trace = false;
 		const logPath = '';
-		logger.init(undefined, logPath, true)
+		logger.init(undefined, logPath, true);
 
 		// make sure to 'Stop' the buffered logging if 'trace' is not set
 		// logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop, false);
@@ -206,7 +202,7 @@ export class DebugSession extends LoggingDebugSession {
 		const lines = args.lines || [];
 
 		// clear old breakpoints
-		this._runtime.clearBreakpoints(path)
+		this._runtime.clearBreakpoints(path);
 
 		// set breakpoint locations
 		const bps = lines.map(l => {
@@ -218,7 +214,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			breakpoints: bps
 		};
-		this._breakpointsResponses.push(response)
+		this._breakpointsResponses.push(response);
 		this.sendResponse(response);
 	}
 
@@ -393,7 +389,7 @@ export class DebugSession extends LoggingDebugSession {
 
 	// Dummy code used for debugging:
     protected sendErrorResponse(response: DebugProtocol.Response, codeOrMessage: number | DebugProtocol.Message, format?: string, variables?: any, dest?: ErrorDestination): void {};
-    runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void): void {console.log('request: runInTerminalRequest')};
+    runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void): void {console.log('request: runInTerminalRequest');};
     // protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {};
     // protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request): void {};
     // protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {};

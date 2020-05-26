@@ -12,7 +12,7 @@ function timeout(ms: number) {
 export type unnamedRArg = (number|string|boolean|undefined);
 export type unnamedRArgs = (unnamedRArg|rList)[];
 export type namedRArgs = {[arg:string]: unnamedRArg|rList};
-export type rList = (unnamedRArgs|namedRArgs)
+export type rList = (unnamedRArgs|namedRArgs);
 export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
 
 
@@ -39,14 +39,14 @@ export class RSession {
         }
 
 
-        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP)
+        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP);
 
         if(this.cp.pid === undefined){
             return;
         }
 
         // start R in terminal process
-        this.runCommand(rPath, rArgs)
+        this.runCommand(rPath, rArgs);
 
         // vscode.window.showErrorMessage('R path not valid!');
         // return;
@@ -105,7 +105,7 @@ export class RSession {
     // Call an R-function (constructs and calls the command)
     public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = this.defaultLibrary){
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
-        const cmd = makeFunctionCall(fnc, args, args2, library)
+        const cmd = makeFunctionCall(fnc, args, args2, library);
         this.runCommand(cmd);
     }
 
@@ -121,10 +121,10 @@ export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs
     args = convertToUnnamedArgs(args);
     args2 = convertToUnnamedArgs(args2);
     args = args.concat(args2);
-    const argString = unnamedRArgsToString(args)
+    const argString = unnamedRArgsToString(args);
 
-    if(library != ''){
-        library = library + '::'
+    if(library !== ''){
+        library = library + '::';
     }
 
     // construct and execute function-call
@@ -134,25 +134,25 @@ export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs
 
 
 function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
-    var ret: unnamedRArgs
+    var ret: unnamedRArgs;
     if(isArray(args)){
-        ret = args.map(convertToUnnamedArg)
+        ret = args.map(convertToUnnamedArg);
     } else if(isObject(args)){
         ret = [];
         for(const arg in <namedRArgs>args){
-            ret.push(arg + '=' + unnamedRArgToString(convertToUnnamedArg(args[arg])))
+            ret.push(arg + '=' + unnamedRArgToString(convertToUnnamedArg(args[arg])));
         }
     } else{
-        ret = [<unnamedRArg>args]
+        ret = [<unnamedRArg>args];
     }
     return ret;
 }
 
 function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
-    var ret: unnamedRArg
+    var ret: unnamedRArg;
     if(isArray(arg)){
         // is rList
-        ret = makeFunctionCall('list', arg,[],'base')
+        ret = makeFunctionCall('list', arg,[],'base');
     } else{
         ret = <unnamedRArg>arg;
     }
@@ -160,13 +160,13 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
 }
 
 function unnamedRArgsToString(args: unnamedRArgs): string{
-    return args.map(unnamedRArgToString).join(',')
+    return args.map(unnamedRArgToString).join(',');
 }
 
 function unnamedRArgToString(arg: unnamedRArg): string{
     var ret: string;
     if(arg===undefined){
-        ret = 'NULL'
+        ret = 'NULL';
     } else if(typeof arg === 'boolean'){
         if(arg){
             ret = 'TRUE';

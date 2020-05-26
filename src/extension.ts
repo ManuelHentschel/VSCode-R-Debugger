@@ -46,21 +46,20 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 				config.name = 'Launch';
 				config.request = 'launch';
 				config.debugFunction = false;
-				config.allowGlobalDebugging = true;
-				config.program = '${file}'
+				// config.allowGlobalDebugging = true;
+				config.program = '${file}';
 			}
 		} else if(config.debugFunction){
 			if(!config.program || !config.mainFunction){
 				return vscode.window.showErrorMessage("Please specify an R file and a function name in the Debugger config.").then(_ => {
 					return undefined;
-				})
+				});
 			}
 		} else {
 			if(!config.program){
-				config.program = '${file}'
+				config.program = '${file}';
 			}
 		}
-
 		return config;
 	}
 }
