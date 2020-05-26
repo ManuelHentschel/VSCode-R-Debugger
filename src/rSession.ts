@@ -37,14 +37,14 @@ export class RSession {
         }
 
 
-        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP)
+        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP);
 
         if(this.cp.pid === undefined){
             return;
         }
 
         // start R in terminal process
-        this.runCommand(rPath, rArgs)
+        this.runCommand(rPath, rArgs);
 
         // vscode.window.showErrorMessage('R path not valid!');
         // return;
@@ -103,7 +103,7 @@ export class RSession {
     // Call an R-function (constructs and calls the command)
     // public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[], library: string = this.defaultLibrary){
     public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = this.defaultLibrary){
-        const cmd = makeFunctionCall(fnc, args, args2, library)
+        const cmd = makeFunctionCall(fnc, args, args2, library);
         this.runCommand(cmd);
     }
 
@@ -118,11 +118,11 @@ export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs
     // if necessary, convert args form object-form to array, save to args2 to have a unambiguous data type
     args = convertToUnnamedArgs(args);
     args2 = convertToUnnamedArgs(args2);
-    args = args.concat(args2)
-    const argString = unnamedRArgsToString(args)
+    args = args.concat(args2);
+    const argString = unnamedRArgsToString(args);
 
-    if(library != ''){
-        library = library + '::'
+    if(library !== ''){
+        library = library + '::';
     }
 
     // construct and execute function-call
@@ -132,22 +132,22 @@ export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs
 
 
 function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
-    var ret: unnamedRArgs
+    var ret: unnamedRArgs;
     if(isArray(args)){
         ret = <unnamedRArgs>args;
     } else if(isObject(args)){
         ret = [];
         for(const arg in <namedRArgs>args){
-            ret.push(arg + '=' + unnamedRArgToString(args[arg]))
+            ret.push(arg + '=' + unnamedRArgToString(args[arg]));
         }
     } else{
-        ret = [<unnamedRArg>args]
+        ret = [<unnamedRArg>args];
     }
     return ret;
 }
 
 function unnamedRArgsToString(args: unnamedRArgs): string{
-    return args.map(unnamedRArgToString).join(',')
+    return args.map(unnamedRArgToString).join(',');
 }
 
 function unnamedRArgToString(arg: unnamedRArg): string{
