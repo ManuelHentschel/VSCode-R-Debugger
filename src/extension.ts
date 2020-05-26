@@ -3,7 +3,6 @@
 import * as vscode from 'vscode';
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
 import { DebugSession } from './debugSession';
-import * as Net from 'net';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -30,9 +29,6 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {}
 
 
-//
-// Helper-Stuff for debugging:
-//
 
 class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
@@ -49,49 +45,28 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 				config.type = 'R-Debugger';
 				config.name = 'Launch';
 				config.request = 'launch';
-				config.program = '${file}';
+				config.debugFunction = false;
+				config.allowGlobalDebugging = true;
+				config.program = '${file}'
 			}
-		}
-
-		if (!config.program) {
-			return vscode.window.showInformationMessage("Cannot find a program to debug").then(_ => {
-				return undefined;	// abort launch
-			});
+		} else if(config.debugFunction){
+			if(!config.program || !config.mainFunction){
+				return vscode.window.showErrorMessage("Please specify an R file and a function name in the Debugger config.").then(_ => {
+					return undefined;
+				})
+			}
+		} else {
+			if(!config.program){
+				config.program = '${file}'
+			}
 		}
 
 		return config;
 	}
 }
 
-class MockDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
-
-	private server?: Net.Server;
-
-	createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-
-		if (!this.server) {
-			// start listening on a random port
-			this.server = Net.createServer(socket => {
-				const session = new DebugSession();
-				session.setRunAsServer(true);
-				session.start(<NodeJS.ReadableStream>socket, socket);
-			}).listen(0);
-		}
-
-		// make VS Code connect to debug server
-		return new vscode.DebugAdapterServer((<Net.AddressInfo>this.server.address()).port);
-	}
-
-	dispose() {
-		if (this.server) {
-			this.server.close();
-		}
-	}
-}
 
 class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
-
-
 	createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
         let ret = new vscode.DebugAdapterInlineImplementation(new DebugSession());
         return ret;

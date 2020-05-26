@@ -465,11 +465,8 @@ export class DebugRuntime extends EventEmitter {
 				this.sendEvent('breakpointValidated', bp);
 				break;
 			case 'lineAtBreakpoint':
-				if(body.line>0){
+				if(body>0){
 					this.currentLine = body.line;
-				}
-				if(body.filename){
-					this.currentFile = body.filename;
 				}
 				break;
 			case 'error':
@@ -490,9 +487,9 @@ export class DebugRuntime extends EventEmitter {
 				this.requestInfoFromR();
 				break;
 			case 'callMain':
-				this.rSession.useQueue = this.useRCommandQueue;
 				this.setAllBreakpoints();
 				this.rSession.callFunction(this.mainFunction,[],[],'');
+				this.rSession.useQueue = this.useRCommandQueue;
 				this.isAlmostRunningMain = true;
 				break;
 			case 'stack':
@@ -573,11 +570,6 @@ export class DebugRuntime extends EventEmitter {
 		try {
 			if(stack['frames'][0]['line'] === 0){
 				stack['frames'][0]['line'] = this.currentLine;
-			}
-		} catch(error){}
-		try {
-			if(stack['frames'][0]['file'] === 0){
-				stack['frames'][0]['file'] = this.currentFile;
 			}
 		} catch(error){}
 		this.stack = stack
