@@ -52,14 +52,30 @@
         "configurationAttributes": {
           "launch": {
             "required": [
-              "program"
+              "debugFunction",
+              "allowGlobalDebugging"
             ],
             "properties": {
               "program": {
                 "type": "string",
                 "description": "Absolute path to a text file.",
                 "default": "${file}"
-              }
+              },
+              "debugFunction": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to debug a single function (called after sourcing the debugged program/R-file)."
+              },
+              "mainFunction": {
+                "type": "string",
+                "default": "main",
+                "description": "The name of the main function, a single function is being debugged. Must be callable without arguments."
+              }//,
+              // "allowGlobalDebugging": {
+              //   "type": "boolean",
+              //   "default": true,
+              //   "description": "Whether to allow debugging in the global workspace (simulating an ongoing debug session)."
+              // }
             }
           }
         },
@@ -68,18 +84,34 @@
             "type": "R-Debugger",
             "request": "launch",
             "name": "R Debugger",
-            "program": "${file}"
+            "program": "${file}",
+            "debugFunction": false,
+            "allowGlobalDebugging": true
           }
         ],
         "configurationSnippets": [
           {
-            "label": "R Debug: Launch",
-            "description": "Debug the active R file",
+            "label": "R Debug: Launch Global Workspace",
+            "description": "Start a Global R Workspace",
             "body": {
               "type": "R-Debugger",
               "request": "launch",
               "name": "R Debugger",
-              "program": "${file}"
+              "debugFunction": false,
+              "allowGlobalDebugging": true
+            }
+          },
+          {
+            "label": "R Debug: Debug a single function",
+            "description": "Start R to debug a single function call, then exit",
+            "body": {
+              "type": "R-Debugger",
+              "request": "launch",
+              "name": "R Debugger",
+              "debugFunction": true,
+              "mainFunction": "main",
+              "program": "${file}",
+              "allowGlobalDebugging": false
             }
           }
         ]
@@ -132,12 +164,17 @@
         "rdebugger.overwritePrint": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to write a new print() function to .GlobalEnv (base::print is not affected)"
+          "description": "Whether to write a new print() function to .GlobalEnv (direct calls to base::print are not affected)"
         },
         "rdebugger.overwriteCat": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to write a new cat() function to .GlobalEnv (base::cat is not affected)"
+          "description": "Whether to write a new cat() function to .GlobalEnv (direct calls to base::cat are not affected)"
+        },
+        "rdebugger.overwriteSource": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to write a new source() function to .GlobalEnv (direct calls to base::source are not affected)"
         },
         "rdebugger.setBreakpointsInPackages": {
           "type": "boolean",

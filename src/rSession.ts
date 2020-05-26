@@ -9,10 +9,12 @@ function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export type unnamedRArg = (number|string|boolean);
-export type unnamedRArgs = unnamedRArg[];
-export type namedRArgs = {[arg:string]: unnamedRArg};
+export type unnamedRArg = (number|string|boolean|undefined);
+export type unnamedRArgs = (unnamedRArg|rList)[];
+export type namedRArgs = {[arg:string]: unnamedRArg|rList};
+export type rList = (unnamedRArgs|namedRArgs);
 export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
+
 
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
@@ -73,13 +75,13 @@ export class RSession {
             }
         } else{
             this.isBusy = true;
+            if(this.logLevel>=3){
+                console.log('cp.stdin:\n' + cmd.trim());
+            }
             if(this.waitBetweenCommands>0){
                 await timeout(this.waitBetweenCommands);
             }
             this.cp.stdin.write(cmd);
-            if(this.logLevel>=3){
-                console.log('cp.stdin:\n' + cmd.trim());
-            }
         }
 
     }
@@ -88,7 +90,7 @@ export class RSession {
         this.cmdQueue = [];
     }
 
-    // Call this function to indicate that the previous command is done and the R-Process idle:
+    // Call this function to indicate that the previous command is done and the R-Process is idle:
     public showsPrompt(){
         if(this.cmdQueue.length>0){
             this.isBusy = true;
@@ -101,8 +103,11 @@ export class RSession {
     }
 
     // Call an R-function (constructs and calls the command)
-    // public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[], library: string = this.defaultLibrary){
     public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = this.defaultLibrary){
+<<<<<<< HEAD
+=======
+        // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
+>>>>>>> debugSource
         const cmd = makeFunctionCall(fnc, args, args2, library);
         this.runCommand(cmd);
     }
@@ -134,14 +139,32 @@ export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs
 function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
     var ret: unnamedRArgs;
     if(isArray(args)){
-        ret = <unnamedRArgs>args;
+        ret = args.map(convertToUnnamedArg);
     } else if(isObject(args)){
         ret = [];
         for(const arg in <namedRArgs>args){
+<<<<<<< HEAD
             ret.push(arg + '=' + unnamedRArgToString(args[arg]));
         }
     } else{
         ret = [<unnamedRArg>args];
+=======
+            ret.push(arg + '=' + unnamedRArgToString(convertToUnnamedArg(args[arg])));
+        }
+    } else{
+        ret = [<unnamedRArg>args];
+    }
+    return ret;
+}
+
+function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
+    var ret: unnamedRArg;
+    if(isArray(arg)){
+        // is rList
+        ret = makeFunctionCall('list', arg,[],'base');
+    } else{
+        ret = <unnamedRArg>arg;
+>>>>>>> debugSource
     }
     return ret;
 }
@@ -152,7 +175,9 @@ function unnamedRArgsToString(args: unnamedRArgs): string{
 
 function unnamedRArgToString(arg: unnamedRArg): string{
     var ret: string;
-    if(typeof arg === 'boolean'){
+    if(arg===undefined){
+        ret = 'NULL';
+    } else if(typeof arg === 'boolean'){
         if(arg){
             ret = 'TRUE';
         } else{
