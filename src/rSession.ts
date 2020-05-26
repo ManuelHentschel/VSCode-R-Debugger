@@ -104,10 +104,7 @@ export class RSession {
 
     // Call an R-function (constructs and calls the command)
     public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = this.defaultLibrary){
-<<<<<<< HEAD
-=======
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
->>>>>>> debugSource
         const cmd = makeFunctionCall(fnc, args, args2, library);
         this.runCommand(cmd);
     }
@@ -143,12 +140,6 @@ function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
     } else if(isObject(args)){
         ret = [];
         for(const arg in <namedRArgs>args){
-<<<<<<< HEAD
-            ret.push(arg + '=' + unnamedRArgToString(args[arg]));
-        }
-    } else{
-        ret = [<unnamedRArg>args];
-=======
             ret.push(arg + '=' + unnamedRArgToString(convertToUnnamedArg(args[arg])));
         }
     } else{
@@ -164,7 +155,6 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
         ret = makeFunctionCall('list', arg,[],'base');
     } else{
         ret = <unnamedRArg>arg;
->>>>>>> debugSource
     }
     return ret;
 }

@@ -70,12 +70,12 @@
                 "type": "string",
                 "default": "main",
                 "description": "The name of the main function, a single function is being debugged. Must be callable without arguments."
-              }//,
-              // "allowGlobalDebugging": {
-              //   "type": "boolean",
-              //   "default": true,
-              //   "description": "Whether to allow debugging in the global workspace (simulating an ongoing debug session)."
-              // }
+              },
+              "allowGlobalDebugging": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to allow debugging in the global workspace (simulating an ongoing debug session)."
+              }
             }
           }
         },
