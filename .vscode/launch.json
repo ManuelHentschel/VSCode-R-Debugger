@@ -10,20 +10,11 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"runtimeExecutable": "${execPath}",
-			"args": [],
-			"linux": {
-				"args": [
-					"--extensionDevelopmentPath=${workspaceFolder}",
-					"${workspaceFolder}/../hiwijob/v0"
-				]
-			},
-			"windows": {
-				"args": [
-					"--disable-extensions",
-					"--extensionDevelopmentPath=${workspaceFolder}",
-					"${workspaceFolder}/../vscode-R-test"
-				]
-			},
+			"args": [
+				"--disable-extensions",
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/test/R"
+			],
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
 			],

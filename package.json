@@ -124,57 +124,57 @@
         "rdebugger.rterm.windows": {
           "type": "string",
           "default": "\"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe\"",
-          "description": "R.exe path for windows"
+          "description": "R.exe path for Windows."
         },
         "rdebugger.rterm.mac": {
           "type": "string",
           "default": "/usr/local/bin/R",
-          "description": "R path for Mac OS X"
+          "description": "R path for macOS."
         },
         "rdebugger.rterm.linux": {
           "type": "string",
           "default": "/usr/bin/R",
-          "description": "R path for Linux"
+          "description": "R path for Linux."
         },
         "rdebugger.terminal.windows": {
           "type": "string",
           "default": "C:\\Windows\\System32\\cmd.exe",
-          "description": "Terminal path for windows (e.g. cmd.exe)"
+          "description": "Terminal path for windows (e.g. cmd.exe)."
         },
         "rdebugger.terminal.mac": {
           "type": "string",
-          "default": "Terminal.app",
-          "description": "Terminal path for Mac OS X"
+          "default": "/bin/bash",
+          "description": "Terminal path for macOS."
         },
         "rdebugger.terminal.linux": {
           "type": "string",
           "default": "/bin/bash",
-          "description": "Terminal path for Linux"
+          "description": "Terminal path for Linux."
         },
         "rdebugger.useRCommandQueue": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to queue R commands and send them only if the R-process is idle"
+          "description": "Whether to queue R commands and send them only if the R-process is idle."
         },
         "rdebugger.waitBetweenRCommands": {
           "type": "integer",
           "default": 10,
-          "description": "The time (in ms) to wait between R commands"
+          "description": "The time (in ms) to wait between R commands."
         },
         "rdebugger.overwritePrint": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to write a new print() function to .GlobalEnv (direct calls to base::print are not affected)"
+          "description": "Whether to write a new print() function to .GlobalEnv (direct calls to base::print are not affected)."
         },
         "rdebugger.overwriteCat": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to write a new cat() function to .GlobalEnv (direct calls to base::cat are not affected)"
+          "description": "Whether to write a new cat() function to .GlobalEnv (direct calls to base::cat are not affected)."
         },
         "rdebugger.overwriteSource": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to write a new source() function to .GlobalEnv (direct calls to base::source are not affected)"
+          "description": "Whether to write a new source() function to .GlobalEnv (direct calls to base::source are not affected)."
         },
         "rdebugger.setBreakpointsInPackages": {
           "type": "boolean",
