@@ -1,6 +1,7 @@
 foo <- function(x, y) {
   print(x)
   print(y)
+  browser()
   x + y
 }
 
