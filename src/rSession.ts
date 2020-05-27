@@ -3,12 +3,19 @@
 import * as child from 'child_process';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { trimLastNewline } from 'vscode-debugadapter/lib/logger';
-import { isUndefined, isBoolean } from 'util';
+import { isUndefined, isBoolean, isNumber, isArray, isObject } from 'util';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+export type unnamedRArg = (number|string|boolean|undefined);
+export type unnamedRArgs = (unnamedRArg|rList)[];
+export type namedRArgs = {[arg:string]: unnamedRArg|rList};
+export type rList = (unnamedRArgs|namedRArgs);
+export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
+
+
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
     public isBusy: boolean = false;
@@ -32,14 +39,14 @@ export class RSession {
         }
 
 
-        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP)
+        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP);
 
         if(this.cp.pid === undefined){
             return;
         }
 
         // start R in terminal process
-        this.runCommand(rPath, rArgs)
+        this.runCommand(rPath, rArgs);
 
         // vscode.window.showErrorMessage('R path not valid!');
         // return;
@@ -68,13 +75,13 @@ export class RSession {
             }
         } else{
             this.isBusy = true;
+            if(this.logLevel>=3){
+                console.log('cp.stdin:\n' + cmd.trim());
+            }
             if(this.waitBetweenCommands>0){
                 await timeout(this.waitBetweenCommands);
             }
             this.cp.stdin.write(cmd);
-            if(this.logLevel>=3){
-                console.log('cp.stdin:\n' + cmd.trim());
-            }
         }
 
     }
@@ -83,7 +90,7 @@ export class RSession {
         this.cmdQueue = [];
     }
 
-    // Call this function to indicate that the previous command is done and the R-Process idle:
+    // Call this function to indicate that the previous command is done and the R-Process is idle:
     public showsPrompt(){
         if(this.cmdQueue.length>0){
             this.isBusy = true;
@@ -96,31 +103,9 @@ export class RSession {
     }
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: ((string|number)[] | {[arg:string]: (string|number|boolean)})=[], library: string = this.defaultLibrary){
-        // if necessary, convert args form object-form to array, save to args2 to have a unambiguous data type
-        var args2: (string|number)[] = [];
-        if(Array.isArray(args)){
-            args2 = args;
-        } else {
-            for(var arg in args){
-                var value = args[arg]
-                if(isBoolean(value)){
-                    if(value){
-                        value = 'TRUE'
-                    } else{
-                        value = 'FALSE'
-                    }
-                }
-                args2.push(arg + '=' + value);
-            }
-        }
-
-        if(library != ''){
-            library = library + '::'
-        }
-
-        // construct and execute function-call
-        const cmd = library + fnc + '(' + args2.join(',') + ')';
+    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = this.defaultLibrary){
+        // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
+        const cmd = makeFunctionCall(fnc, args, args2, library);
         this.runCommand(cmd);
     }
 
@@ -130,6 +115,69 @@ export class RSession {
     }
 }
 
+
+export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], library: string = ''): string{
+    // if necessary, convert args form object-form to array, save to args2 to have a unambiguous data type
+    args = convertToUnnamedArgs(args);
+    args2 = convertToUnnamedArgs(args2);
+    args = args.concat(args2);
+    const argString = unnamedRArgsToString(args);
+
+    if(library !== ''){
+        library = library + '::';
+    }
+
+    // construct and execute function-call
+    const cmd = library + fnc + '(' + argString + ')';
+    return cmd;
+}
+
+
+function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
+    var ret: unnamedRArgs;
+    if(isArray(args)){
+        ret = args.map(convertToUnnamedArg);
+    } else if(isObject(args)){
+        ret = [];
+        for(const arg in <namedRArgs>args){
+            ret.push(arg + '=' + unnamedRArgToString(convertToUnnamedArg(args[arg])));
+        }
+    } else{
+        ret = [<unnamedRArg>args];
+    }
+    return ret;
+}
+
+function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
+    var ret: unnamedRArg;
+    if(isArray(arg)){
+        // is rList
+        ret = makeFunctionCall('list', arg,[],'base');
+    } else{
+        ret = <unnamedRArg>arg;
+    }
+    return ret;
+}
+
+function unnamedRArgsToString(args: unnamedRArgs): string{
+    return args.map(unnamedRArgToString).join(',');
+}
+
+function unnamedRArgToString(arg: unnamedRArg): string{
+    var ret: string;
+    if(arg===undefined){
+        ret = 'NULL';
+    } else if(typeof arg === 'boolean'){
+        if(arg){
+            ret = 'TRUE';
+        } else{
+            ret = 'FALSE';
+        }
+    } else {
+        ret = '' + arg;
+    }
+    return ret;
+}
 
 
 
