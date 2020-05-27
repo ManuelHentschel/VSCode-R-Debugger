@@ -6,7 +6,7 @@ This extension adds debugging capabilities for the R programming language.
 
 ## Using the Debugger
 * Install the **R Debugger** extension in VS Code.
-* Install the **vscDebugger** package in R (https://github.com/ManuelHentschel/vscodeRPackage).
+* Install the **vscDebugger** package in R (https://github.com/ManuelHentschel/vscDebugger).
 * Make sure the settings `rdebugger.rterm.XXX` and `rdebugger.terminal.XXX` contain valid paths to R and a terminal program
 * Press F5 and select `R Debugger` as debugger. With the default launch configuration, the debugger will start a new R session.
 * To run a file, focus the file in the editor and press F5 (or the continue button in the debug controls)
@@ -16,7 +16,7 @@ This extension adds debugging capabilities for the R programming language.
 ## Installation
 The VS Code extension can be installed from the .vsix file. To do so click `...` in the extension menu and select `Install from VSIX...`.
 
-The R package can be downloaded from https://github.com/ManuelHentschel/vscodeRPackage and installed from the R source code or the `.tar.gz` file using the command `R CMD INSTALL vscDebugger_0.0.0.9000.tar.gz`.
+The R package can be downloaded from https://github.com/ManuelHentschel/vscDebugger and installed from the R source code or the `.tar.gz` file using the command `R CMD INSTALL vscDebugger_0.0.0.9000.tar.gz`.
 
 **Warning:** Currently there is no proper versioning/dependency system in place, so make sure to download both packages/extensions together.
 
