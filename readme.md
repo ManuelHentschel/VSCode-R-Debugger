@@ -14,11 +14,21 @@ This extension adds debugging capabilities for the R programming language.
 
 
 ## Installation
-The VS Code extension can be installed from the .vsix file. To do so click `...` in the extension menu and select `Install from VSIX...`.
+The VS code extension can be run from source by opening the project repo's root directory in vscode and pressing F5.
 
-The R package can be downloaded from https://github.com/ManuelHentschel/vscDebugger and installed from the R source code or the `.tar.gz` file using the command `R CMD INSTALL vscDebugger_0.0.0.9000.tar.gz`.
+Alternatively the VS Code extension can be installed form the .vsix-file found on https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain.
+To download the correct file, filter the commits by branch (develop or master), click the latest commit,
+and download the file `r-debugger.vsix` under the caption "Artifacts".
 
-**Warning:** Currently there is no proper versioning/dependency system in place, so make sure to download both packages/extensions together.
+
+To install the latest development version from GitHub, run the following command in R:
+```r
+devtools::install_github("ManuelHentschel/vscDebugger", ref = "develop")
+```
+To install from the master branch, omit the argument `ref`.
+
+
+**Warning:** Currently there is no proper versioning/dependency system in place, so make sure to download both packages/extensions from the same branch (Master/develop) and at the same time.
 
 
 ## Features
@@ -53,8 +63,8 @@ Since the approach of parsing text output meant for human users is rather error 
 In case of unexpected results, use `browser()` statements and run the code directly from a terminal (or RStudio).
 
 In the following cases the debugger might not work correctly:
-* `browser()`-statements in the code
-* custom error-handling (the debugger uses a custom `options(error=...)` to show stack trace etc. on error)
+* Custom `trace()` or `browser()`-statements in the code
+* Custom error-handling (the debugger uses a custom `options(error=...)` to show stack trace etc. on error)
 * Any form of (interactive) user input in the terminal during runtime
 * Extensive usage of `cat()` without linebreaks (try disabling the `overwrite cat` and `overwrite print` options in the extion settings)
 * Output to stdout that looks like output from `browser()`, the input prompt, or text meant for the debugger (e.g. `<v\s\c>...</v\s\c>`)
@@ -69,8 +79,8 @@ It might be possible, however, that the gathering of information about the stack
 
 ## Debugging R Packages
 In principle R packages can also be debugged using this extension.
-However, some details need to be considered:
-* The package must be installed/built from code using `--with-keep.source` 
+Some details need to be considered:
+* The package must be installed from code using `--with-keep.source` 
 * The modified `print()` and `cat()` versions are not used by calls from within the package.
 In order to use these, import the `vscDebugger` extension in your package, assign `print <- vscDebugger::.vsc.print` and `cat <- vscDebugger::.vsc.cat`, and deactivate the modified `print`/`cat` statements in the debugger settings.
 Don't forget to remove these assignments after debugging.
@@ -91,7 +101,6 @@ Exception handling
 * Select behaviour for exceptions (enter browser, terminate, ...?)
 
 Breakpoints
-* Breakpoint validation (currently, breakpoints on empty lines etc. are silently ignored)
 * Auto adjustment of breakpoint position to next valid position
 * Conditional breakponts, data breakpoints
 * Setting of breakpoints during runtime (currently these are silently ignored)
