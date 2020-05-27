@@ -85,7 +85,7 @@ export class DebugSession extends LoggingDebugSession {
 				group: group,
 				line: line,
 				column: column
-			}
+			};
 			if(filePath !== ''){
 				var source: DebugProtocol.Source = new Source(basename(filePath), filePath);
 				e.body.source = source;
