@@ -221,7 +221,7 @@ export class DebugRuntime extends EventEmitter {
 		this.endOutputGroup();
 	}
 
-	private setAllBreakpoints(){
+	private async setAllBreakpoints(){
 		// set breakpoints in R
 		this.breakPoints.forEach((bps: DebugBreakpoint[], path:string) => {
 			const lines = bps.map(bp => bp.line);
@@ -666,6 +666,7 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.callFunction('.vsc.debugSource', {file: filenameR});
 			const rCall = makeFunctionCall('.vsc.debugSource', {file: filenameR});
 			this.startOutputGroup(rCall, true);
+			this.endOutputGroup();
 			this.requestInfoFromR({dummyFile: filenameR});
 			// this.sendEventOnStack = 'stopOnStepPreserveFocus';
 			this.sendEventOnStack = 'stopOnStep';
