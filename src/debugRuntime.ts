@@ -12,6 +12,7 @@ import { TextDecoder, isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
+import { maxHeaderSize } from 'http';
 
 
 const path = require('path');
@@ -382,11 +383,12 @@ export class DebugRuntime extends EventEmitter {
 			this.terminate();
 		}
 
-		// Breakpoints set with trace() are preceded by this:
-		if(/Tracing (.*)step \d+/.test(line)){
+		// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
+		if(/Tracing (.*)step/.test(line)){
 			showLine = false;
 			this.stdoutIsBrowserInfo = true;
-			this.hitBreakpoint();
+			this.expectBrowser = true;
+			this.hitBreakpoint(true);
 		}
 
 		// Upon hitting a breakpoint/browser():
@@ -405,20 +407,8 @@ export class DebugRuntime extends EventEmitter {
 		} 
 
 		// filter out additional browser info:
-		if(isFullLine && (/(?:debug|exiting from|debugging|Called from): /.test(line))){
+		if(isFullLine && (/(?:debug|exiting from|debugging|Called from|debug at): /.test(line))){
 			showLine = false; // part of browser-info
-			this.stdoutIsBrowserInfo = true;
-		}
-
-		// get current line from browser:
-		tmpMatches = /^debug at (.*)#(\d+): .*$/.exec(line);
-		if(tmpMatches){
-			this.currentFile = tmpMatches[1];
-			this.currentLine = parseInt(tmpMatches[2]);
-			try {
-				this.stack['frames'][0]['line'] = this.currentLine;
-			} catch(error){}
-			showLine = false;
 			this.stdoutIsBrowserInfo = true;
 		}
 
@@ -574,11 +564,11 @@ export class DebugRuntime extends EventEmitter {
 		if(expected){
 			this.stdoutIsBrowserInfo = true; 
 			this.rSession.clearQueue();
-			this.rSession.callFunction('.vsc.getLineAtBreakpoint');
+			// this.rSession.callFunction('.vsc.getLineAtBreakpoint');
 			this.rSession.runCommand('n');
 		} else{
 			this.rSession.clearQueue();
-			this.rSession.callFunction('.vsc.getLineAtBrowser');
+			// this.rSession.callFunction('.vsc.getLineAtBreakpoint');
 		}
 		this.requestInfoFromR();
 		// event is sent after receiving stack from R in order to answer stack-request synchronously:
@@ -607,12 +597,12 @@ export class DebugRuntime extends EventEmitter {
 	private updateStack(stack: any[]){
 		try {
 			if(stack['frames'][0]['line'] === 0){
-				stack['frames'][0]['line'] = this.currentLine;
+				// stack['frames'][0]['line'] = this.currentLine;
 			}
 		} catch(error){}
 		try {
 			if(stack['frames'][0]['file'] === 0){
-				stack['frames'][0]['file'] = this.currentFile;
+				// stack['frames'][0]['file'] = this.currentFile;
 			}
 		} catch(error){}
 		this.stack = stack;

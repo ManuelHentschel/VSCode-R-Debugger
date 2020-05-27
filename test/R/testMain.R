@@ -14,4 +14,7 @@ bar <- function(x, n) {
   z
 }
 
-bar(2, 5)
+main <- function(){
+  bar(2, 5)
+}
+

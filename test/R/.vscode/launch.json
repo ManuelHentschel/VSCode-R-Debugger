@@ -7,9 +7,18 @@
     {
       "type": "R-Debugger",
       "request": "launch",
-      "name": "R Debugger",
+      "name": "R Debugger Global",
       "program": "${file}",
       "debugFunction": false,
+      "allowGlobalDebugging": true
+    },
+    {
+      "type": "R-Debugger",
+      "request": "launch",
+      "name": "R Debugger Function",
+      "program": "${file}",
+      "debugFunction": true,
+      "mainFunction": "main",
       "allowGlobalDebugging": true
     }
   ]
