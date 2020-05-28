@@ -4,8 +4,9 @@ import {
 	LoggingDebugSession, ErrorDestination,
 	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
 	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent,
-	Thread, StackFrame, Scope, Source, Handles, Breakpoint, Event
+	Thread, StackFrame, Scope, Handles, Breakpoint, Event
 } from 'vscode-debugadapter';
+import * as DebugAdapter from 'vscode-debugadapter'; 
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
 import { DebugRuntime, DebugBreakpoint } from './debugRuntime';
@@ -26,6 +27,13 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	mainFunction: string|undefined;
 }
 
+interface Source extends DebugProtocol.Source {
+	srcbody: string;
+}
+interface SourceArguments extends DebugProtocol.SourceArguments {
+	source?: Source;
+}
+
 
 export class DebugSession extends LoggingDebugSession {
 
@@ -37,8 +45,9 @@ export class DebugSession extends LoggingDebugSession {
 
 	private _configurationDone = new Subject();
 
-	private _evalResponses: DebugProtocol.EvaluateResponse[] = [];
+	// private _evalResponses: DebugProtocol.EvaluateResponse[] = [];
 	private _breakpointsResponses: DebugProtocol.SetBreakpointsResponse[] = [];
+	private _evalResponses: Record<number, DebugProtocol.EvaluateResponse> = {};
 
 	private _logLevel = 3;
 
@@ -87,7 +96,7 @@ export class DebugSession extends LoggingDebugSession {
 				column: column
 			};
 			if(filePath !== ''){
-				var source: DebugProtocol.Source = new Source(basename(filePath), filePath);
+				var source: DebugProtocol.Source = new DebugAdapter.Source(basename(filePath), filePath);
 				e.body.source = source;
 			}
 			this.sendEvent(e);
@@ -95,13 +104,11 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('end', () => {
 			this.sendEvent(new TerminatedEvent());
 		});
-		this._runtime.on('evalResponse', (result: string) => {
-			const response = this._evalResponses.shift();
-			if(result.length>0){
-				response.body = {
-					result: result,
-					variablesReference: 0
-				};
+		this._runtime.on('evalResponse', (result: {result:string, type:string, variablesReference:number}, id: number) => {
+			// const response = this._evalResponses.shift();
+			const response = this._evalResponses[id];
+			if(result.result!==undefined && result.result!=='' || result.variablesReference>0){
+				response.body = result;
 				this.sendResponse(response);
 			} else {
 				response.success = false;
@@ -299,6 +306,18 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 
+    protected sourceRequest(response: DebugProtocol.SourceResponse, args: SourceArguments, request?: DebugProtocol.Request): void {
+		response.body = {
+			content: <string>args.source.srcbody
+		};
+		this.sendResponse(response);
+
+	};
+
+
+
+
+
 	// Exception:
     protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
 		// DUMMY
@@ -356,8 +375,9 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
-		this._evalResponses.push(response);
-		this._runtime.evaluate(args.expression, args.frameId, args.context);
+		const requestIdR = this._runtime.evaluate(args.expression, args.frameId, args.context);
+		// this._evalResponses.push(response);
+		this._evalResponses[requestIdR] = response;
 		// this.logAndSendResponse(response);
 	}
 
@@ -409,7 +429,7 @@ export class DebugSession extends LoggingDebugSession {
     protected restartFrameRequest(response: DebugProtocol.RestartFrameResponse, args: DebugProtocol.RestartFrameArguments, request?: DebugProtocol.Request): void {};
     protected gotoRequest(response: DebugProtocol.GotoResponse, args: DebugProtocol.GotoArguments, request?: DebugProtocol.Request): void {};
     protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {};
-    protected sourceRequest(response: DebugProtocol.SourceResponse, args: DebugProtocol.SourceArguments, request?: DebugProtocol.Request): void {};
+    // protected sourceRequest(response: DebugProtocol.SourceResponse, args: DebugProtocol.SourceArguments, request?: DebugProtocol.Request): void {};
     // protected threadsRequest(response: DebugProtocol.ThreadsResponse, request?: DebugProtocol.Request): void {};
     protected terminateThreadsRequest(response: DebugProtocol.TerminateThreadsResponse, args: DebugProtocol.TerminateThreadsArguments, request?: DebugProtocol.Request): void {};
     // protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments, request?: DebugProtocol.Request): void {};

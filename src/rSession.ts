@@ -21,7 +21,7 @@ export class RSession {
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 4; // can only be changed during construction
+    public readonly logLevelCP: number = 3; // can only be changed during construction
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public readonly successTerminal: boolean = false;
@@ -29,6 +29,7 @@ export class RSession {
     public readonly debugRuntime: DebugRuntime;
     private restOfStderr: string='';
     private restOfStdout: string='';
+
 
     constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[],
         // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
@@ -155,7 +156,6 @@ export class RSession {
 			// abort output handling if ignoreOutput has been set to true
 			// used to avoid handling remaining output after debugging has been stopped
             if(this.ignoreOutput){ return; }
-            console.log('rSession: line: ' + lines[i]);
 			this.debugRuntime.handleLine(lines[i], fromStderr, true);
 		}
 
@@ -235,15 +235,17 @@ export function escapeStringForR(s: string, quote: string='"') {
     if (s === undefined) {
         return "NULL";
     } else {
-        return (quote +
-            s.replace(/\\/g, "\\\\")
+        return(
+            quote
+            + s.replace(/\\/g, "\\\\")
                 .replace(/"""/g, `\\${quote}`)
                 .replace(/\n/g, "\\n")
-                .replace(/\r/g, "\\r")
+                // .replace(/\r/g, "\\r")
+                .replace(/\r/g, "")
                 .replace(/\t/g, "\\t")
                 .replace(/\f/g, "\\f")
-                .replace(/\v/g, "\\v") +
-            quote);
+                .replace(/\v/g, "\\v")
+            + quote);
     }
 }
 

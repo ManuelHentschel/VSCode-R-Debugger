@@ -23,6 +23,7 @@ export interface DebugBreakpoint {
 }
 
 
+
 export class DebugRuntime extends EventEmitter {
 
 	// delimiters used when printing info from R which is meant for the debugger
@@ -302,8 +303,6 @@ export class DebugRuntime extends EventEmitter {
 		// only show the line to the user if it is complete & relevant
 		var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningMain;
 
-
-
 		// filter out info meant for vsc:
 		const jsonRegex = new RegExp(escapeForRegex(this.rDelimiter0) + '(.*)' + escapeForRegex(this.rDelimiter1));
 		const jsonMatch = jsonRegex.exec(line);
@@ -327,7 +326,7 @@ export class DebugRuntime extends EventEmitter {
 
 
 		// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
-		if(/Tracing (.*)step/.test(line)){
+		if(isFullLine && /Tracing (.*)step/.test(line)){
 			showLine = false;
 			this.stdoutIsBrowserInfo = true;
 			this.expectBrowser = true;
@@ -471,7 +470,7 @@ export class DebugRuntime extends EventEmitter {
 				// contains the result of an evalRequest sent by the debugger
 				const result = body;
 				await this.waitForMessages(); //make sure that stack info is received
-				this.sendEvent('evalResponse', result);
+				this.sendEvent('evalResponse', result, id);
 				break;
 			case 'print':
 				// also used by .vsc.cat()
@@ -657,7 +656,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 	
 	// evaluate an expression entered into the debug window in R
-	public async evaluate(expr: string, frameId: number | undefined, context: string|undefined) {
+	public evaluate(expr: string, frameId: number | undefined, context: string|undefined) {
 		var silent: boolean = false;
 		if(context==='watch'){
 			silent = true;
@@ -666,8 +665,12 @@ export class DebugRuntime extends EventEmitter {
 			frameId = 0;
 		}
 		expr = escapeStringForR(expr, '"');
-		this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent}, [], false);
-		this.requestInfoFromR();
+		const rId = ++this.requestId;
+		this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent, id: rId}, [], false);
+		if(!silent){
+			this.requestInfoFromR();
+		}
+		return rId;
 	}
 
 
