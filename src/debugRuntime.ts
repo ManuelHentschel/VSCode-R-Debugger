@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 // import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
 import { workspace } from 'vscode';
-import {getRPath, getTerminalPath, escapeForRegex } from "./utils";
+import { config, getRPath, getTerminalPath, escapeForRegex } from "./utils";
 import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
@@ -111,9 +111,8 @@ export class DebugRuntime extends EventEmitter {
 		// LAUNCH R PROCESS
 
 		// read settings from vsc-settings
-		const config = workspace.getConfiguration('rdebugger');
-		this.useRCommandQueue = config.get<boolean>('useRCommandQueue', true);
-		this.waitBetweenRCommands = config.get<number>('waitBetweenRCommands', 0);
+		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
+		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
@@ -129,7 +128,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// start R in child process
 		const terminalPath = getTerminalPath(); // read OS-specific terminal path from config
-		const rPath = getRPath(); // read OS-specific R path from config
+		const rPath = await getRPath(); // read OS-specific R path from config
 		const cwd = path.dirname(program);
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
@@ -196,9 +195,9 @@ export class DebugRuntime extends EventEmitter {
 		// PREP R SESSION AND SOURCE MAIN
 
 		// get config about overwriting R functions
-		const overwritePrint = config.get<boolean>('overwritePrint', false);
-		const overwriteCat = config.get<boolean>('overwriteCat', false);
-		const overwriteSource = config.get<boolean>('overwriteSource', false);
+		const overwritePrint = config().get<boolean>('overwritePrint', false);
+		const overwriteCat = config().get<boolean>('overwriteCat', false);
+		const overwriteSource = config().get<boolean>('overwriteSource', false);
 
 		// prep r session
 		const options = {
@@ -228,7 +227,7 @@ export class DebugRuntime extends EventEmitter {
 			// actual call to main()/error if no main() found is made as response to message 'callMain'
 		}
 
-		this.setBreakpointsInPackages = config.get<boolean>('setBreakpointsInPackages', false);
+		this.setBreakpointsInPackages = config().get<boolean>('setBreakpointsInPackages', false);
 
 		this.endOutputGroup(); // ends the collapsed output group containing config data, R path, etc.
 	}

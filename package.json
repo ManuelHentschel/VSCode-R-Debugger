@@ -123,7 +123,7 @@
       "properties": {
         "rdebugger.rterm.windows": {
           "type": "string",
-          "default": "\"C:\\Program Files\\R\\R-3.6.3\\bin\\R.exe\"",
+          "default": "",
           "description": "R.exe path for Windows."
         },
         "rdebugger.rterm.mac": {
@@ -207,6 +207,7 @@
   },
   "dependencies": {
     "await-notify": "1.0.1",
-    "vscode-debugadapter": "^1.40.0"
+    "vscode-debugadapter": "^1.40.0",
+    "winreg": "^1.2.4"
   }
 }

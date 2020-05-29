@@ -7,7 +7,8 @@ This extension adds debugging capabilities for the R programming language to Vis
 ## Using the Debugger
 * Install the **R Debugger** extension in VS Code.
 * Install the **vscDebugger** package in R (https://github.com/ManuelHentschel/vscDebugger).
-* Make sure the settings `rdebugger.rterm.XXX` and `rdebugger.terminal.XXX` contain valid paths to R and a terminal program
+* Make sure the settings `rdebugger.terminal.*` contain valid path to terminal program.
+* If your R path is neither in Windows registry nor in `PATH` environment variable, make sure to provide valid R path in `rdebugger.rterm.*`.
 * Press F5 and select `R Debugger` as debugger. With the default launch configuration, the debugger will start a new R session.
 * To run a file, focus the file in the editor and press F5 (or the continue button in the debug controls)
 * Output will be printed to the debug console,
@@ -15,6 +16,7 @@ expressions entered into the debug console are evaluated in the currently active
 * During debugging in the global workspace it is often necessary to click the dummy frame
 in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv`.
 
+*For Windows users: If your R installation is from [CRAN](http://cran.r-project.org/mirrors.html) with default installation settings, especially **Save version number in registry** is enabled, then there's no need to specify `rdebugger.rterm.windows`.*
 
 ## Installation
 The VS code extension can be run from source by opening the project repo's root directory in vscode and pressing F5.
