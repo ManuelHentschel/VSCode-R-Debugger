@@ -129,7 +129,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// start R in child process
 		const terminalPath = getTerminalPath(); // read OS-specific terminal path from config
-		const rPath = getRPath(); // read OS-specific R path from config
+		const rPath = await getRPath(); // read OS-specific R path from config
 		const cwd = path.dirname(program);
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
