@@ -1,9 +1,11 @@
 foo <- function(x, y) {
   print(x)
-  print(y)
-  browser()
+  print(y); print(0)
+  l <- list(1,2,3)
+  lng <- length(l)
   x + y
-}
+  return(100)
+} 
 
 bar <- function(x, n) {
   z <- x
@@ -14,4 +16,9 @@ bar <- function(x, n) {
   z
 }
 
-bar(2, 5)
+g <- function(){
+  print('g')
+  return(list(1,2,333))
+}
+
+g()

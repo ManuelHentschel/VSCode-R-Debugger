@@ -43,6 +43,7 @@ export async function getRPath() {
                 const item: winreg.RegistryItem = await new Promise((c, e) =>
                     key.get("InstallPath", (err, result) => err === null ? c(result) : e(err)));
                 rpath = path.join(item.value, "bin", "R.exe");
+                rpath = '"' + rpath + '"';
             } catch (e) {
                 rpath = "";
             }

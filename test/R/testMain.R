@@ -1,3 +1,12 @@
+
+
+print('sourcing stuff!')
+
+
+g <- function(){
+  1234
+}
+
 foo <- function(x, y) {
   print(x)
   print(y)
