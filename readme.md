@@ -13,6 +13,7 @@ This extension adds debugging capabilities for the R programming language.
 * To run a file, focus the file in the editor and press F5 (or the continue button in the debug controls)
 * Output will be printed to the debug console, expressions entered into the debug console are evaluated in the currently active frame
 
+*For Windows users: If your R installation is from [CRAN](http://cran.r-project.org/mirrors.html) with default installation settings, especially **Save version number in registry** is enabled, then there's no need to specify `rdebugger.rterm.windows`.*
 
 ## Installation
 The VS code extension can be run from source by opening the project repo's root directory in vscode and pressing F5.
