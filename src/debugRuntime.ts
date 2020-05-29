@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 // import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
 import { workspace } from 'vscode';
-import {getRPath, getTerminalPath, escapeForRegex } from "./utils";
+import { config, getRPath, getTerminalPath, escapeForRegex } from "./utils";
 import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
@@ -111,9 +111,8 @@ export class DebugRuntime extends EventEmitter {
 		// LAUNCH R PROCESS
 
 		// read settings from vsc-settings
-		const config = workspace.getConfiguration('rdebugger');
-		this.useRCommandQueue = config.get<boolean>('useRCommandQueue', true);
-		this.waitBetweenRCommands = config.get<number>('waitBetweenRCommands', 0);
+		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
+		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
@@ -199,9 +198,9 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.defaultLibrary = this.packageName;
 
 		// get config about overwriting R functions
-		const overwritePrint = config.get<boolean>('overwritePrint', false);
-		const overwriteCat = config.get<boolean>('overwriteCat', false);
-		const overwriteSource = config.get<boolean>('overwriteSource', false);
+		const overwritePrint = config().get<boolean>('overwritePrint', false);
+		const overwriteCat = config().get<boolean>('overwriteCat', false);
+		const overwriteSource = config().get<boolean>('overwriteSource', false);
 
 		// prep r session
 		const options = {
@@ -220,7 +219,7 @@ export class DebugRuntime extends EventEmitter {
 		);
 		this.rSession.callFunction('.vsc.prepGlobalEnv', options);
 
-		this.setBreakpointsInPackages = config.get<boolean>('setBreakpointsInPackages', false);
+		this.setBreakpointsInPackages = config().get<boolean>('setBreakpointsInPackages', false);
 
 		this.endOutputGroup();
 	}

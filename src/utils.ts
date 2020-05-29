@@ -3,8 +3,10 @@ import { window, workspace } from "vscode";
 import path = require("path");
 import fs = require("fs");
 import winreg = require("winreg");
-const config = workspace.getConfiguration("rdebugger");
 
+export function config() {
+    return workspace.getConfiguration("rdebugger");
+}
 
 function getRfromEnvPath(platform: string) {
     let splitChar: string = ":";
@@ -30,7 +32,7 @@ export async function getRPath() {
     const platform: string = process.platform;
 
     if (platform === "win32") {
-        rpath = config.get<string>("rterm.windows", "");
+        rpath = config().get<string>("rterm.windows", "");
         if (rpath === "") {
             // Find path from registry
             try {
@@ -46,9 +48,9 @@ export async function getRPath() {
             }
         }
     } else if (platform === "darwin") {
-        rpath = config.get<string>("rterm.mac", "");
+        rpath = config().get<string>("rterm.mac", "");
     } else if (platform === "linux") {
-        rpath = config.get<string>("rterm.linux", "");
+        rpath = config().get<string>("rterm.linux", "");
     }
 
     if (rpath === "") {
@@ -63,13 +65,13 @@ export async function getRPath() {
 
 export function getTerminalPath() {
     if (process.platform === "win32") {
-        return config.get<string>("terminal.windows", "");
+        return config().get<string>("terminal.windows", "");
     }
     if (process.platform === "darwin") {
-        return config.get<string>("terminal.mac", "");
+        return config().get<string>("terminal.mac", "");
     }
     if (process.platform === "linux") {
-        return config.get<string>("terminal.linux", "");
+        return config().get<string>("terminal.linux", "");
     }
     window.showErrorMessage(`${process.platform} can't find Terminal`);
     return "";
