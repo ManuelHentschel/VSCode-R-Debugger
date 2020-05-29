@@ -297,7 +297,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// filter out additional browser info:
-		if(isFullLine && (/(?:debug|exiting from|debugging|Called from|debug at): /.test(line))){
+		if(isFullLine && (/(?:debug|exiting from|debugging|Called from|debug at) /.test(line))){
 			showLine = false; // part of browser-info
 			this.stdoutIsBrowserInfo = true;
 		}
