@@ -10,6 +10,7 @@ import * as DebugAdapter from 'vscode-debugadapter';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
 import { DebugRuntime, DebugBreakpoint } from './debugRuntime';
+import { anyRArgs } from './rSession';
 const { Subject } = require('await-notify');
 
 
@@ -51,6 +52,7 @@ export class DebugSession extends LoggingDebugSession {
 	// private _evalResponses: DebugProtocol.EvaluateResponse[] = [];
 	private _breakpointsResponses: DebugProtocol.SetBreakpointsResponse[] = [];
 	private _evalResponses: Record<number, DebugProtocol.EvaluateResponse> = {};
+	private _completionResponses: DebugProtocol.CompletionsResponse[] = [];
 
 	private _logLevel = 3;
 
@@ -119,8 +121,13 @@ export class DebugSession extends LoggingDebugSession {
 				this.sendResponse(response);
 			}
 		});
-		this._runtime.on('breakpointResponse', (breakpoints: any) => {
-
+		this._runtime.on('breakpointResponse', (breakpoints: any) => { });
+		this._runtime.on('completionResponse', (completionsItems: DebugProtocol.CompletionItem[]) => {
+			const response = this._completionResponses.shift();
+			response.body = {
+				targets: completionsItems
+			};
+			this.sendResponse(response);
 		});
 	}
 
@@ -149,7 +156,7 @@ export class DebugSession extends LoggingDebugSession {
 
 		// make VS Code to support completion in REPL
 		response.body.supportsCompletionsRequest = true;
-		response.body.completionTriggerCharacters = [ ".", "[" ];
+		response.body.completionTriggerCharacters = [ "[", "(", " ", "+", "-",  "*", "/", "$" ];
 
 		// make VS Code to send cancelRequests
 		response.body.supportsCancelRequest = true;
@@ -330,12 +337,13 @@ export class DebugSession extends LoggingDebugSession {
 	};
 
 
+
 	// COMPLETION
-
 	protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {
-		this.sendResponse(response);
+		this._completionResponses.push(response);
+		this._runtime.getCompletions(args.frameId, args.text, args.column, args.line);
+		// this.sendResponse(response);
 	};
-
 
 
 	// Exception:

@@ -454,6 +454,9 @@ export class DebugRuntime extends EventEmitter {
 				const line = body['line'];
 				this.writeOutput(output, true, false, file, line);
 				break;
+			case 'completion':
+				this.sendEvent('completionResponse', body);
+				break;
 			case 'go':
 				// is sent by .vsc.prepGlobalEnv() to indicate that R is ready for .vsc.debugSource()
 				this.isRunningCustomCode = true;
@@ -727,6 +730,22 @@ export class DebugRuntime extends EventEmitter {
 			await this.waitForMessages();
 			return this.variables[varRef];
 		}
+	}
+
+
+	///////////////////////////////
+	// COMPLETION
+
+	public async getCompletions(frameId:number, text:string, column:number, line:number){
+		this.rSession.callFunction('.vsc.getCompletion', {
+			frameIdVsc: frameId,
+			text: text,
+			column: column,
+			line: line,
+			onlyGlobalEnv: (this.debugMode === 'global'),
+			id: ++this.requestId
+		});
+		await this.waitForMessages();
 	}
 
 
