@@ -148,7 +148,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body.supportsDataBreakpoints = false;
 
 		// make VS Code to support completion in REPL
-		response.body.supportsCompletionsRequest = false;
+		response.body.supportsCompletionsRequest = true;
 		response.body.completionTriggerCharacters = [ ".", "[" ];
 
 		// make VS Code to send cancelRequests
@@ -330,6 +330,11 @@ export class DebugSession extends LoggingDebugSession {
 	};
 
 
+	// COMPLETION
+
+	protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {
+		this.sendResponse(response);
+	};
 
 
 
@@ -458,7 +463,7 @@ export class DebugSession extends LoggingDebugSession {
     // protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments, request?: DebugProtocol.Request): void {};
     protected stepInTargetsRequest(response: DebugProtocol.StepInTargetsResponse, args: DebugProtocol.StepInTargetsArguments, request?: DebugProtocol.Request): void {};
     protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request): void {};
-    protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {};
+    // protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {};
     // protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {};
     protected loadedSourcesRequest(response: DebugProtocol.LoadedSourcesResponse, args: DebugProtocol.LoadedSourcesArguments, request?: DebugProtocol.Request): void {};
     protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments, request?: DebugProtocol.Request): void {};
