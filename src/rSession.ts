@@ -238,7 +238,7 @@ export function escapeStringForR(s: string, quote: string='"') {
         return(
             quote
             + s.replace(/\\/g, "\\\\")
-                .replace(/"""/g, `\\${quote}`)
+                .replace(RegExp(quote, "g"), `\\${quote}`)
                 .replace(/\n/g, "\\n")
                 // .replace(/\r/g, "\\r")
                 .replace(/\r/g, "")
@@ -248,7 +248,6 @@ export function escapeStringForR(s: string, quote: string='"') {
             + quote);
     }
 }
-
 
 function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
     // converts anyRArgs to unnamed args by recursively converting named args "{key: arg}" to "key=arg"
