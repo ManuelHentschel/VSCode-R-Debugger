@@ -61,6 +61,9 @@ export class DebugRuntime extends EventEmitter {
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
 	private waitBetweenRCommands: number = 0;
 
+	// whether to show package environments
+	private includePackages: boolean = false;
+
 	// since we want to send breakpoint events, we will assign an id to every event
 	// so that the frontend can match events with breakpoints.
 	private breakpointId = 1;
@@ -97,7 +100,7 @@ export class DebugRuntime extends EventEmitter {
 
 	// start
 	// public async start(program: string, allowDebugGlobal: boolean=true, callMain: boolean=false, mainFunction: string='main') {
-	public async start(debugFunction: boolean, debugFile: boolean, allowGlobalDebugging: boolean, workingDirectory: string, program?: string, mainFunction?: string) {
+	public async start(debugFunction: boolean, debugFile: boolean, allowGlobalDebugging: boolean, workingDirectory: string, program?: string, mainFunction?: string, includePackages: boolean = false) {
 
 		// STORE LAUNCH CONFIG TO PROPERTIES
 		this.callMain = debugFunction;
@@ -118,6 +121,7 @@ export class DebugRuntime extends EventEmitter {
 		// read settings from vsc-settings
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
+		this.includePackages = config().get<boolean>('includePackageScopes', false);
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
@@ -600,8 +604,9 @@ export class DebugRuntime extends EventEmitter {
 	// request info about the stack and workspace from R:
 	private requestInfoFromR(args: anyRArgs = []) {
 		const args2: anyRArgs = {
-			'id': ++this.requestId,
-			'isError': this.isCrashed
+			id: ++this.requestId,
+			isError: this.isCrashed,
+			includePackages: this.includePackages
 		};
 		this.rSession.callFunction('.vsc.getStack', args, args2);
 		return this.waitForMessages();
