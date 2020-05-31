@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 // import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
 import { workspace } from 'vscode';
-import { config, getRPath, getTerminalPath, escapeForRegex } from "./utils";
+import { config, getRPath, escapeForRegex } from "./utils";
 import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
@@ -127,24 +127,22 @@ export class DebugRuntime extends EventEmitter {
 		);
 
 		// start R in child process
-		const terminalPath = getTerminalPath(); // read OS-specific terminal path from config
 		const rPath = await getRPath(); // read OS-specific R path from config
 		const cwd = path.dirname(program);
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
 		this.writeOutput(''
-			+ 'terminalPath: ' + terminalPath
-			+ '\ncwd: ' + cwd
+			+ 'cwd: ' + cwd
 			+ '\nrPath: ' + rPath
 			+ '\nrArgs: ' + rArgs.join(' ')
 		);
 
 		const thisDebugRuntime = this; // direct callback to this.handleLine() does not seem to work...
-		this.rSession = new RSession(terminalPath, rPath, cwd, rArgs, thisDebugRuntime);
+		this.rSession = new RSession(rPath, cwd, rArgs, thisDebugRuntime);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		if(!this.rSession.successTerminal){
-            vscode.window.showErrorMessage('Terminal path not working:\n' + terminalPath);
+            vscode.window.showErrorMessage('Failed to spawn a child process!');
 			this.terminate();
 			return;
 		}

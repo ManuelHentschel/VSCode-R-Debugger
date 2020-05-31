@@ -31,7 +31,7 @@ export class RSession {
     private restOfStdout: string='';
 
 
-    constructor(terminalPath:string, rPath: string, cwd: string, rArgs: string[]=[],
+    constructor(rPath: string, cwd: string, rArgs: string[]=[],
         // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
         debugRuntime: DebugRuntime,
         logLevel=undefined, logLevelCP=undefined)
@@ -45,7 +45,7 @@ export class RSession {
             this.logLevelCP = logLevelCP;
         }
 
-        this.cp = spawnChildProcess(terminalPath, cwd, [], this.logLevelCP);
+        this.cp = spawnRProcess(rPath, cwd, rArgs, this.logLevelCP);
 
         if(this.cp.pid === undefined){
             this.successTerminal = false;
@@ -64,8 +64,6 @@ export class RSession {
 			this.handleData(data, true);
 		});
 
-        // start R in terminal process
-        this.runCommand(rPath, rArgs);
 
         this.successTerminal = true;
     }
@@ -285,14 +283,16 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
 /////////////////////////////////
 // Child Process
 
-function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[] = [], logLevel=3){
+function spawnRProcess(rPath: string, cwd: string, rArgs: string[] = [], logLevel=3){
     const options = {
         cwd: cwd,
         env: {
             VSCODE_DEBUG_SESSION: "1",
-        }
+        },
+        shell: true
     };
-    const cp = child.spawn(terminalPath, cmdArgs, options);
+
+    const cp = child.spawn(rPath, rArgs, options);
 
     // log output to console.log:
     if(logLevel>=4){
