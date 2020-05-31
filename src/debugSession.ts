@@ -86,7 +86,7 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>bp));
 		});
-		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line=1, column=1, group?: ("start"|"startCollapsed"|"end")) => {
+		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line?: number, column?: number, group?: ("start"|"startCollapsed"|"end")) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
 			e.body = {
 				category: category,

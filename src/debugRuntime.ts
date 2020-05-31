@@ -358,13 +358,15 @@ export class DebugRuntime extends EventEmitter {
 			showLine = false;
 		}
 
+		// check for StdErr (show everything):
+		if(fromStderr){
+			showLine = true;
+		}
 
 		// output any part of the line that was not parsed
 		if(showLine && line.length>0){
-			if(isFullLine){
-				line = line + '\n';
-			}
-			this.writeOutput(line, false, fromStderr);
+			this.writeOutput(line, isFullLine, fromStderr);
+			line = '';
 		}
 		return line;
 	}
