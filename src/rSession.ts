@@ -117,10 +117,10 @@ export class RSession {
 
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], escapeStrings: boolean=true, library: string = this.defaultLibrary){
+    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], escapeStrings: boolean=true, library: string = this.defaultLibrary, force:boolean=false){
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
         const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library);
-        this.runCommand(cmd);
+        this.runCommand(cmd, [], force);
     }
 
     // Kill the child process

@@ -21,10 +21,13 @@ const { Subject } = require('await-notify');
  */
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
-	program: string;
+
+	program: string|undefined;
 	debugFunction: boolean;
+	debugFile: boolean;
 	allowGlobalDebugging: boolean;
 	mainFunction: string|undefined;
+	workingDirectory: string;
 }
 
 interface Source extends DebugProtocol.Source {
@@ -129,6 +132,9 @@ export class DebugSession extends LoggingDebugSession {
 		// build and return the capabilities of this debug adapter:
 		response.body = response.body || {};
 
+		// support restart
+		response.body.supportsRestartRequest = true;
+
 		// the adapter implements the configurationDoneRequest.
 		response.body.supportsConfigurationDoneRequest = true;
 
@@ -194,7 +200,16 @@ export class DebugSession extends LoggingDebugSession {
 		await this._configurationDone.wait(1000);
 
 		// start the program in the runtime
-		this._runtime.start(args.program, args.allowGlobalDebugging, args.debugFunction, args.mainFunction);
+		// this._runtime.start(args.program, args.allowGlobalDebugging, args.debugFunction, args.mainFunction);
+		this._runtime.start(
+			args.debugFunction,
+			args.debugFile,
+			args.allowGlobalDebugging,
+			args.workingDirectory,
+			args.program,
+			args.mainFunction
+		);
+
 
 		this.sendResponse(response);
 	}
@@ -392,7 +407,10 @@ export class DebugSession extends LoggingDebugSession {
 		// no response to be sent (?)
 	}
 
-
+    protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {
+		this._runtime.returnToPrompt();
+		this.sendResponse(response);
+	};
 
 
     protected dispatchRequest(request: DebugProtocol.Request): void {
@@ -415,7 +433,7 @@ export class DebugSession extends LoggingDebugSession {
     // protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {};
     protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request): void {};
     // protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request): void {};
-    protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {};
+    // protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {};
     // protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request): void {};
     protected setFunctionBreakPointsRequest(response: DebugProtocol.SetFunctionBreakpointsResponse, args: DebugProtocol.SetFunctionBreakpointsArguments, request?: DebugProtocol.Request): void {};
     // protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request): void {};

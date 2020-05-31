@@ -53,18 +53,29 @@
           "launch": {
             "required": [
               "debugFunction",
+              "debugFile",
               "allowGlobalDebugging"
             ],
             "properties": {
               "program": {
                 "type": "string",
-                "description": "Absolute path to a text file.",
+                "description": "Absolute path to an R file",
                 "default": "${file}"
+              },
+              "workingDirectory": {
+                "type": "string",
+                "description": "Absolute path to a directory.",
+                "default": "${workspaceFolder}"
               },
               "debugFunction": {
                 "type": "boolean",
                 "default": false,
                 "description": "Whether to debug a single function (called after sourcing the debugged program/R-file)."
+              },
+              "debugFile": {
+                "type": "boolean",
+                "default": false,
+                "description":  "Whether to debug the R code contained in a R-file."
               },
               "mainFunction": {
                 "type": "string",
@@ -84,8 +95,11 @@
             "type": "R-Debugger",
             "request": "launch",
             "name": "R Debugger",
+            "workingDirectory": "${workspaceFolder}",
             "program": "${file}",
+            "mainFunction": "main",
             "debugFunction": false,
+            "debugFile": false,
             "allowGlobalDebugging": true
           }
         ],
@@ -98,6 +112,20 @@
               "request": "launch",
               "name": "R Debugger",
               "debugFunction": false,
+              "debugFile": false,
+              "allowGlobalDebugging": true
+            }
+          },
+          {
+            "label": "R Debug: Debug a .R file",
+            "description": "Start R do debug a .R file",
+            "body": {
+              "type": "R-Debugger",
+              "request": "launch",
+              "name": "R Debugger",
+              "debugFunction": false,
+              "debugFile": true,
+              "program": "${file}",
               "allowGlobalDebugging": true
             }
           },

@@ -41,6 +41,9 @@ export class DebugRuntime extends EventEmitter {
 	// The file we are debugging
 	private sourceFile: string;
 
+	// the directory in which to run the file
+	private cwd: string;
+
 	// The current line
 	private currentLine = 0;
 	private currentFile = ''; //might be different from sourceFile
@@ -79,8 +82,9 @@ export class DebugRuntime extends EventEmitter {
 	private sendEventOnStack: string = ''; // send this event upon receiving the next Stack-message
 
 	// debugMode
-	private mainFunction: string = 'main';
 	private callMain: boolean = false;
+	private mainFunction: string = 'main';
+	private callSource: boolean = false;
 	private allowDebugGlobal: boolean = false;
 	private debugMode: ('function'|'global') = 'function';
 	private setBreakpointsInPackages: boolean = false;
@@ -92,21 +96,22 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// start
-	public async start(program: string, allowDebugGlobal: boolean=true, callMain: boolean=false, mainFunction: string='main') {
+	// public async start(program: string, allowDebugGlobal: boolean=true, callMain: boolean=false, mainFunction: string='main') {
+	public async start(debugFunction: boolean, debugFile: boolean, allowGlobalDebugging: boolean, workingDirectory: string, program?: string, mainFunction?: string) {
 
 		// STORE LAUNCH CONFIG TO PROPERTIES
-
+		this.callMain = debugFunction;
+		this.callSource = debugFile;
+		this.allowDebugGlobal = allowGlobalDebugging;
+		this.cwd = workingDirectory;
 		this.sourceFile = program;
-		// this.allowDebugGlobal = allowDebugGlobal; //currently not working!
-		this.allowDebugGlobal = true;
-		this.callMain = callMain;
 		this.mainFunction = mainFunction;
-		if(callMain){
+
+		if(this.callMain){
 			this.debugMode = 'function';
 		} else{
 			this.debugMode = 'global';
 		}
-
 
 		// LAUNCH R PROCESS
 
@@ -128,7 +133,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// start R in child process
 		const rPath = await getRPath(); // read OS-specific R path from config
-		const cwd = path.dirname(program);
+		const cwd = this.cwd;
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
@@ -213,6 +218,13 @@ export class DebugRuntime extends EventEmitter {
 			+ '\nallow global debugging: ' + this.allowDebugGlobal
 		);
 		this.rSession.callFunction('.vsc.prepGlobalEnv', options);
+
+		if(this.callSource){
+			// debug-source the specified file
+			this.writeOutput(''
+				+ 'program: ' + program
+			);
+		}
 
 		if(this.callMain){
 			// source file that is being debugged
@@ -442,7 +454,9 @@ export class DebugRuntime extends EventEmitter {
 				// is sent by .vsc.prepGlobalEnv() to indicate that R is ready for .vsc.debugSource()
 				this.isRunningCustomCode = true;
 				this.rSession.useQueue = this.useRCommandQueue;
-				if(this.debugMode === 'global'){
+				if(this.callSource){
+					this.debugSource(this.sourceFile);
+				} else if(this.debugMode === 'global'){
 					this.requestInfoFromR();
 					this.sendEventOnStack = 'stopOnEntry';
 				}
@@ -613,17 +627,21 @@ export class DebugRuntime extends EventEmitter {
 			this.expectBrowser = false;
 			this.rSession.runCommand('c');
 		} else{
-			this.setAllBreakpoints();
 			const filename = vscode.window.activeTextEditor.document.fileName;
-			// const filenameR = toRStringLiteral(filename);
-			this.rSession.callFunction('.vsc.debugSource', {file: filename});
-			const rCall = makeFunctionCall('.vsc.debugSource', {file: filename});
-			this.startOutputGroup(rCall, true);
-			this.endOutputGroup();
-			this.requestInfoFromR({dummyFile: filename});
-			// this.sendEventOnStack = 'stopOnStepPreserveFocus';
-			this.sendEventOnStack = 'stopOnStep';
+			this.debugSource(filename);
 		}
+	}
+
+	// debug source:
+	public debugSource(filename: string){
+		this.setAllBreakpoints();
+		this.rSession.callFunction('.vsc.debugSource', {file: filename});
+		const rCall = makeFunctionCall('.vsc.debugSource', {file: filename});
+		this.startOutputGroup(rCall, true);
+		this.endOutputGroup();
+		this.requestInfoFromR({dummyFile: filename});
+		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
+		this.sendEventOnStack = 'stopOnStep';
 	}
 
 	// step:
@@ -803,10 +821,28 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.clearQueue();
 		if(this.debugMode === 'function'){
 			this.rSession.runCommand('Q', [], true);
+			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
+			const infoString = "You terminated R while debugging a function.\n" +
+				"If you want to keep the R session running and only exit the function, use 'Restart' (Ctrl+Shift+F5).\n";
+			this.sendEvent('output', infoString, "console");
+			this.sendEvent('end');
 		} else{
-			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base');
+			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
 			this.sendEvent('end');
 		}
+	}
+
+	public returnToPrompt(): void {
+		this.rSession.clearQueue();
+		if(this.debugMode === 'function'){
+			this.rSession.runCommand('Q', [], true);
+		}
+		this.debugMode = 'global';
+		const filename = vscode.window.activeTextEditor.document.fileName;
+		this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
+		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
+		this.currentLine = 0;
+		this.sendEventOnStack = 'stopOnStep';
 	}
 
 	public terminate(): void {
