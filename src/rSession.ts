@@ -286,9 +286,12 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
 /////////////////////////////////
 // Child Process
 
-function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[]=[], logLevel=3){
+function spawnChildProcess(terminalPath: string, cwd: string, cmdArgs: string[] = [], logLevel=3){
     const options = {
-        cwd: cwd
+        cwd: cwd,
+        env: {
+            VSCODE_DEBUG_SESSION: "1",
+        }
     };
     const cp = child.spawn(terminalPath, cmdArgs, options);
 
