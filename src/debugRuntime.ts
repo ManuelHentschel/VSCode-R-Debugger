@@ -808,10 +808,28 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.clearQueue();
 		if(this.debugMode === 'function'){
 			this.rSession.runCommand('Q', [], true);
+			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
+			const infoString = "You terminated R while debugging a function.\n" +
+				"If you want to keep the R session running and only exit the function, use 'Restart' (Ctrl+Shift+F5).\n";
+			this.sendEvent('output', infoString, "console");
+			this.sendEvent('end');
 		} else{
-			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base');
+			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
 			this.sendEvent('end');
 		}
+	}
+
+	public returnToPrompt(): void {
+		this.rSession.clearQueue();
+		if(this.debugMode === 'function'){
+			this.rSession.runCommand('Q', [], true);
+		}
+		this.debugMode = 'global';
+		const filename = vscode.window.activeTextEditor.document.fileName;
+		this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
+		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
+		this.currentLine = 0;
+		this.sendEventOnStack = 'stopOnStep';
 	}
 
 	public terminate(): void {
