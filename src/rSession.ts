@@ -288,6 +288,7 @@ function spawnRProcess(rPath: string, cwd: string, rArgs: string[] = [], logLeve
         cwd: cwd,
         env: {
             VSCODE_DEBUG_SESSION: "1",
+            ...process.env
         },
         shell: true
     };
