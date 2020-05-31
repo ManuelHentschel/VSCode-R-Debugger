@@ -193,6 +193,11 @@
           "type": "boolean",
           "default": false,
           "description": "Whether to enable breakpoints in packages. Can impact performance if set to true."
+        },
+        "rdebugger.includePackageScopes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Set to true to show package scopes in the variable window."
         }
       }
     }
