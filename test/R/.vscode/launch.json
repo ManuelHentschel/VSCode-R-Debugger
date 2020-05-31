@@ -9,8 +9,9 @@
             "request": "launch",
             "name": "R Debugger",
             "workingDirectory": "${workspaceFolder}",
+            "program": "${file}",
             "debugFunction": false,
-            "debugFile": false,
+            "debugFile": true,
             "allowGlobalDebugging": true
         }
     ]

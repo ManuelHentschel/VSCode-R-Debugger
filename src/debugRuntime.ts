@@ -219,6 +219,13 @@ export class DebugRuntime extends EventEmitter {
 		);
 		this.rSession.callFunction('.vsc.prepGlobalEnv', options);
 
+		if(this.callSource){
+			// debug-source the specified file
+			this.writeOutput(''
+				+ 'program: ' + program
+			);
+		}
+
 		if(this.callMain){
 			// source file that is being debugged
 			this.writeOutput(''
@@ -447,7 +454,9 @@ export class DebugRuntime extends EventEmitter {
 				// is sent by .vsc.prepGlobalEnv() to indicate that R is ready for .vsc.debugSource()
 				this.isRunningCustomCode = true;
 				this.rSession.useQueue = this.useRCommandQueue;
-				if(this.debugMode === 'global'){
+				if(this.callSource){
+					this.debugSource(this.sourceFile);
+				} else if(this.debugMode === 'global'){
 					this.requestInfoFromR();
 					this.sendEventOnStack = 'stopOnEntry';
 				}
@@ -618,17 +627,21 @@ export class DebugRuntime extends EventEmitter {
 			this.expectBrowser = false;
 			this.rSession.runCommand('c');
 		} else{
-			this.setAllBreakpoints();
 			const filename = vscode.window.activeTextEditor.document.fileName;
-			// const filenameR = toRStringLiteral(filename);
-			this.rSession.callFunction('.vsc.debugSource', {file: filename});
-			const rCall = makeFunctionCall('.vsc.debugSource', {file: filename});
-			this.startOutputGroup(rCall, true);
-			this.endOutputGroup();
-			this.requestInfoFromR({dummyFile: filename});
-			// this.sendEventOnStack = 'stopOnStepPreserveFocus';
-			this.sendEventOnStack = 'stopOnStep';
+			this.debugSource(filename);
 		}
+	}
+
+	// debug source:
+	public debugSource(filename: string){
+		this.setAllBreakpoints();
+		this.rSession.callFunction('.vsc.debugSource', {file: filename});
+		const rCall = makeFunctionCall('.vsc.debugSource', {file: filename});
+		this.startOutputGroup(rCall, true);
+		this.endOutputGroup();
+		this.requestInfoFromR({dummyFile: filename});
+		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
+		this.sendEventOnStack = 'stopOnStep';
 	}
 
 	// step:

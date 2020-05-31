@@ -51,7 +51,7 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 			}
 		} else if(config.debugFunction){
 			if(!config.program || !config.mainFunction){
-				return vscode.window.showErrorMessage("Please specify an R file and a function name in the Debugger config.").then(_ => {
+				return vscode.window.showErrorMessage("Please specify an R file as 'program' and a function name in the Debugger config.").then(_ => {
 					return undefined;
 				});
 			} else if(!config.workingDirectory){
@@ -59,7 +59,7 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 			}
 		} else if(config.debugFile){
 			if(!config.program){
-				return vscode.window.showErrorMessage("Please specify an R file.").then(_ => {
+				return vscode.window.showErrorMessage("Please specify an R file as 'program'.").then(_ => {
 					return undefined;
 				});
 			} else if(!config.workingDirectory){

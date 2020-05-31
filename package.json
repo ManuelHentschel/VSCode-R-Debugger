@@ -96,6 +96,8 @@
             "request": "launch",
             "name": "R Debugger",
             "workingDirectory": "${workspaceFolder}",
+            "program": "${file}",
+            "mainFunction": "main",
             "debugFunction": false,
             "debugFile": false,
             "allowGlobalDebugging": true
