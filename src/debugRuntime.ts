@@ -41,6 +41,9 @@ export class DebugRuntime extends EventEmitter {
 	// The file we are debugging
 	private sourceFile: string;
 
+	// the directory in which to run the file
+	private cwd: string;
+
 	// The current line
 	private currentLine = 0;
 	private currentFile = ''; //might be different from sourceFile
@@ -79,8 +82,9 @@ export class DebugRuntime extends EventEmitter {
 	private sendEventOnStack: string = ''; // send this event upon receiving the next Stack-message
 
 	// debugMode
-	private mainFunction: string = 'main';
 	private callMain: boolean = false;
+	private mainFunction: string = 'main';
+	private callSource: boolean = false;
 	private allowDebugGlobal: boolean = false;
 	private debugMode: ('function'|'global') = 'function';
 	private setBreakpointsInPackages: boolean = false;
@@ -92,21 +96,22 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// start
-	public async start(program: string, allowDebugGlobal: boolean=true, callMain: boolean=false, mainFunction: string='main') {
+	// public async start(program: string, allowDebugGlobal: boolean=true, callMain: boolean=false, mainFunction: string='main') {
+	public async start(debugFunction: boolean, debugFile: boolean, allowGlobalDebugging: boolean, workingDirectory: string, program?: string, mainFunction?: string) {
 
 		// STORE LAUNCH CONFIG TO PROPERTIES
-
+		this.callMain = debugFunction;
+		this.callSource = debugFile;
+		this.allowDebugGlobal = allowGlobalDebugging;
+		this.cwd = workingDirectory;
 		this.sourceFile = program;
-		// this.allowDebugGlobal = allowDebugGlobal; //currently not working!
-		this.allowDebugGlobal = true;
-		this.callMain = callMain;
 		this.mainFunction = mainFunction;
-		if(callMain){
+
+		if(this.callMain){
 			this.debugMode = 'function';
 		} else{
 			this.debugMode = 'global';
 		}
-
 
 		// LAUNCH R PROCESS
 
@@ -128,7 +133,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// start R in child process
 		const rPath = await getRPath(); // read OS-specific R path from config
-		const cwd = path.dirname(program);
+		const cwd = this.cwd;
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 

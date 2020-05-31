@@ -21,10 +21,13 @@ const { Subject } = require('await-notify');
  */
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
-	program: string;
+
+	program: string|undefined;
 	debugFunction: boolean;
+	debugFile: boolean;
 	allowGlobalDebugging: boolean;
 	mainFunction: string|undefined;
+	workingDirectory: string;
 }
 
 interface Source extends DebugProtocol.Source {
@@ -194,7 +197,16 @@ export class DebugSession extends LoggingDebugSession {
 		await this._configurationDone.wait(1000);
 
 		// start the program in the runtime
-		this._runtime.start(args.program, args.allowGlobalDebugging, args.debugFunction, args.mainFunction);
+		// this._runtime.start(args.program, args.allowGlobalDebugging, args.debugFunction, args.mainFunction);
+		this._runtime.start(
+			args.debugFunction,
+			args.debugFile,
+			args.allowGlobalDebugging,
+			args.workingDirectory,
+			args.program,
+			args.mainFunction
+		);
+
 
 		this.sendResponse(response);
 	}
