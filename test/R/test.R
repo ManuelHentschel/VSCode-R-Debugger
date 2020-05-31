@@ -16,6 +16,14 @@ bar <- function(x, n) {
   z
 }
 
+
+f1 <- 100
+fara <- 123
+fuck <- 0
+fantom <- FALSE
+phantom <- TRUE
+l <- list(a=1, b=2, c=3)
+
 g <- function(){
   print('g')
   return(list(1,2,333))
