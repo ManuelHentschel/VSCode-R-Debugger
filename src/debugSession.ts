@@ -156,7 +156,7 @@ export class DebugSession extends LoggingDebugSession {
 
 		// make VS Code to support completion in REPL
 		response.body.supportsCompletionsRequest = true;
-		response.body.completionTriggerCharacters = [ "[", "(", " ", "+", "-",  "*", "/", "$" ];
+		response.body.completionTriggerCharacters = [ "[", "(", " ", "+", "-",  "*", "/", "$", ":" ];
 
 		// make VS Code to send cancelRequests
 		response.body.supportsCancelRequest = true;
