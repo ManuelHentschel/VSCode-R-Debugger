@@ -85,8 +85,18 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('stopOnDataBreakpoint', () => {
 			this.sendEvent(new StoppedEvent('data breakpoint', DebugSession.THREAD_ID));
 		});
-		this._runtime.on('stopOnException', () => {
-			this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID, 'Informative exception text'));
+		this._runtime.on('stopOnException', (args: any) => {
+			const e: DebugProtocol.StoppedEvent = new StoppedEvent('exception', DebugSession.THREAD_ID, '');
+			e.body = {
+				reason : 'exception',
+				threadId: 1,
+				description: 'Stopped on Exception',
+				// text: 'text'
+				text: args.message
+			};
+			this.sendEvent(e);
+
+			// this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID, 'See debug console'));
 		});
 		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>bp));
@@ -156,7 +166,7 @@ export class DebugSession extends LoggingDebugSession {
 
 		// make VS Code to support completion in REPL
 		response.body.supportsCompletionsRequest = true;
-		response.body.completionTriggerCharacters = [ "[", "(", " ", "+", "-",  "*", "/", "$", ":" ];
+		response.body.completionTriggerCharacters = [ "[", "$", ":" ];
 
 		// make VS Code to send cancelRequests
 		response.body.supportsCancelRequest = true;
@@ -165,16 +175,23 @@ export class DebugSession extends LoggingDebugSession {
 		response.body.supportsBreakpointLocationsRequest = true;
 
 		// enable exception-info (not working???)
-		response.body.supportsExceptionInfoRequest = true;
+		response.body.supportsExceptionInfoRequest = false;
 		response.body.supportsExceptionOptions = true;
-		const exceptionBreakpointFilters: DebugProtocol.ExceptionBreakpointsFilter[] = [{
-			filter: 'dummyFilter',
-			label: 'dummyFilterLabel',
-			default: true
-		}];
+		const exceptionBreakpointFilters: DebugProtocol.ExceptionBreakpointsFilter[] = [
+			{
+				filter: 'fromFile',
+				label: 'Errors from R file',
+				default: true
+			},
+			{
+				filter: 'fromEval',
+				label: 'Errors from debug console',
+				default: true
+			}
+		];
 		response.body.exceptionBreakpointFilters = exceptionBreakpointFilters;
 		
-		// enable saving variables to clipboard
+		// enable saving variables to clipboard (not working!!!)
 		response.body.supportsClipboardContext = true;
 
 		this.sendResponse(response);
@@ -420,8 +437,8 @@ export class DebugSession extends LoggingDebugSession {
 		// no response to be sent (?)
 	}
 
-    protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {
-		this._runtime.returnToPrompt();
+    protected async restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request) {
+		await this._runtime.returnToPrompt();
 		this.sendResponse(response);
 	};
 
