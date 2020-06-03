@@ -51,7 +51,8 @@ export class DebugSession extends LoggingDebugSession {
 
 	// private _evalResponses: DebugProtocol.EvaluateResponse[] = [];
 	private _breakpointsResponses: DebugProtocol.SetBreakpointsResponse[] = [];
-	private _evalResponses: Record<number, DebugProtocol.EvaluateResponse> = {};
+	// private _evalResponses: Record<number, DebugProtocol.EvaluateResponse> = {};
+	private _evalResponses = new Map<number, DebugProtocol.EvaluateResponse>();
 	private _completionResponses: DebugProtocol.CompletionsResponse[] = [];
 
 	private _logLevel = 3;
@@ -121,7 +122,7 @@ export class DebugSession extends LoggingDebugSession {
 		});
 		this._runtime.on('evalResponse', (result: {result:string, type:string, variablesReference:number}, id: number) => {
 			// const response = this._evalResponses.shift();
-			const response = this._evalResponses[id];
+			const response = this._evalResponses.get(id);
 			if(result.result!==undefined && result.result!=='' || result.variablesReference>0){
 				response.body = result;
 				this.sendResponse(response);
@@ -186,7 +187,7 @@ export class DebugSession extends LoggingDebugSession {
 			{
 				filter: 'fromEval',
 				label: 'Errors from debug console',
-				default: true
+				default: false
 			}
 		];
 		response.body.exceptionBreakpointFilters = exceptionBreakpointFilters;
@@ -286,6 +287,8 @@ export class DebugSession extends LoggingDebugSession {
 
 	// Exception-breakpoints
     protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request): void {
+		this._runtime.breakOnErrorFromConsole =  args.filters.indexOf('fromEval') > -1;
+		this._runtime.breakOnErrorFromFile =  args.filters.indexOf('fromFile') > -1;
 		this.sendResponse(response);
 	}
 
@@ -422,7 +425,8 @@ export class DebugSession extends LoggingDebugSession {
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
 		const requestIdR = this._runtime.evaluate(args.expression, args.frameId, args.context);
 		// this._evalResponses.push(response);
-		this._evalResponses[requestIdR] = response;
+		// this._evalResponses[requestIdR] = response;
+		this._evalResponses.set(requestIdR, response);
 		// this.logAndSendResponse(response);
 	}
 
@@ -430,11 +434,13 @@ export class DebugSession extends LoggingDebugSession {
 	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
 		this._runtime.terminateFromPrompt();
 		// no response to be sent (?)
+		this.sendMissingResponses();
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
 		this._runtime.terminateFromPrompt();
 		// no response to be sent (?)
+		this.sendMissingResponses();
 	}
 
     protected async restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request) {
@@ -451,6 +457,18 @@ export class DebugSession extends LoggingDebugSession {
     sendResponse(response: DebugProtocol.Response): void {
 		console.log('response ' + response.request_seq + ': ' + response.command);
 		super.sendResponse(response);
+	}
+
+	private sendMissingResponses() {
+		this._breakpointsResponses.forEach(response => {
+			this.sendResponse(response);
+		});
+		this._evalResponses.forEach((response, key) => {
+			this.sendResponse(response);
+		});
+		this._completionResponses.forEach(response => {
+			this.sendResponse(response);
+		});
 	}
 
 

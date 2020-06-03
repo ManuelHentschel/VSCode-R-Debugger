@@ -50,6 +50,8 @@ export class DebugRuntime extends EventEmitter {
 
 	// maps from sourceFile to array of breakpoints
 	private breakPoints = new Map<string, DebugBreakpoint[]>();
+	public breakOnErrorFromFile: boolean = true;
+	public breakOnErrorFromConsole: boolean = false;
 
 	// debugging
 	private logLevel = 3;
@@ -695,7 +697,14 @@ export class DebugRuntime extends EventEmitter {
 		}
 		expr = escapeStringForR(expr, '"');
 		const rId = ++this.requestId;
-		this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent, id: rId}, [], false);
+		const rArgs = {
+			expr: expr,
+			frameId: frameId,
+			silent: silent,
+			catchErrors: !this.breakOnErrorFromConsole,
+			id: rId
+		};
+		this.rSession.callFunction('.vsc.evalInFrame', rArgs, [], false);
 		if(!silent){
 			this.requestInfoFromR();
 		}
