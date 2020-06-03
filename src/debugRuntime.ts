@@ -342,14 +342,7 @@ export class DebugRuntime extends EventEmitter {
 			showLine = false;
 		}
 
-		// matches echo of calls to 'our' R package. (Refine in case the user makes such calls?)
-		const packageCallRegex = new RegExp(this.rPackageName + '::');
-		if(isFullLine && packageCallRegex.test(line)) {
-			// was a command sent to R by the debugger
-			console.log('matches: vscDebugger::');
-			showLine = false;
-		}
-		
+		// matches echo of calls made by the debugger
 		const echoRegex = new RegExp(escapeForRegex(this.rAppend) + '$');
 		if(isFullLine && echoRegex.test(line)){
 			showLine = false;
