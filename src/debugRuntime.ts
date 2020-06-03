@@ -50,6 +50,8 @@ export class DebugRuntime extends EventEmitter {
 
 	// maps from sourceFile to array of breakpoints
 	private breakPoints = new Map<string, DebugBreakpoint[]>();
+	public breakOnErrorFromFile: boolean = true;
+	public breakOnErrorFromConsole: boolean = false;
 
 	// debugging
 	private logLevel = 3;
@@ -417,10 +419,14 @@ export class DebugRuntime extends EventEmitter {
 				// sent if an error was encountered by R and 
 				this.stdoutIsBrowserInfo = true;
 				this.isCrashed = true;
-				this.requestInfoFromR();
+				this.expectBrowser = true;
+				this.debugMode = 'function';
+				this.sendEventOnStack = '';
+				await this.requestInfoFromR();
 				// event is sent after receiving stack from R in order to answer stack-request synchronously:
 				// (apparently required by vsc?)
-				this.sendEventOnStack = 'stopOnException';
+				// this.sendEventOnStack = 'stopOnException';
+				this.sendEvent('stopOnException', body);
 				break;
 			case 'end':
 				// can be sent e.g. after completing main()
@@ -629,14 +635,12 @@ export class DebugRuntime extends EventEmitter {
 
 	// continue script execution:
 	public continue(reverse = false) {
-		if(this.isCrashed){
-			this.terminateFromPrompt();
-		} else if(this.debugMode === 'function'){
-			this.expectBrowser = false;
-			this.rSession.runCommand('c');
-		} else{
+		if(this.debugMode === 'global'){
 			const filename = vscode.window.activeTextEditor.document.fileName;
 			this.debugSource(filename);
+		} else{
+			this.expectBrowser = false;
+			this.runCommandAndSendEvent('c', '');
 		}
 	}
 
@@ -654,38 +658,30 @@ export class DebugRuntime extends EventEmitter {
 
 	// step:
 	public async step(reverse = false, event = 'stopOnStep') {
-		if(this.isCrashed){
-			this.terminateFromPrompt();
-		} else {
-			// await this.waitForMessages();
-			this.rSession.runCommand('n');
-			this.requestInfoFromR();
-			await this.waitForMessages();
-			this.sendEvent(event);
-		}
+		this.runCommandAndSendEvent('n');
 	}
 
 	// step into function:
 	public async stepIn(event = 'stopOnStep') {
-		if(this.isCrashed){
-			this.terminateFromPrompt();
-		} else {
-			await this.waitForMessages();
-			this.rSession.runCommand('s');
-			this.requestInfoFromR();
-			await this.waitForMessages();
-			this.sendEvent(event);
-		}
+		this.runCommandAndSendEvent('s');
 	}
 
 	// execute rest of function:
 	public async stepOut(reverse = false, event = 'stopOnStep') {
+		this.runCommandAndSendEvent('f');
+	}
+
+	private async runCommandAndSendEvent(command: string, event: string = 'stopOnStep'){
 		if(this.isCrashed){
-			this.terminateFromPrompt();
+			if(this.allowDebugGlobal){
+				this.returnToPrompt();
+			} else{
+				this.terminateFromPrompt();
+			}
 		} else {
 			await this.waitForMessages();
-			this.rSession.runCommand('f');
-			this.requestInfoFromR();
+			this.rSession.runCommand(command);
+			await this.requestInfoFromR();
 			this.sendEvent(event);
 		}
 	}
@@ -701,13 +697,24 @@ export class DebugRuntime extends EventEmitter {
 		}
 		expr = escapeStringForR(expr, '"');
 		const rId = ++this.requestId;
-		this.rSession.callFunction('.vsc.evalInFrame', {expr: expr, frameId: frameId, silent: silent, id: rId}, [], false);
+		const rArgs = {
+			expr: expr,
+			frameId: frameId,
+			silent: silent,
+			catchErrors: !this.breakOnErrorFromConsole,
+			id: rId
+		};
+		this.rSession.callFunction('.vsc.evalInFrame', rArgs, [], false);
 		if(!silent){
 			this.requestInfoFromR();
 		}
 		return rId;
 	}
 
+
+
+	//////////////////////////
+	// STACK INFO
 
 	public getStack(startFrame: number, endFrame: number) {
 		// can be returned synchronously since step-events are sent only after receiving stack info
@@ -856,17 +863,18 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	public returnToPrompt(): void {
+	public async returnToPrompt() {
 		this.rSession.clearQueue();
 		if(this.debugMode === 'function'){
 			this.rSession.runCommand('Q', [], true);
 		}
 		this.debugMode = 'global';
-		const filename = vscode.window.activeTextEditor.document.fileName;
-		this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
-		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
 		this.currentLine = 0;
-		this.sendEventOnStack = 'stopOnStep';
+		const filename = vscode.window.activeTextEditor.document.fileName;
+		await this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
+		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
+		this.sendEvent('stopOnStep');
+		// this.sendEventOnStack = 'stopOnStep';
 	}
 
 	public terminate(): void {

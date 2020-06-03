@@ -7,11 +7,29 @@
         {
             "type": "R-Debugger",
             "request": "launch",
-            "name": "R Debugger",
-            "workingDirectory": "${workspaceFolder}",
+            "name": "R Debug File",
             "program": "${file}",
             "debugFunction": false,
             "debugFile": true,
+            "allowGlobalDebugging": true
+        },
+        {
+            "type": "R-Debugger",
+            "request": "launch",
+            "name": "R Debug Only Workspace",
+            "workingDirectory": "${workspaceFolder}",
+            "debugFunction": false,
+            "debugFile": false,
+            "allowGlobalDebugging": true
+        },
+        {
+            "type": "R-Debugger",
+            "request": "launch",
+            "name": "R Debug Function",
+            "program": "${file}",
+            "mainFunction": "main",
+            "debugFunction": true,
+            "debugFile": false,
             "allowGlobalDebugging": true
         }
     ]
