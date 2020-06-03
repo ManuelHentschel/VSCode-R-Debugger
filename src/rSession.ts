@@ -24,6 +24,7 @@ export class RSession {
     public readonly logLevelCP: number = 3; // can only be changed during construction
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
+    public defaultAppend: string = '';
     public readonly successTerminal: boolean = false;
     public ignoreOutput: boolean=false;
     public readonly debugRuntime: DebugRuntime;
@@ -117,9 +118,12 @@ export class RSession {
 
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], escapeStrings: boolean=true, library: string = this.defaultLibrary, force:boolean=false){
+    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[],
+        escapeStrings: boolean=true, library: string = this.defaultLibrary,
+        force:boolean=false, append: string = this.defaultAppend
+    ){
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
-        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library);
+        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library, append);
         this.runCommand(cmd, [], force);
     }
 
@@ -181,7 +185,10 @@ export class RSession {
 /////////////////////////////////////////////////
 // Construction of R function calls
 
-export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs=[], escapeStrings: boolean=true, library: string = ''): string{
+export function makeFunctionCall(
+    fnc: string, args: anyRArgs=[], args2: anyRArgs=[],
+    escapeStrings: boolean=true, library: string = '', append: string = ''
+): string{
     // args and args2 are handled identically and only necessary when combining named and unnamed arguments
     args = convertToUnnamedArgs(convertArgsToStrings(args, escapeStrings));
     args2 = convertToUnnamedArgs(convertArgsToStrings(args2, escapeStrings));
@@ -193,7 +200,7 @@ export function makeFunctionCall(fnc: string, args: anyRArgs=[], args2: anyRArgs
     }
 
     // construct and execute function-call
-    const cmd = library + fnc + '(' + argString + ')';
+    const cmd = library + fnc + '(' + argString + ')' + append;
     return cmd;
 }
 

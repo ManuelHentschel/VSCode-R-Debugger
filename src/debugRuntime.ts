@@ -36,7 +36,8 @@ export class DebugRuntime extends EventEmitter {
 	readonly rContinue = '<##v\\s\\c>'; //actual prompt is followed by a newline to make easier to identify
 	readonly rStartup = '<v\\s\\c\\R\\STARTUP>';
 	readonly rLibraryNotFound = '<v\\s\\c\\LIBRARY\\NOT\\FOUND>';
-	readonly packageName = 'vscDebugger';
+	readonly rPackageName = 'vscDebugger';
+	readonly rAppend = ' ### <v\\s\\c\\COMMAND>';
 
 	// The file we are debugging
 	private sourceFile: string;
@@ -189,16 +190,17 @@ export class DebugRuntime extends EventEmitter {
 
 		// load R package, wrapped in a try-catch-function
 		// missing R package will be handled by this.handleLine()
-		this.writeOutput('library: ' + this.packageName);
+		this.writeOutput('library: ' + this.rPackageName);
 		const tryCatchArgs: anyRArgs = {
-			expr: makeFunctionCall('library', this.packageName, [], false, 'base'),
+			expr: makeFunctionCall('library', this.rPackageName, [], false, 'base'),
 			error: 'function(e)' + makeFunctionCall('cat', this.rLibraryNotFound, '\n', true, 'base'),
 			silent: true
 		};
 		this.rSession.callFunction('tryCatch', tryCatchArgs, [], false, 'base');
 
 		// all R function calls from here on are (by default) meant for functions from the vsc-extension:
-		this.rSession.defaultLibrary = this.packageName;
+		this.rSession.defaultLibrary = this.rPackageName;
+		this.rSession.defaultAppend = this.rAppend;
 
 
 		// PREP R SESSION AND SOURCE MAIN
@@ -298,7 +300,7 @@ export class DebugRuntime extends EventEmitter {
 		// Check for Library-Not-Found-Message
 		if(!this.isRunningCustomCode && RegExp(escapeForRegex(this.rLibraryNotFound)).test(line)){
 			console.error('R-Library not found!');
-			vscode.window.showErrorMessage('Please install the R package "' + this.packageName + '"!');
+			vscode.window.showErrorMessage('Please install the R package "' + this.rPackageName + '"!');
 			this.terminate();
 		}
 
@@ -341,11 +343,17 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// matches echo of calls to 'our' R package. (Refine in case the user makes such calls?)
-		const packageCallRegex = new RegExp(this.packageName + '::');
+		const packageCallRegex = new RegExp(this.rPackageName + '::');
 		if(isFullLine && packageCallRegex.test(line)) {
 			// was a command sent to R by the debugger
 			console.log('matches: vscDebugger::');
 			showLine = false;
+		}
+		
+		const echoRegex = new RegExp(escapeForRegex(this.rAppend) + '$');
+		if(isFullLine && echoRegex.test(line)){
+			showLine = false;
+			console.log('matches: echo');
 		}
 
 
