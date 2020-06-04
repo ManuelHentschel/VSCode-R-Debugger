@@ -240,6 +240,7 @@ export class DebugRuntime extends EventEmitter {
 			);
 			this.rSession.callFunction('source', program, [], true, 'base');
 			this.rSession.callFunction('.vsc.lookForMain', this.mainFunction);
+			this.setAllBreakpoints();
 			// actual call to main()/error if no main() found is made as response to message 'callMain'
 		}
 
