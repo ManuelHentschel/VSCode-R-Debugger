@@ -69,17 +69,22 @@ export class RSession {
         this.successTerminal = true;
     }
 
-    public async runCommand(cmd: string, args: (string|number)[]=[], force=false){
+    public async runCommand(cmd: string, args: (string|number)[]=[], force=false, append?: string){
         // remove trailing newline
 		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
         }
 
+
+        if(append === undefined){
+            append = this.defaultAppend;
+        }
+
         // append arguments (if any given) and newline
         if(args.length > 0){
-            cmd = cmd + ' ' + args.join(' ') + '\n';
+            cmd = cmd + ' ' + args.join(' ') + append + '\n';
         } else {
-            cmd = cmd + '\n';
+            cmd = cmd + append + '\n';
         }
 
         // execute command or add to command queue
@@ -123,8 +128,8 @@ export class RSession {
         force:boolean=false, append: string = this.defaultAppend
     ){
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
-        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library, append);
-        this.runCommand(cmd, [], force);
+        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library);
+        this.runCommand(cmd, [], force, append);
     }
 
     // Kill the child process
