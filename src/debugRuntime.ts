@@ -349,7 +349,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// matches echo of calls made by the debugger
-		const echoRegex = new RegExp('<.*' + escapeForRegex(this.rAppend) + '$');
+		const echoRegex = new RegExp(escapeForRegex(this.rAppend) + '$');
 		if(isFullLine && echoRegex.test(line)){
 			line = line.replace(echoRegex, '');
 			console.log('matches: echo');
