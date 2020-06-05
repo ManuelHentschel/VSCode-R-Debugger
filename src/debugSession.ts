@@ -424,23 +424,20 @@ export class DebugSession extends LoggingDebugSession {
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
 		const requestIdR = this._runtime.evaluate(args.expression, args.frameId, args.context);
-		// this._evalResponses.push(response);
-		// this._evalResponses[requestIdR] = response;
 		this._evalResponses.set(requestIdR, response);
-		// this.logAndSendResponse(response);
 	}
 
 
 	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
 		this._runtime.terminateFromPrompt();
+		this.sendMissingResponses(); // answer all open requests to avoid 'Canceled' message to debug console
 		// no response to be sent (?)
-		this.sendMissingResponses();
 	}
 
 	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
 		this._runtime.terminateFromPrompt();
+		this.sendMissingResponses(); // answer all open requests to avoid 'Canceled' message to debug console
 		// no response to be sent (?)
-		this.sendMissingResponses();
 	}
 
     protected async restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request) {

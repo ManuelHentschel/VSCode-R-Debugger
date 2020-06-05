@@ -35,3 +35,9 @@ main <- function(){
 }
 
 # g()
+
+base::cat('asdf')
+
+
+base::cat('qwer\n')
+
