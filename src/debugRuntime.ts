@@ -136,6 +136,7 @@ export class DebugRuntime extends EventEmitter {
 			+ '\nrContinue: ' + this.rContinue
 			+ '\nrStartup: ' + this.rStartup
 			+ '\nrLibraryNotFound: ' + this.rLibraryNotFound
+			+ '\nrAppend: ' + this.rAppend
 		);
 
 		// start R in child process
