@@ -85,7 +85,7 @@ This problem might be reduced by using the "functional" debug mode
 * Extensive use of lazy evaluation, promises, side-effects:
 In the general case, the debugger recognizes unevaluated promises and preserves them.
 It might be possible, however, that the gathering of information about the stack/variables leads to unexpected side-effects.
-Especially watch espressions must be safe to be evaluated in any frame,
+Especially watch-expressions must be safe to be evaluated in any frame,
 since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
 
 
