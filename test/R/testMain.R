@@ -10,7 +10,7 @@ g <- function(){
 foo <- function(x, y) {
   print(x)
   print(y)
-  browser()
+  # browser()
   x + y
 }
 
@@ -25,7 +25,6 @@ bar <- function(x, n) {
 
 
 main <- function(){
-  kjkjlkjlkjlkjlk
   bar(2, 5)
 }
 
