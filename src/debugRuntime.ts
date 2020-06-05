@@ -2,19 +2,13 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-// import { readFileSync, write } from 'fs';
 import { EventEmitter } from 'events';
-// import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
-import { workspace } from 'vscode';
 import { config, getRPath, escapeForRegex } from "./utils";
 import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { maxHeaderSize } from 'http';
-
-const path = require('path');
 
 export interface DebugBreakpoint {
 	id: number;
@@ -210,6 +204,7 @@ export class DebugRuntime extends EventEmitter {
 		const overwritePrint = config().get<boolean>('overwritePrint', false);
 		const overwriteCat = config().get<boolean>('overwriteCat', false);
 		const overwriteSource = config().get<boolean>('overwriteSource', false);
+		this.setBreakpointsInPackages = config().get<boolean>('setBreakpointsInPackages', false);
 
 		// prep r session
 		const options = {
@@ -225,6 +220,7 @@ export class DebugRuntime extends EventEmitter {
 			+ '\noverwrite cat(): ' + overwriteCat
 			+ '\noverwrite source(): ' + overwriteSource
 			+ '\nallow global debugging: ' + this.allowDebugGlobal
+			+ '\nset breakpoints in packages: ' + this.setBreakpointsInPackages
 		);
 		this.rSession.callFunction('.vsc.prepGlobalEnv', options);
 
@@ -233,6 +229,7 @@ export class DebugRuntime extends EventEmitter {
 			this.writeOutput(''
 				+ 'program: ' + program
 			);
+			// actual call to .vsc.debugSource is made after receiving a message 'go'
 		}
 
 		if(this.callMain){
@@ -247,7 +244,6 @@ export class DebugRuntime extends EventEmitter {
 			// actual call to main()/error if no main() found is made as response to message 'callMain'
 		}
 
-		this.setBreakpointsInPackages = config().get<boolean>('setBreakpointsInPackages', false);
 
 		this.endOutputGroup(); // ends the collapsed output group containing config data, R path, etc.
 	}
@@ -266,8 +262,6 @@ export class DebugRuntime extends EventEmitter {
 		};
 		return new Promise(poll);
 	}
-
-
 
 
 
@@ -882,9 +876,7 @@ export class DebugRuntime extends EventEmitter {
 		this.currentLine = 0;
 		const filename = vscode.window.activeTextEditor.document.fileName;
 		await this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
-		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
-		this.sendEvent('stopOnStep');
-		// this.sendEventOnStack = 'stopOnStep';
+		this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
 	}
 
 	public terminate(): void {
