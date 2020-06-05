@@ -75,7 +75,7 @@
               "debugFile": {
                 "type": "boolean",
                 "default": false,
-                "description":  "Whether to debug the R code contained in a R-file."
+                "description": "Whether to debug the R code contained in a R-file."
               },
               "mainFunction": {
                 "type": "string",

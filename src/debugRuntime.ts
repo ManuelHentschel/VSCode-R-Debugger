@@ -307,16 +307,20 @@ export class DebugRuntime extends EventEmitter {
 
 
 		// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
-		if(isFullLine && /Tracing (.*)step/.test(line)){
-			showLine = false;
+		const tracingInfoRegex = /Tracing (.*)step.*$/;
+		if(isFullLine && tracingInfoRegex.test(line)){
+			// showLine = false;
+			line = line.replace(tracingInfoRegex, '');
 			this.stdoutIsBrowserInfo = true;
 			this.expectBrowser = true;
 			this.hitBreakpoint(true);
 		}
 
 		// filter out additional browser info:
-		if(isFullLine && (/(?:debug|exiting from|debugging|Called from|debug at) /.test(line))){
-			showLine = false; // part of browser-info
+		const browserInfoRegex = /(?:debug|exiting from|debugging|Called from|debug at):? .*$/;
+		if(isFullLine && (browserInfoRegex.test(line))){
+			// showLine = false; // part of browser-info
+			line = line.replace(browserInfoRegex, '');
 			this.stdoutIsBrowserInfo = true;
 		}
 
@@ -344,9 +348,9 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// matches echo of calls made by the debugger
-		const echoRegex = new RegExp(escapeForRegex(this.rAppend) + '$');
+		const echoRegex = new RegExp('<.*' + escapeForRegex(this.rAppend) + '$');
 		if(isFullLine && echoRegex.test(line)){
-			showLine = false;
+			line = line.replace(echoRegex, '');
 			console.log('matches: echo');
 		}
 
@@ -746,6 +750,9 @@ export class DebugRuntime extends EventEmitter {
 	// COMPLETION
 
 	public async getCompletions(frameId:number, text:string, column:number, line:number){
+		if(frameId === undefined){
+			frameId = 0;
+		}
 		this.rSession.callFunction('.vsc.getCompletion', {
 			frameIdVsc: frameId,
 			text: text,

@@ -35,3 +35,10 @@ main <- function(){
 }
 
 # g()
+
+base::cat('asdf')
+
+# browser()
+
+base::cat('qwer\n')
+
