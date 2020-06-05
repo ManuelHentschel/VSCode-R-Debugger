@@ -33,6 +33,9 @@ export class DebugRuntime extends EventEmitter {
 	readonly rPackageName = 'vscDebugger';
 	readonly rAppend = ' ### <v\\s\\c\\COMMAND>';
 
+	// delay in ms between polls when waiting for messages from R
+	readonly pollingDelay = 10;
+
 	// The file we are debugging
 	private sourceFile: string;
 
@@ -259,7 +262,7 @@ export class DebugRuntime extends EventEmitter {
 			if(this.hasStartedR){
 				resolve(true);
 			} else {
-				setTimeout(_ => poll(resolve), 100);
+				setTimeout(_ => poll(resolve), this.pollingDelay);
 			}
 		};
 		return new Promise(poll);
@@ -577,7 +580,7 @@ export class DebugRuntime extends EventEmitter {
 			if(this.messageId >= this.requestId){
 				resolve();
 			} else {
-				setTimeout(_ => poll(resolve), 100);
+				setTimeout(_ => poll(resolve), this.pollingDelay);
 			}
 		};
 		return new Promise(poll);
