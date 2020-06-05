@@ -2,19 +2,13 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-// import { readFileSync, write } from 'fs';
 import { EventEmitter } from 'events';
-// import { Terminal, window } from 'vscode';
 import * as vscode from 'vscode';
-import { workspace } from 'vscode';
 import { config, getRPath, escapeForRegex } from "./utils";
 import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { maxHeaderSize } from 'http';
-
-const path = require('path');
 
 export interface DebugBreakpoint {
 	id: number;
@@ -136,6 +130,7 @@ export class DebugRuntime extends EventEmitter {
 			+ '\nrContinue: ' + this.rContinue
 			+ '\nrStartup: ' + this.rStartup
 			+ '\nrLibraryNotFound: ' + this.rLibraryNotFound
+			+ '\nrAppend: ' + this.rAppend
 		);
 
 		// start R in child process
@@ -209,6 +204,7 @@ export class DebugRuntime extends EventEmitter {
 		const overwritePrint = config().get<boolean>('overwritePrint', false);
 		const overwriteCat = config().get<boolean>('overwriteCat', false);
 		const overwriteSource = config().get<boolean>('overwriteSource', false);
+		this.setBreakpointsInPackages = config().get<boolean>('setBreakpointsInPackages', false);
 
 		// prep r session
 		const options = {
@@ -224,6 +220,7 @@ export class DebugRuntime extends EventEmitter {
 			+ '\noverwrite cat(): ' + overwriteCat
 			+ '\noverwrite source(): ' + overwriteSource
 			+ '\nallow global debugging: ' + this.allowDebugGlobal
+			+ '\nset breakpoints in packages: ' + this.setBreakpointsInPackages
 		);
 		this.rSession.callFunction('.vsc.prepGlobalEnv', options);
 
@@ -232,6 +229,7 @@ export class DebugRuntime extends EventEmitter {
 			this.writeOutput(''
 				+ 'program: ' + program
 			);
+			// actual call to .vsc.debugSource is made after receiving a message 'go'
 		}
 
 		if(this.callMain){
@@ -246,7 +244,6 @@ export class DebugRuntime extends EventEmitter {
 			// actual call to main()/error if no main() found is made as response to message 'callMain'
 		}
 
-		this.setBreakpointsInPackages = config().get<boolean>('setBreakpointsInPackages', false);
 
 		this.endOutputGroup(); // ends the collapsed output group containing config data, R path, etc.
 	}
@@ -265,8 +262,6 @@ export class DebugRuntime extends EventEmitter {
 		};
 		return new Promise(poll);
 	}
-
-
 
 
 
@@ -307,16 +302,20 @@ export class DebugRuntime extends EventEmitter {
 
 
 		// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
-		if(isFullLine && /Tracing (.*)step/.test(line)){
-			showLine = false;
+		const tracingInfoRegex = /Tracing (.*)step.*$/;
+		if(isFullLine && tracingInfoRegex.test(line)){
+			// showLine = false;
+			line = line.replace(tracingInfoRegex, '');
 			this.stdoutIsBrowserInfo = true;
 			this.expectBrowser = true;
 			this.hitBreakpoint(true);
 		}
 
 		// filter out additional browser info:
-		if(isFullLine && (/(?:debug|exiting from|debugging|Called from|debug at) /.test(line))){
-			showLine = false; // part of browser-info
+		const browserInfoRegex = /(?:debug|exiting from|debugging|Called from|debug at):? .*$/;
+		if(isFullLine && (browserInfoRegex.test(line))){
+			// showLine = false; // part of browser-info
+			line = line.replace(browserInfoRegex, '');
 			this.stdoutIsBrowserInfo = true;
 		}
 
@@ -346,7 +345,7 @@ export class DebugRuntime extends EventEmitter {
 		// matches echo of calls made by the debugger
 		const echoRegex = new RegExp(escapeForRegex(this.rAppend) + '$');
 		if(isFullLine && echoRegex.test(line)){
-			showLine = false;
+			line = line.replace(echoRegex, '');
 			console.log('matches: echo');
 		}
 
@@ -746,6 +745,9 @@ export class DebugRuntime extends EventEmitter {
 	// COMPLETION
 
 	public async getCompletions(frameId:number, text:string, column:number, line:number){
+		if(frameId === undefined){
+			frameId = 0;
+		}
 		this.rSession.callFunction('.vsc.getCompletion', {
 			frameIdVsc: frameId,
 			text: text,
@@ -874,9 +876,7 @@ export class DebugRuntime extends EventEmitter {
 		this.currentLine = 0;
 		const filename = vscode.window.activeTextEditor.document.fileName;
 		await this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
-		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
-		this.sendEvent('stopOnStep');
-		// this.sendEventOnStack = 'stopOnStep';
+		this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
 	}
 
 	public terminate(): void {
