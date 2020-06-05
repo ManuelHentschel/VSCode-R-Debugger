@@ -2,8 +2,6 @@
 
 This extension adds debugging capabilities for the R programming language to Visual Studio Code.
 
-**UPDATE:** The Debugger is now able to debug arbitrary R files and does not depend on a main()-function anymore!
-
 ## Using the Debugger
 * Install the **R Debugger** extension in VS Code.
 * Install the **vscDebugger** package in R (https://github.com/ManuelHentschel/vscDebugger).
@@ -39,8 +37,8 @@ To install from the master branch, omit the argument `ref`.
 The debugger includes the following features:
 * Controlling the program flow using *step*, *step in*, *step out*, *continue*
 * Breakpoints 
-* Exception handling to a very limited extent (breaks on exception)
-* Information about the stack trace, scopes, and variables in each frame/scope
+* Information about the stack trace, scopes, variables, and watch expressions in each frame/scope
+* Exception handling (breaks on exception, access to stack info)
 * Evaluation of arbitrary R code in the selected stack frame
 * Overwriting `print()` and `cat()` with modified versions that also print the current source file and line the the debug console
 * Overwriting `source()` with `.vsc.debugSource()` to allow recursive debugging (i.e. breakpoints in files that are `source()`d from within another file)
@@ -55,7 +53,7 @@ The debugger works as follows:
 * After each step, function call etc., the debugger calls functions from the package `vscDebugger` to get info about the stack/variables
 
 The output of the R process is read and parsed as follows:
-* Information sent by functions from `vscDebugger` is encoded as json and surrounded by keywords (e.g. "<v\\s\\c>").
+* Information sent by functions from `vscDebugger` is encoded as json and surrounded by keywords (`<v\s\c>...</v\s\c>`).
 These lines are parsed by the VS Code extension and not shown to the user.
 * Information printed by the `browser()` function is parsed and used to update the source file/line highlighted inside VS Code.
 These lines are also hidden from the user.
@@ -72,7 +70,7 @@ These are used to implement breakpoints, so usage might interfere with the debug
 * Calls to `browser()` without `.doTrace()`:
 In normal code, these will be recognized as breakpoints,
 but inside watch-expressions they will cause the debugger to become unresponsive
-* Custom error-handling: the debugger uses a custom `options(error=...)` to show stack trace etc. on error
+* Custom `options(error=...)`: the debugger uses its own `options(error=...)` to show stack trace etc. on error
 * Any form of (interactive) user input in the terminal during runtime:
 The debugger passes all user input through `eval(...)`, no direct input to stdin is passed to the R process
 * Extensive usage of `cat()` without linebreaks:
@@ -87,6 +85,8 @@ This problem might be reduced by using the "functional" debug mode
 * Extensive use of lazy evaluation, promises, side-effects:
 In the general case, the debugger recognizes unevaluated promises and preserves them.
 It might be possible, however, that the gathering of information about the stack/variables leads to unexpected side-effects.
+Especially watch espressions must be safe to be evaluated in any frame,
+since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
 
 
 
@@ -103,31 +103,21 @@ Don't forget to remove these assignments after debugging.
 The following topics could be improved/fixed in the future.
 
 Variables/Stack view
-* Properly display info about S3/S4 classes
 * Summarize large lists (min, max, mean, ...)
+* Row-wise display of data.frames, column-wise display of matrices
 * Load large workspaces/lists in chunks (currently hardcoded 1000 items maximum)
 * Enable copying from variables list
 * Refine display of variables (can be customized by `.vsc.addVarInfo`, default config is to be improved)
-* Use `addTaskCallback` to simplify getting stack info?
-
-Exception handling
-* Properly display exception info (how do I show the large red box?)
-* (Getting the corresponding info from R should be doable)
-* Select behaviour for exceptions (enter browser, terminate, ...?)
 
 Breakpoints
 * Auto adjustment of breakpoint position to next valid position
 * Conditional breakponts, data breakpoints
-* Setting of breakpoints during runtime (currently these are silently ignored)
+* Setting of breakpoints during runtime (currently most of these are silently ignored)
 
 General
 * Improve error handling
 * Handling graphical output etc.?
-* Source line info does not work for modified `print()` when called from a line with breakpoint
 * Attach to currently open R process instead of spawning a new one?
-* Nested formatting of output in the debug console (use existing functionality from variables view)
-* Auto complete in the debug console
-* Tidy up debug console output
 
 Give user more direct access to the R session:
 * Use (visible) integrated terminal instead of background process,
