@@ -38,7 +38,6 @@ main <- function(){
 
 base::cat('asdf')
 
-# browser()
 
 base::cat('qwer\n')
 

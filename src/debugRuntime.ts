@@ -79,7 +79,6 @@ export class DebugRuntime extends EventEmitter {
 	private requestId = 0; // id of the last function call made to R (not all function calls need to be numbered)
 	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
 	private lastStackId = 0; // id of the last stack-message received from R
-	private sendEventOnStack: string = ''; // send this event upon receiving the next Stack-message
 
 	// debugMode
 	private callMain: boolean = false;
@@ -96,8 +95,11 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// start
-	// public async start(program: string, allowDebugGlobal: boolean=true, callMain: boolean=false, mainFunction: string='main') {
-	public async start(debugFunction: boolean, debugFile: boolean, allowGlobalDebugging: boolean, workingDirectory: string, program?: string, mainFunction?: string, includePackages: boolean = false) {
+	public async start(
+		debugFunction: boolean, debugFile: boolean,
+		allowGlobalDebugging: boolean, workingDirectory: string,
+		program?: string, mainFunction?: string, includePackages: boolean = false
+	) {
 
 		// STORE LAUNCH CONFIG TO PROPERTIES
 		this.callMain = debugFunction;
@@ -356,9 +358,9 @@ export class DebugRuntime extends EventEmitter {
 			console.log("matches: prompt");
 			if(this.allowDebugGlobal){
 				if(this.debugMode === 'function'){
-					this.sendEventOnStack = 'stopOnEntry';
-					this.requestInfoFromR();
 					this.debugMode = 'global';
+					await this.requestInfoFromR();
+					this.sendEvent('stopOnEntry');
 				}
 				this.endOutputGroup();
 				this.rSession.showsPrompt();
@@ -422,11 +424,9 @@ export class DebugRuntime extends EventEmitter {
 				this.isCrashed = true;
 				this.expectBrowser = true;
 				this.debugMode = 'function';
-				this.sendEventOnStack = '';
 				await this.requestInfoFromR();
 				// event is sent after receiving stack from R in order to answer stack-request synchronously:
 				// (apparently required by vsc?)
-				// this.sendEventOnStack = 'stopOnException';
 				this.sendEvent('stopOnException', body);
 				break;
 			case 'end':
@@ -437,10 +437,6 @@ export class DebugRuntime extends EventEmitter {
 				// contains info about the entire stack and some variables. requested by the debugger on each step
 				this.lastStackId = id;
 				this.updateStack(body);
-				if(this.sendEventOnStack){
-					this.sendEvent(this.sendEventOnStack);
-					this.sendEventOnStack = '';
-				}
 				break;
 			case 'variables':
 				// contains info about single variables, requested by the debugger
@@ -471,17 +467,25 @@ export class DebugRuntime extends EventEmitter {
 				if(this.callSource){
 					this.debugSource(this.sourceFile);
 				} else if(this.debugMode === 'global'){
-					this.requestInfoFromR();
-					this.sendEventOnStack = 'stopOnEntry';
+					await this.requestInfoFromR();
+					this.sendEvent('stopOnEntry');
 				}
 				break;
 			case 'callMain':
 				// is sent by .vsc.prepGlobalEnv() to indicate that main() was found
 				this.rSession.useQueue = this.useRCommandQueue;
 				this.setAllBreakpoints();
-				this.rSession.callFunction('.vsc.sendToVsc', 'nextCallIsMain');
-				this.rSession.callFunction(this.mainFunction,[],[],false,'');
+				const mainCall = makeFunctionCall(this.mainFunction,[],[],false,'');
+				const endCall = makeFunctionCall('.vsc.sendToVsc', {message: 'endMain'});
+				this.rSession.runCommand(mainCall + ';' + endCall);
 				this.isRunningCustomCode = true;
+				break;
+			case 'endMain':
+				// is sent after executing the main() function
+				if(!this.allowDebugGlobal){
+					this.debugMode = 'global';
+					this.terminate();
+				}
 				break;
 			case 'noMain':
 				// is sent by .vsc.prepGlobalEnv() if no main() is found
@@ -543,7 +547,7 @@ export class DebugRuntime extends EventEmitter {
 		this.writeOutput("", false, false, '', 1, "end");
 	}
 
-	private hitBreakpoint(expected: boolean = true){
+	private async hitBreakpoint(expected: boolean = true){
 		this.expectBrowser = true; //indicates that following browser statements are no 'new' breakpoint
 		this.debugMode = 'function'; //browser is only called from inside a function/evaluated expression
 		if(expected){
@@ -557,10 +561,10 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.clearQueue();
 		}
 		// request stack
-		this.requestInfoFromR();
+		await this.requestInfoFromR();
 		// event is sent after receiving stack from R in order to answer stack-request synchronously:
 		// (apparently required by vsc?)
-		this.sendEventOnStack = 'stopOnBreakpoint';
+		this.sendEvent('stopOnBreakpoint');
 	}
 
 
@@ -646,15 +650,14 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// debug source:
-	public debugSource(filename: string){
+	public async debugSource(filename: string){
 		this.setAllBreakpoints();
 		this.rSession.callFunction('.vsc.debugSource', {file: filename});
 		const rCall = makeFunctionCall('.vsc.debugSource', {file: filename});
 		this.startOutputGroup(rCall, true);
 		this.endOutputGroup();
-		this.requestInfoFromR({dummyFile: filename});
-		// this.sendEventOnStack = 'stopOnStepPreserveFocus';
-		this.sendEventOnStack = 'stopOnStep';
+		await this.requestInfoFromR({dummyFile: filename});
+		this.sendEvent('stopOnStep');
 	}
 
 	// step:
@@ -887,10 +890,11 @@ export class DebugRuntime extends EventEmitter {
 		this.sendEvent('end');
 	}
 
-	public resetRInput(): void {
-		this.sendEventOnStack = 'stopOnException';
+	public async resetRInput() {
 		this.rSession.clearQueue();
-		this.requestInfoFromR();
+		await this.requestInfoFromR();
+		this.sendEvent('stopOnException');
+
 	}
 
 	public cancel(): void {

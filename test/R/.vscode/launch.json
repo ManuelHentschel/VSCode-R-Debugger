@@ -30,7 +30,7 @@
             "mainFunction": "main",
             "debugFunction": true,
             "debugFile": false,
-            "allowGlobalDebugging": true
+            "allowGlobalDebugging": false
         }
     ]
 }
