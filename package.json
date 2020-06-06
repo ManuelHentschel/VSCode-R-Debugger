@@ -52,40 +52,35 @@
         "configurationAttributes": {
           "launch": {
             "required": [
-              "debugFunction",
-              "debugFile",
+              "debugMode",
               "allowGlobalDebugging"
             ],
             "properties": {
-              "program": {
+              "debugMode": {
                 "type": "string",
-                "description": "Absolute path to an R file",
-                "default": "${file}"
+                "enum": ["function","file","workspace"],
+                "description": "Debug a single main-FUNCTION, run an R FILE, or just start an empty R WORKSPACE",
+                "default": "file"
               },
               "workingDirectory": {
                 "type": "string",
                 "description": "Absolute path to a directory.",
                 "default": "${workspaceFolder}"
               },
-              "debugFunction": {
-                "type": "boolean",
-                "default": false,
-                "description": "Whether to debug a single function (called after sourcing the debugged program/R-file)."
-              },
-              "debugFile": {
-                "type": "boolean",
-                "default": false,
-                "description": "Whether to debug the R code contained in a R-file."
+              "file": {
+                "type": "string",
+                "description": "Absolute path to an R file",
+                "default": "${file}"
               },
               "mainFunction": {
                 "type": "string",
                 "default": "main",
-                "description": "The name of the main function, a single function is being debugged. Must be callable without arguments."
+                "description": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
               },
               "allowGlobalDebugging": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to allow debugging in the global workspace (simulating an ongoing debug session)."
+                "description": "Whether to allow debugging in the global workspace after running the function/file."
               }
             }
           }
@@ -95,11 +90,10 @@
             "type": "R-Debugger",
             "request": "launch",
             "name": "R Debugger",
+            "debugMode": "file",
             "workingDirectory": "${workspaceFolder}",
             "program": "${file}",
             "mainFunction": "main",
-            "debugFunction": false,
-            "debugFile": false,
             "allowGlobalDebugging": true
           }
         ],
@@ -111,8 +105,7 @@
               "type": "R-Debugger",
               "request": "launch",
               "name": "R Debugger",
-              "debugFunction": false,
-              "debugFile": false,
+              "debugMode": "workspace",
               "allowGlobalDebugging": true
             }
           },
@@ -123,8 +116,7 @@
               "type": "R-Debugger",
               "request": "launch",
               "name": "R Debugger",
-              "debugFunction": false,
-              "debugFile": true,
+              "debugMode": "file",
               "program": "${file}",
               "allowGlobalDebugging": true
             }
@@ -136,9 +128,9 @@
               "type": "R-Debugger",
               "request": "launch",
               "name": "R Debugger",
-              "debugFunction": true,
-              "mainFunction": "main",
+              "debugMode": "function",
               "program": "${file}",
+              "mainFunction": "main",
               "allowGlobalDebugging": false
             }
           }
