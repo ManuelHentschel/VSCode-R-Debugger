@@ -69,7 +69,7 @@ export class RSession {
         this.successTerminal = true;
     }
 
-    public async runCommand(cmd: string, args: (string|number)[]=[], force=false, append?: string){
+    public async runCommand(cmd: string, args: (string|number)[]=[], force=false, append: string = ''){
         // remove trailing newline
 		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
@@ -115,7 +115,7 @@ export class RSession {
             this.isBusy = true;
             const cmd = this.cmdQueue.shift();
             console.log('rSession: calling from list: "' + cmd.trim() + '"');
-            this.runCommand(cmd, [], true);
+            this.runCommand(cmd, [], true, '');
         } else{
             this.isBusy = false;
         }
@@ -216,9 +216,11 @@ function convertArgsToStrings(args:anyRArgs=[], escapeStrings:boolean = false): 
         args = args.map((arg) => convertArgsToStrings(arg, escapeStrings));
     } else if(args!==null && typeof args === 'object'){
         //namedRArgs
+        const ret = {};
         for(const arg in <namedRArgs>args){
-            args[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
         }
+        args = ret;
     } else if(args === undefined){
         //undefined
         args = 'NULL';
@@ -282,7 +284,9 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
     var ret: unnamedRArg;
     if(Array.isArray(arg)){
         // is rList
-        ret = makeFunctionCall('list', arg, [], false,'base');
+        ret = makeFunctionCall('list', arg, [], false,'base', '');
+    } else if(arg!==null && typeof arg === 'object'){
+        ret = makeFunctionCall('list', arg, [], false, 'base', '');
     } else{
         ret = <unnamedRArg>arg;
     }

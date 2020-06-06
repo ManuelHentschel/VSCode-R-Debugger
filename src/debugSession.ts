@@ -23,9 +23,8 @@ const { Subject } = require('await-notify');
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
 
-	program: string|undefined;
-	debugFunction: boolean;
-	debugFile: boolean;
+	file: string|undefined;
+	debugMode: ("function"|"file"|"workspace")
 	allowGlobalDebugging: boolean;
 	mainFunction: string|undefined;
 	workingDirectory: string;
@@ -224,14 +223,17 @@ export class DebugSession extends LoggingDebugSession {
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
 
+		const debugFunction = args.debugMode === 'function';
+		const debugFile = args.debugMode === 'file';
+
+
 		// start the program in the runtime
 		// this._runtime.start(args.program, args.allowGlobalDebugging, args.debugFunction, args.mainFunction);
 		this._runtime.start(
-			args.debugFunction,
-			args.debugFile,
+			args.debugMode,
 			args.allowGlobalDebugging,
 			args.workingDirectory,
-			args.program,
+			args.file,
 			args.mainFunction
 		);
 
