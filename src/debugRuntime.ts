@@ -491,9 +491,9 @@ export class DebugRuntime extends EventEmitter {
 				// is sent by .vsc.prepGlobalEnv() to indicate that main() was found
 				this.rSession.useQueue = this.useRCommandQueue;
 				this.setAllBreakpoints(true);
-				const beginMain = makeFunctionCall('.vsc.sendToVsc', {message: 'beginMain'});
-				const mainCall = makeFunctionCall(this.mainFunction,[],[],false,'');
-				const endMain = makeFunctionCall('.vsc.sendToVsc', {message: 'endMain'});
+				const beginMain = makeFunctionCall('.vsc.sendToVsc', {message: 'beginMain'}, [], true, this.rStrings.packageName, '');
+				const mainCall = makeFunctionCall(this.mainFunction,[],[],false, '', '');
+				const endMain = makeFunctionCall('.vsc.sendToVsc', {message: 'endMain'}, [], true, this.rStrings.packageName, this.rStrings.append);
 				this.rSession.runCommand(beginMain + ';' + mainCall + ';' + endMain);
 				this.isRunningCustomCode = true;
 				break;

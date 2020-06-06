@@ -59,6 +59,32 @@ These lines are parsed by the VS Code extension and not shown to the user.
 These lines are also hidden from the user.
 * Everything else is printed to the debug console
 
+## Launch config
+The behaviour of the debugger can be configured with the entry `"debugMode"`,
+which can be one of the values `"function"`, `"file"`, and `"workspace"`.
+The intended usecases for these modes are:
+
+* `"workspace"`: Starts an R process in the background and sends all input into the debug console to the R process (but indirectly, through `eval()` nested in some helper functions).
+R Files can be run by focussing a file and pressing `F5`.
+The stack view contains a single dummy frame.
+To view the variables in the global environment it is often necessary to click this frame and expand the variables view.
+This method is 'abusing' the debug adapter protocol to some extent, since the protocol is apparently not designed for ongoing interactive programming in a global workspace.
+* `"file"`: Is pretty much equivalent to launching the debugger with `"workspace"` and then calling `.vsc.debugSource()` on a file.
+Is hopefully the behaviour expected by users coming from R Studio etc.
+* `"function"`: The above debug modes introduce significant overhead by passing all input through `eval()` etc.
+and use a custom version of `source()`, which makes changes to the R code in order to set breakpoints.
+To provide a somewhat 'cleaner' method of running code, this debug mode can be used used.
+The call to `main()` is entered directly into R's `stdin`, hence there are no additional functions on the call stack (as is the case when entering `main()` into the debug console).
+Breakpoints are set by using R's `trace(..., tracer=browser)` function, which is more robust than the custom breakpoint mechanism.
+
+The remaining config entries are:
+* `"workingDirectory"`: An absolute path to the desired work directory. Defaults to the workspace folder.
+* `"file"`: Required for debug modes `"file"` and `"function"`. The file to be debugged/sourced before calling the main function.
+* `"mainFunction"`: The name of the main function to be debugged. Must be callable without arguments.
+* `"allowGlobalDebugging"`: Whether to keep the R session running after debugging and evaluate expressions from the debug console.
+Essential for debug moge `"workspace"`, recommended for `"file"`, usually not sensible for `"function"`.
+
+
 
 ## Warning
 Since the approach of parsing text output meant for human users is rather error prone, there are probably some cases that are not implemented correctly yet.
@@ -85,7 +111,7 @@ This problem might be reduced by using the "functional" debug mode
 * Extensive use of lazy evaluation, promises, side-effects:
 In the general case, the debugger recognizes unevaluated promises and preserves them.
 It might be possible, however, that the gathering of information about the stack/variables leads to unexpected side-effects.
-Especially watch espressions must be safe to be evaluated in any frame,
+Especially watch-expressions must be safe to be evaluated in any frame,
 since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
 
 
