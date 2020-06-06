@@ -9,8 +9,8 @@ print("A breakpoint here should NOT work with debugMode==function")
 
 foo <- function(x,y){
   print(x)
-  print("A breakpoint here should work with debugMode==function or debugMode==file")
-  print("A breakpoint here should also work from the debug console, if .vsc.debugSource() was used")
+  print("A breakpoint here should work with debugMode==function")
+  print("A breakpoint here should also work from the debug console, if .vsc.debugSource() or debugMode==file was used")
   print(y)
   return(x+y)
 }
