@@ -315,7 +315,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// filter out additional browser info:
-		const browserInfoRegex = /(?:debug|exiting from|debugging|Called from|debug at):? .*$/;
+		const browserInfoRegex = /(?:debug:|exiting from|debugging|Called from|debug at):? .*$/;
 		if(isFullLine && (browserInfoRegex.test(line))){
 			// showLine = false; // part of browser-info
 			line = line.replace(browserInfoRegex, '');
@@ -363,10 +363,10 @@ export class DebugRuntime extends EventEmitter {
 				// ignore
 			} else if(this.allowGlobalDebugging){
 				if(this.debugState === 'function'){
-					this.debugState = 'global';
 					await this.requestInfoFromR();
 					this.sendEvent('stopOnStep');
 				}
+				this.debugState = 'global';
 				this.endOutputGroup();
 				this.expectBrowser = false;
 			} else{
@@ -470,6 +470,7 @@ export class DebugRuntime extends EventEmitter {
 				this.rSession.useQueue = this.useRCommandQueue;
 				if(this.debugMode === 'file'){
 					// call .vsc.debugSource()
+					this.debugState = 'global';
 					this.debugSource(this.sourceFile);
 				} else if(this.debugMode === 'function'){
 					// source file and look for main() function
@@ -503,7 +504,7 @@ export class DebugRuntime extends EventEmitter {
 				// is sent after executing the main() function
 				if(!this.allowGlobalDebugging){
 					this.debugState = 'global';
-					this.terminate();
+					this.terminate(false);
 				}
 				break;
 			case 'noMain':
@@ -591,9 +592,12 @@ export class DebugRuntime extends EventEmitter {
 	// waits for this.messageId to catch up with this.requestId
 	// this.requestId is incremented by calls to e.g. this.requestInfoFromR()
 	// this.messageId is incremented by messages from R that contain an Id>0
-	private async waitForMessages(){
+	private async waitForMessages(id?: number){
+		if(id === undefined){
+			id = this.requestId;
+		}
 		const poll = (resolve: () => void) => {
-			if(this.messageId >= this.requestId){
+			if(this.messageId >= id){
 				resolve();
 			} else {
 				setTimeout(_ => poll(resolve), this.pollingDelay);
@@ -636,13 +640,14 @@ export class DebugRuntime extends EventEmitter {
 
 	// request info about the stack and workspace from R:
 	private requestInfoFromR(args: anyRArgs = []) {
+		const id = ++this.requestId;
 		const args2: anyRArgs = {
-			id: ++this.requestId,
+			id: id,
 			isError: this.isCrashed,
 			includePackages: this.includePackages
 		};
 		this.rSession.callFunction('.vsc.getStack', args, args2);
-		return this.waitForMessages();
+		return this.waitForMessages(id);
 	}
 
 	// request info about specific variables from R:
@@ -902,8 +907,8 @@ export class DebugRuntime extends EventEmitter {
 		this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
 	}
 
-	public terminate(): void {
-		this.rSession.ignoreOutput = true;
+	public terminate(ignoreOutput: boolean = true): void {
+		this.rSession.ignoreOutput = ignoreOutput;
 		this.isRunningCustomCode = false;
 		this.rSession.clearQueue();
 		this.rSession.killChildProcess();
