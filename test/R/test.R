@@ -11,6 +11,10 @@ foo <- function(x,y){
   print(x)
   print("A breakpoint here should work with debugMode==function")
   print("A breakpoint here should also work from the debug console, if .vsc.debugSource() or debugMode==file was used")
+  # Currently, breakpoints are only set during runtime, when .vsc.debugSource() is called
+  # Also, breakpoints are 'permanent' and can only be deactivated by calling .vsc.debugSource() again
+  # In the future this should be refined by using trace(..., tracer=browser), to facilitate better breakpoint setting/clearing
+
   print(y)
   return(x+y)
 }
