@@ -45,28 +45,29 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 				config.type = 'R-Debugger';
 				config.name = 'Launch';
 				config.request = 'launch';
-				config.debugFunction = false;
-				config.allowGlobalDebugging = true;
+				config.debugMode = 'workspace';
 				config.workingDirectory = "${workspaceRoot}";
 			}
-		} else if(config.debugFunction){
-			if(!config.program || !config.mainFunction){
-				return vscode.window.showErrorMessage("Please specify an R file as 'program' and a function name in the Debugger config.").then(_ => {
+		} else if(config.debugMode === 'function'){
+			if(!config.file || !config.mainFunction){
+				return vscode.window.showErrorMessage("Please specify an R file as 'file' and a function name in the Debugger config.").then(_ => {
 					return undefined;
 				});
 			} else if(!config.workingDirectory){
-				config.workingDirectory = "${fileDirname}";
+				config.workingDirectory = "${workspaceFolder}";
 			}
-		} else if(config.debugFile){
-			if(!config.program){
-				return vscode.window.showErrorMessage("Please specify an R file as 'program'.").then(_ => {
+		} else if(config.debugMode === 'file'){
+			if(!config.file){
+				return vscode.window.showErrorMessage("Please specify an R file as 'file'.").then(_ => {
 					return undefined;
 				});
 			} else if(!config.workingDirectory){
-				config.workingDirectory = "${fileDirname}";
+				config.workingDirectory = "${workspaceFolder}";
 			}
-		} else if(!config.workingDirectory){
-			config.workingDirectory = "${workspaceFolder}";
+		} else { // config.debugMode === 'workspace'
+			if(!config.workingDirectory){
+				config.workingDirectory = "${workspaceFolder}";
+			}
 		}
 		return config;
 	}

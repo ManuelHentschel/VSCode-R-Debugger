@@ -21,7 +21,7 @@ export class RSession {
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 3; // can only be changed during construction
+    public readonly logLevelCP: number = 4; // can only be changed during construction
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
@@ -69,17 +69,22 @@ export class RSession {
         this.successTerminal = true;
     }
 
-    public async runCommand(cmd: string, args: (string|number)[]=[], force=false){
+    public async runCommand(cmd: string, args: (string|number)[]=[], force=false, append: string = ''){
         // remove trailing newline
 		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
         }
 
+
+        if(append === undefined){
+            append = this.defaultAppend;
+        }
+
         // append arguments (if any given) and newline
         if(args.length > 0){
-            cmd = cmd + ' ' + args.join(' ') + '\n';
+            cmd = cmd + ' ' + args.join(' ') + append + '\n';
         } else {
-            cmd = cmd + '\n';
+            cmd = cmd + append + '\n';
         }
 
         // execute command or add to command queue
@@ -110,7 +115,7 @@ export class RSession {
             this.isBusy = true;
             const cmd = this.cmdQueue.shift();
             console.log('rSession: calling from list: "' + cmd.trim() + '"');
-            this.runCommand(cmd, [], true);
+            this.runCommand(cmd, [], true, '');
         } else{
             this.isBusy = false;
         }
@@ -123,8 +128,8 @@ export class RSession {
         force:boolean=false, append: string = this.defaultAppend
     ){
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
-        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library, append);
-        this.runCommand(cmd, [], force);
+        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library);
+        this.runCommand(cmd, [], force, append);
     }
 
     // Kill the child process
@@ -211,9 +216,11 @@ function convertArgsToStrings(args:anyRArgs=[], escapeStrings:boolean = false): 
         args = args.map((arg) => convertArgsToStrings(arg, escapeStrings));
     } else if(args!==null && typeof args === 'object'){
         //namedRArgs
+        const ret = {};
         for(const arg in <namedRArgs>args){
-            args[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
         }
+        args = ret;
     } else if(args === undefined){
         //undefined
         args = 'NULL';
@@ -277,7 +284,9 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
     var ret: unnamedRArg;
     if(Array.isArray(arg)){
         // is rList
-        ret = makeFunctionCall('list', arg, [], false,'base');
+        ret = makeFunctionCall('list', arg, [], false,'base', '');
+    } else if(arg!==null && typeof arg === 'object'){
+        ret = makeFunctionCall('list', arg, [], false, 'base', '');
     } else{
         ret = <unnamedRArg>arg;
     }
