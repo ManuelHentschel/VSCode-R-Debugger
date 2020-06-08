@@ -92,6 +92,10 @@ fun <- function(x, ...) {
   browser()
 }
 
+# active bindings
+env1 <- new.env()
+makeActiveBinding("x", function() rnorm(1), env1)
+
 main <- function() {
   print("testing objects")
   fun(1, a = 1, b = 2)
