@@ -450,11 +450,13 @@ export class DebugSession extends LoggingDebugSession {
 
     protected dispatchRequest(request: DebugProtocol.Request): void {
 		console.log('request ' + request.seq + ': ' + request.command);
+		console.log(request);
 		super.dispatchRequest(request);
 	}
 
     sendResponse(response: DebugProtocol.Response): void {
 		console.log('response ' + response.request_seq + ': ' + response.command);
+		console.log(response);
 		super.sendResponse(response);
 	}
 

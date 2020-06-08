@@ -40,7 +40,7 @@ The debugger includes the following features:
 * Information about the stack trace, scopes, variables, and watch expressions in each frame/scope
 * Exception handling (breaks on exception, access to stack info)
 * Evaluation of arbitrary R code in the selected stack frame
-* Overwriting `print()` and `cat()` with modified versions that also print the current source file and line the the debug console
+* Overwriting `print()` and `cat()` with modified versions that also print the calling source file and line to the debug console
 * Overwriting `source()` with `.vsc.debugSource()` to allow recursive debugging (i.e. breakpoints in files that are `source()`d from within another file)
 * Supports VS Code's remote development extensions
 
@@ -73,7 +73,7 @@ This method is 'abusing' the debug adapter protocol to some extent, since the pr
 Is hopefully the behaviour expected by users coming from R Studio etc.
 * `"function"`: The above debug modes introduce significant overhead by passing all input through `eval()` etc.
 and use a custom version of `source()`, which makes changes to the R code in order to set breakpoints.
-To provide a somewhat 'cleaner' method of running code, this debug mode can be used used.
+To provide a somewhat 'cleaner' method of running code, this debug mode can be used.
 The call to `main()` is entered directly into R's `stdin`, hence there are no additional functions on the call stack (as is the case when entering `main()` into the debug console).
 Breakpoints are set by using R's `trace(..., tracer=browser)` function, which is more robust than the custom breakpoint mechanism.
 

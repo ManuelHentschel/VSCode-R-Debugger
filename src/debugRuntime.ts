@@ -149,7 +149,8 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession = new RSession(rPath, cwd, rArgs, thisDebugRuntime);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		if(!this.rSession.successTerminal){
-            vscode.window.showErrorMessage('Failed to spawn a child process!');
+			this.writeOutput('Failed to spawn a child process!', true, true);
+            // vscode.window.showErrorMessage('Failed to spawn a child process!');
 			this.terminate();
 			return;
 		}
@@ -161,7 +162,7 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
 
 		// set timeout
-		const ms = 10000;
+		const ms = 1000;
 		let timeout = new Promise((resolve, reject) => {
 			let id = setTimeout(() => {
 			clearTimeout(id);
@@ -175,7 +176,9 @@ export class DebugRuntime extends EventEmitter {
 
 		// abort if the terminal does not print the message (--> R has not started!)
 		if(!successR){
-            vscode.window.showErrorMessage('R path not working:\n' + rPath);
+			this.endOutputGroup();
+			this.writeOutput('R path not working:\n' + rPath, true, true);
+            // vscode.window.showErrorMessage('R path not working:\n' + rPath);
 			this.terminate();
 			return;
 		}
@@ -299,7 +302,9 @@ export class DebugRuntime extends EventEmitter {
 		// Check for Library-Not-Found-Message
 		if(!this.isRunningCustomCode && RegExp(escapeForRegex(this.rStrings.libraryNotFound)).test(line)){
 			console.error('R-Library not found!');
-			vscode.window.showErrorMessage('Please install the R package "' + this.rStrings.packageName + '"!');
+			// vscode.window.showErrorMessage('Please install the R package "' + this.rStrings.packageName + '"!');
+			this.endOutputGroup();
+			this.writeOutput('Please install the R package "' + this.rStrings.packageName + '"!', true, true);
 			this.terminate();
 		}
 
@@ -509,7 +514,9 @@ export class DebugRuntime extends EventEmitter {
 				break;
 			case 'noMain':
 				// is sent by .vsc.prepGlobalEnv() if no main() is found
-				vscode.window.showErrorMessage('No ' + this.mainFunction + '() function found in .GlobalEnv!');
+				// vscode.window.showErrorMessage('No ' + this.mainFunction + '() function found in .GlobalEnv!');
+				this.endOutputGroup();
+				this.writeOutput('No ' + this.mainFunction + '() function found in the workspace!', true, true);
 				this.terminate();
 				break;
 			case 'acknowledge':
@@ -885,9 +892,13 @@ export class DebugRuntime extends EventEmitter {
 		if(this.debugState === 'function'){
 			this.rSession.runCommand('Q', [], true);
 			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
-			const infoString = "You terminated R while debugging a function.\n" +
-				"If you want to keep the R session running and only exit the function, use 'Restart' (Ctrl+Shift+F5).\n";
-			this.sendEvent('output', infoString, "console");
+			if(this.allowGlobalDebugging){
+				const infoString = "You terminated R while debugging a function.\n" +
+					"If you want to keep the R session running and only exit the function, use:\n" + 
+					" - 'Restart' (Ctrl+Shift+F5) when stopped on a normal breakpoint\n" +
+					" - 'Continue' (F5) when stopped on an exception";
+				this.sendEvent('output', infoString, "console");
+			}
 			this.sendEvent('end');
 		} else{
 			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
