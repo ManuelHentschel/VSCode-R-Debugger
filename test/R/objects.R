@@ -56,7 +56,23 @@ lm_obj <- lm(mpg ~ ., data = mtcars)
 # S4 class
 setClass("Person", representation(name = "character", age = "numeric"))
 setClass("Employee", representation(boss = "Person"), contains = "Person")
-person <- new("Person", name = "Somebody", age = 20)
+person1 <- new("Person", name = "Somebody", age = 20)
+
+# R6 class
+Person <- R6::R6Class("Person",
+  private = list(
+    name = NULL,
+    age = NULL
+  ),
+  public = list(
+  initialize = function(name) {
+    private$name <- name
+  },
+  greeting = function() {
+    cat("Hello, my name is ", private$name, "!\n", sep = "")
+  }
+))
+person2 <- Person$new(name = "Somebody")
 
 # function
 fun1 <- sum # primitive
@@ -71,7 +87,13 @@ s4 <- 1 + 2i
 s5 <- TRUE
 s6 <- charToRaw("h")
 
+# ...
+fun <- function(x, ...) {
+  browser()
+}
+
 main <- function() {
   print("testing objects")
+  fun(1, a = 1, b = 2)
   browser()
 }
