@@ -425,8 +425,13 @@ export class DebugSession extends LoggingDebugSession {
 	}
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
-		const requestIdR = this._runtime.evaluate(args.expression, args.frameId, args.context);
-		this._evalResponses.set(requestIdR, response);
+		if(args.context === 'clipboard'){
+			response.success = false;
+			this.sendResponse(response);
+		} else{
+			const requestIdR = this._runtime.evaluate(args.expression, args.frameId, args.context);
+			this._evalResponses.set(requestIdR, response);
+		}
 	}
 
 
