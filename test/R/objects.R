@@ -1,3 +1,6 @@
+options(vsc.trySilent = FALSE)
+
+
 # NULL
 nul <- NULL
 
@@ -5,6 +8,7 @@ nul <- NULL
 env <- new.env()
 env$a <- 1
 env$b <- 1:5
+l <- .vsc.getCustomInfo(env, 'childVars')
 
 # data.frame
 df1 <- mtcars
@@ -88,7 +92,7 @@ s5 <- TRUE
 s6 <- charToRaw("h")
 
 # ...
-fun <- function(x, ...) {
+fun <- function(x, y, ...) {
   browser()
 }
 
@@ -98,7 +102,9 @@ makeActiveBinding("x", function() rnorm(1), env1)
 
 main <- function() {
   print("testing objects")
-  fun(1, a = 1, b = 2)
+  l <- list(1,2,3)
+  x <- 9
+  fun(1, a = 1, b = x, y = l)
   browser()
 }
 

@@ -191,8 +191,10 @@ export class DebugSession extends LoggingDebugSession {
 		];
 		response.body.exceptionBreakpointFilters = exceptionBreakpointFilters;
 		
-		// enable saving variables to clipboard (not working!!!)
+		// 
 		response.body.supportsClipboardContext = true;
+		response.body.supportsSetVariable = true;
+		response.body.supportsSetExpression = false;
 
 		this.sendResponse(response);
 
@@ -368,6 +370,15 @@ export class DebugSession extends LoggingDebugSession {
 	};
 
 
+	// SET VAR
+
+    protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request) {
+		this._runtime.setVariable(<anyRArgs> <unknown>args);
+		response.body = {value: "<Evaluate an expression to update>"};
+		this.sendResponse(response);
+	};
+
+
 	// Exception:
     protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
 		// DUMMY
@@ -507,7 +518,7 @@ export class DebugSession extends LoggingDebugSession {
     // protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments, request?: DebugProtocol.Request): void {};
     // protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments, request?: DebugProtocol.Request): void {};
     // protected variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request): void {};
-    protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request): void {};
+    // protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request): void {};
     protected setExpressionRequest(response: DebugProtocol.SetExpressionResponse, args: DebugProtocol.SetExpressionArguments, request?: DebugProtocol.Request): void {};
     // protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments, request?: DebugProtocol.Request): void {};
     protected stepInTargetsRequest(response: DebugProtocol.StepInTargetsResponse, args: DebugProtocol.StepInTargetsArguments, request?: DebugProtocol.Request): void {};

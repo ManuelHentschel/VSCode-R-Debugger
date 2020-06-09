@@ -747,6 +747,10 @@ export class DebugRuntime extends EventEmitter {
 		return rId;
 	}
 
+	public setVariable(args: anyRArgs){
+		this.rSession.callFunction('.vsc.setVariable', args);
+	}
+
 
 
 	//////////////////////////
