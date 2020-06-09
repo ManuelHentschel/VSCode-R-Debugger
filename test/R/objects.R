@@ -101,3 +101,13 @@ main <- function() {
   fun(1, a = 1, b = 2)
   browser()
 }
+
+.vsc.addVarInfo(
+  name = 'Bytes',
+  doesApply = function(v) TRUE, # could be narrowed down
+  customAttributes = function(v) list(
+    names=list('__bytes'),
+    values=list(unclass(object.size(v)))
+  ),
+  position = -2 # append just before the default case
+)
