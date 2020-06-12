@@ -67,6 +67,9 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime = new DebugRuntime();
 
 		// setup event handlers
+		this._runtime.on('response', (response: DebugProtocol.Response) => {
+			this.sendResponse(response);
+		});
 		this._runtime.on('stopOnEntry', () => {
 			this.sendEvent(new StoppedEvent('entry', DebugSession.THREAD_ID));
 		});
@@ -165,14 +168,14 @@ export class DebugSession extends LoggingDebugSession {
 		response.body.supportsDataBreakpoints = false;
 
 		// make VS Code to support completion in REPL
-		response.body.supportsCompletionsRequest = true;
+		response.body.supportsCompletionsRequest = false;
 		response.body.completionTriggerCharacters = [ "[", "$", ":", "@" ];
 
 		// make VS Code to send cancelRequests
 		response.body.supportsCancelRequest = true;
 
 		// make VS Code send the breakpointLocations request
-		response.body.supportsBreakpointLocationsRequest = true;
+		response.body.supportsBreakpointLocationsRequest = false;
 
 		// enable exception-info (not working???)
 		response.body.supportsExceptionInfoRequest = false;
@@ -193,7 +196,7 @@ export class DebugSession extends LoggingDebugSession {
 		
 		// 
 		response.body.supportsClipboardContext = true;
-		response.body.supportsSetVariable = true;
+		response.body.supportsSetVariable = false;
 		response.body.supportsSetExpression = false;
 
 		this.sendResponse(response);
@@ -348,7 +351,7 @@ export class DebugSession extends LoggingDebugSession {
 		response.body = {
 			variables: variables
 		};
-		this.sendResponse(response);
+		// this.sendResponse(response);
 	}
 
 
@@ -467,6 +470,7 @@ export class DebugSession extends LoggingDebugSession {
     protected dispatchRequest(request: DebugProtocol.Request): void {
 		console.log('request ' + request.seq + ': ' + request.command);
 		console.log(request);
+		this._runtime.dispatchRequest(request);
 		super.dispatchRequest(request);
 	}
 

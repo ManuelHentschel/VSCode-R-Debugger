@@ -422,6 +422,9 @@ export class DebugRuntime extends EventEmitter {
 		this.messageId = Math.max(this.messageId, id);
 
 		switch(message){
+			case 'response':
+				this.sendEvent('response', body);
+				break;
 			case 'breakpointVerification':
 				// sent to report back after trying to set a breakpoint
 				const bp = body;
@@ -527,6 +530,16 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
+
+	// REQUESTS
+
+	public dispatchRequest(request: DebugProtocol.Request): void{
+		// this.rSession.callFunction('.vsc.dispatchRequest', <anyRArgs><unknown>request);
+		console.log('Dispatch request!!!!!!!!!!!!!!!!!!!');
+		if(this.rSession){
+			this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
+		}
+	}
 
 
 	//////////////////////////////////////////////
@@ -647,6 +660,7 @@ export class DebugRuntime extends EventEmitter {
 
 	// request info about the stack and workspace from R:
 	private requestInfoFromR(args: anyRArgs = []) {
+		return 0;
 		const id = ++this.requestId;
 		const args2: anyRArgs = {
 			id: id,
@@ -659,6 +673,7 @@ export class DebugRuntime extends EventEmitter {
 
 	// request info about specific variables from R:
 	private requestVariablesFromR(refs: number[]){
+		return 0;
 		const rArgs: anyRArgs = {'refs': refs, 'id': ++this.requestId};
 		this.rSession.callFunction('.vsc.getVarLists', rArgs);
 		return this.waitForMessages();
@@ -740,7 +755,7 @@ export class DebugRuntime extends EventEmitter {
 			catchErrors: !this.breakOnErrorFromConsole,
 			id: rId
 		};
-		this.rSession.callFunction('.vsc.evalInFrame', rArgs, [], false);
+		// this.rSession.callFunction('.vsc.evalInFrame', rArgs, [], false);
 		if(!silent){
 			this.requestInfoFromR();
 		}
@@ -748,7 +763,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public setVariable(args: anyRArgs){
-		this.rSession.callFunction('.vsc.setVariable', args);
+		// this.rSession.callFunction('.vsc.setVariable', args);
 	}
 
 

@@ -1,5 +1,8 @@
 options(vsc.trySilent = FALSE)
 
+options(error = traceback)
+
+# trace(.vsc.setVariable, tracer=browser)
 
 # NULL
 nul <- NULL
