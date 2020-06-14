@@ -9,6 +9,9 @@ import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
+import { InitializeRequestArguments } from './debugSession';
+
+const { Subject } = require('await-notify');
 
 export interface DebugBreakpoint {
 	id: number;
@@ -16,7 +19,9 @@ export interface DebugBreakpoint {
 	verified: boolean;
 }
 
-
+function timeout(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export class DebugRuntime extends EventEmitter {
 
@@ -24,7 +29,7 @@ export class DebugRuntime extends EventEmitter {
 	// need to occurr on the same line!
 	// need to match those used in the R-package
 	// TODO: replace with a dedicated pipe between R and vsc?
-	readonly rStrings = {
+	private rStrings = {
 		delimiter0: '<v\\s\\c>',
 		delimiter1: '</v\\s\\c>',
 		prompt: '<#v\\s\\c>', //actual prompt is followed by a newline to make easier to identify
@@ -52,6 +57,12 @@ export class DebugRuntime extends EventEmitter {
 	private breakPoints = new Map<string, DebugBreakpoint[]>();
 	public breakOnErrorFromFile: boolean = true;
 	public breakOnErrorFromConsole: boolean = false;
+
+	private rSessionStartup = new Subject();
+	private rSessionReady: boolean = false;
+
+	private rPackageStartup = new Subject();
+	private rPackageFound: boolean = false;
 
 	// debugging
 	private logLevel = 3;
@@ -84,6 +95,8 @@ export class DebugRuntime extends EventEmitter {
 	private requestId = 0; // id of the last function call made to R (not all function calls need to be numbered)
 	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
 	private lastStackId = 0; // id of the last stack-message received from R
+	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
+	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
 
 	// debugMode
 	private mainFunction: string = 'main';
@@ -98,26 +111,27 @@ export class DebugRuntime extends EventEmitter {
 		super();
 	}
 
-	// start
-	public async start(
-		debugMode: "function"|"file"|"workspace",
-		allowGlobalDebugging: boolean, workingDirectory: string,
-		program?: string, mainFunction?: string, includePackages: boolean = false
-	) {
-
-		// STORE LAUNCH CONFIG TO PROPERTIES
-		this.debugMode = debugMode;
-		this.allowGlobalDebugging = allowGlobalDebugging;
-		this.cwd = workingDirectory;
-		this.sourceFile = program;
-		this.mainFunction = mainFunction;
-
+	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: DebugProtocol.InitializeRequest) {
 
 		// LAUNCH R PROCESS
+		if(args.rStrings){
+			const rs1 = args.rStrings;
+			const rs0 = this.rStrings;
+			this.rStrings.delimiter0 = rs1.delimiter0 || rs0.delimiter0;
+			this.rStrings.delimiter1 = rs1.delimiter1 || rs0.delimiter1;
+			this.rStrings.prompt = rs1.prompt || rs0.prompt;
+			this.rStrings.continue = rs1.continue || rs0.continue;
+			this.rStrings.startup = rs1.startup || rs0.startup;
+			this.rStrings.libraryNotFound = rs1.libraryNotFound || rs0.libraryNotFound;
+			this.rStrings.packageName = rs1.packageName || rs0.packageName;
+			this.rStrings.append = rs1.append || rs0.append;
+		}
 
 		// read settings from vsc-settings
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
+
+		// move to launch config!
 		this.includePackages = config().get<boolean>('includePackageScopes', false);
 
 		// print some info about the rSession
@@ -149,12 +163,10 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession = new RSession(rPath, cwd, rArgs, thisDebugRuntime);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		if(!this.rSession.successTerminal){
-			this.writeOutput('Failed to spawn a child process!', true, true);
-            // vscode.window.showErrorMessage('Failed to spawn a child process!');
-			this.terminate();
-			return;
+			const message = 'Failed to spawn a child process!';
+			await this.abortInitializeRequest(response, message);
+			return false;
 		}
-
 
 		// CHECK IF R HAS STARTED
 
@@ -162,27 +174,15 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
 
 		// set timeout
-		const ms = 1000;
-		let timeout = new Promise((resolve, reject) => {
-			let id = setTimeout(() => {
-			clearTimeout(id);
-			resolve(false);
-			}, ms);
-		});
-
-		// wait for message from R (or for the timeout)
-		// the timeout resolves to false, this.waitForR() resolves to true
-		const successR = await Promise.race([timeout, this.waitForR()]);
-
-		// abort if the terminal does not print the message (--> R has not started!)
-		if(!successR){
-			this.endOutputGroup();
-			this.writeOutput('R path not working:\n' + rPath, true, true);
-            // vscode.window.showErrorMessage('R path not working:\n' + rPath);
-			this.terminate();
-			return;
+		await this.rSessionStartup.wait(this.startupTimeout);
+		if(this.rSessionReady){
+			console.log("R Session Ready");
+		} else{
+			const message = 'R path not working:\n' + rPath;
+			await this.abortInitializeRequest(response, message);
+			return false;
 		}
-
+		
 
 		// LOAD R PACKAGE
 
@@ -200,7 +200,45 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.defaultLibrary = this.rStrings.packageName;
 		this.rSession.defaultAppend = this.rStrings.append;
 
+		this.dispatchRequest(request);
 
+		await this.rPackageStartup.wait(this.startupTimeout);
+		if(this.rPackageFound){
+			// nice
+			return true;
+		} else{
+			const message = 'Please install the R package "' + this.rStrings.packageName + '"!';
+			await this.abortInitializeRequest(response, message);
+			return false;
+		}
+	}
+
+	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string){
+		console.error(message);
+		this.endOutputGroup();
+		this.writeOutput(message, true, true);
+		await timeout(this.terminateTimeout);
+
+		response.success = false;
+		response.message = message;
+		this.sendEvent('response', response);
+		this.killR();
+		return false;
+	}
+
+	// start
+	public async start(
+		debugMode: "function"|"file"|"workspace",
+		allowGlobalDebugging: boolean, workingDirectory: string,
+		program?: string, mainFunction?: string, includePackages: boolean = false
+	) {
+
+		// STORE LAUNCH CONFIG TO PROPERTIES
+		this.debugMode = debugMode;
+		this.allowGlobalDebugging = allowGlobalDebugging;
+		this.cwd = workingDirectory;
+		this.sourceFile = program;
+		this.mainFunction = mainFunction;
 		// PREP R SESSION AND SOURCE MAIN
 
 		// get config about overwriting R functions
@@ -254,23 +292,6 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 
-	// async method to wait for R to start up
-	// needs to be raced against a timeout to avoid stalling the application
-	// this.hasStartedR is set to true by this.handleLine()
-	private async waitForR(){
-		const poll = (resolve: (boolean) => void) => {
-			if(this.hasStartedR){
-				resolve(true);
-			} else {
-				setTimeout(_ => poll(resolve), this.pollingDelay);
-			}
-		};
-		return new Promise(poll);
-	}
-
-
-
-
 
 	//////////
 	// Output-handlers: (for output of the R process to stdout/stderr)
@@ -289,6 +310,8 @@ export class DebugRuntime extends EventEmitter {
 		const jsonMatch = jsonRegex.exec(line);
 		if(jsonMatch && isFullLine){
 			// is meant for the debugger, not the user
+			this.rPackageFound = true;
+			this.rPackageStartup.notify();
 			this.handleJson(jsonMatch[1]);
 			line = line.replace(jsonRegex, '');
 		}
@@ -297,15 +320,14 @@ export class DebugRuntime extends EventEmitter {
 
 		// Check for R-Startup message
 		if(!this.isRunningCustomCode && RegExp(escapeForRegex(this.rStrings.startup)).test(line)){
+			this.rSessionReady = true;
+			this.rSessionStartup.notify();
 			this.hasStartedR = true;
 		}
 		// Check for Library-Not-Found-Message
 		if(!this.isRunningCustomCode && RegExp(escapeForRegex(this.rStrings.libraryNotFound)).test(line)){
-			console.error('R-Library not found!');
-			// vscode.window.showErrorMessage('Please install the R package "' + this.rStrings.packageName + '"!');
-			this.endOutputGroup();
-			this.writeOutput('Please install the R package "' + this.rStrings.packageName + '"!', true, true);
-			this.terminate();
+			this.rPackageFound = false;
+			this.rPackageStartup.notify();
 		}
 
 
@@ -368,7 +390,6 @@ export class DebugRuntime extends EventEmitter {
 				// ignore
 			} else if(this.allowGlobalDebugging){
 				if(this.debugState === 'function'){
-					await this.requestInfoFromR();
 					this.sendEvent('stopOnStep');
 				}
 				this.debugState = 'global';
@@ -425,6 +446,9 @@ export class DebugRuntime extends EventEmitter {
 			case 'response':
 				this.sendEvent('response', body);
 				break;
+			case 'event':
+				this.sendEvent('event', body);
+				break;
 			case 'breakpointVerification':
 				// sent to report back after trying to set a breakpoint
 				const bp = body;
@@ -436,7 +460,6 @@ export class DebugRuntime extends EventEmitter {
 				this.isCrashed = true;
 				this.expectBrowser = true;
 				this.debugState = 'function';
-				await this.requestInfoFromR();
 				// event is sent after receiving stack from R in order to answer stack-request synchronously:
 				// (apparently required by vsc?)
 				this.sendEvent('stopOnException', body);
@@ -445,32 +468,12 @@ export class DebugRuntime extends EventEmitter {
 				// can be sent e.g. after completing main()
 				this.terminate();
 				break;
-			case 'stack':
-				// contains info about the entire stack and some variables. requested by the debugger on each step
-				this.lastStackId = id;
-				this.updateStack(body);
-				break;
-			case 'variables':
-				// contains info about single variables, requested by the debugger
-				if(id >= this.lastStackId){
-					this.updateVariables(body);
-				}
-				break;
-			case 'eval':
-				// contains the result of an evalRequest sent by the debugger
-				const result = body;
-				await this.waitForMessages(); //make sure that stack info is received
-				this.sendEvent('evalResponse', result, id);
-				break;
 			case 'print':
 				// also used by .vsc.cat()
 				const output = body['output'];
 				const file = body['file'];
 				const line = body['line'];
 				this.writeOutput(output, true, false, file, line);
-				break;
-			case 'completion':
-				this.sendEvent('completionResponse', body);
 				break;
 			case 'go':
 				// is sent by .vsc.prepGlobalEnv() to indicate that R is ready for .vsc.debugSource()
@@ -488,7 +491,6 @@ export class DebugRuntime extends EventEmitter {
 				} else if(this.allowGlobalDebugging){
 					// simply start the R session and wait for user
 					this.debugState = 'global';
-					await this.requestInfoFromR();
 					this.sendEvent('stopOnEntry');
 				} else{
 					// Not a sensible usecase
@@ -533,11 +535,16 @@ export class DebugRuntime extends EventEmitter {
 
 	// REQUESTS
 
-	public dispatchRequest(request: DebugProtocol.Request): void{
+	public dispatchRequest(request: DebugProtocol.Request) {
 		// this.rSession.callFunction('.vsc.dispatchRequest', <anyRArgs><unknown>request);
-		console.log('Dispatch request!!!!!!!!!!!!!!!!!!!');
-		if(this.rSession){
+		
+		if(request.command === 'asdf' || request.command === 'launch'){
+			// ignore
+		} else if(this.rSession){
 			this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
+		} else{
+			this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
+			// console.log("R session not ready for request");
 		}
 	}
 
@@ -548,6 +555,9 @@ export class DebugRuntime extends EventEmitter {
 	// send event to the debugSession
 	private sendEvent(event: string, ... args: any[]) {
 		console.log('event:' + event);
+		if(args){
+			console.log(args);
+		}
 		setImmediate(_ => {
 			this.emit(event, ...args);
 		});
@@ -598,85 +608,12 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.runCommand('n');
 		} else{
 			// unexpected breakpoint --> browser() statement is part of the actual source code
-			this.rSession.clearQueue();
+			// this.rSession.clearQueue();
 		}
 		// request stack
-		await this.requestInfoFromR();
 		// event is sent after receiving stack from R in order to answer stack-request synchronously:
 		// (apparently required by vsc?)
 		this.sendEvent('stopOnBreakpoint');
-	}
-
-
-	// Async function to wait for responses from R
-	// waits for this.messageId to catch up with this.requestId
-	// this.requestId is incremented by calls to e.g. this.requestInfoFromR()
-	// this.messageId is incremented by messages from R that contain an Id>0
-	private async waitForMessages(id?: number){
-		if(id === undefined){
-			id = this.requestId;
-		}
-		const poll = (resolve: () => void) => {
-			if(this.messageId >= id){
-				resolve();
-			} else {
-				setTimeout(_ => poll(resolve), this.pollingDelay);
-			}
-		};
-		return new Promise(poll);
-	}
-
-
-
-	/////////////////////////////////////////////////
-	// STACK / VARIABLES
-
-	// handle new stack info
-	private updateStack(stack: any[]){
-		try {
-			if(stack['frames'][0]['line'] === 0){
-				// stack['frames'][0]['line'] = this.currentLine;
-			}
-		} catch(error){}
-		try {
-			if(stack['frames'][0]['file'] === 0){
-				// stack['frames'][0]['file'] = this.currentFile;
-			}
-		} catch(error){}
-		this.stack = stack;
-		this.variables = {};
-		this.updateVariables(stack['varLists']);
-	}
-
-	// handle new variable info
-	private updateVariables(varLists: any[]){
-		varLists.forEach(varList => {
-			if(varList['isReady']){
-				this.variables[varList['reference']] = (varList['variables'] as DebugProtocol.Variable[]);
-			}
-		});
-		console.log('updated: variables');
-	}
-
-	// request info about the stack and workspace from R:
-	private requestInfoFromR(args: anyRArgs = []) {
-		return 0;
-		const id = ++this.requestId;
-		const args2: anyRArgs = {
-			id: id,
-			isError: this.isCrashed,
-			includePackages: this.includePackages
-		};
-		this.rSession.callFunction('.vsc.getStack', args, args2);
-		return this.waitForMessages(id);
-	}
-
-	// request info about specific variables from R:
-	private requestVariablesFromR(refs: number[]){
-		return 0;
-		const rArgs: anyRArgs = {'refs': refs, 'id': ++this.requestId};
-		this.rSession.callFunction('.vsc.getVarLists', rArgs);
-		return this.waitForMessages();
 	}
 
 
@@ -699,11 +636,10 @@ export class DebugRuntime extends EventEmitter {
 	// debug source:
 	public async debugSource(filename: string){
 		this.setAllBreakpoints();
-		this.rSession.callFunction('.vsc.debugSource', {file: filename});
-		const rCall = makeFunctionCall('.vsc.debugSource', {file: filename});
+		this.rSession.callFunction('.vsc.debugSource', { file: filename });
+		const rCall = makeFunctionCall('.vsc.debugSource', { file: filename });
 		this.startOutputGroup(rCall, true);
 		this.endOutputGroup();
-		await this.requestInfoFromR({dummyFile: filename});
 		this.sendEvent('stopOnStep');
 	}
 
@@ -723,95 +659,19 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	private async runCommandAndSendEvent(command: string, event: string = 'stopOnStep'){
-		if(this.isCrashed){
-			if(this.allowGlobalDebugging){
+		if (this.isCrashed) {
+			if (this.allowGlobalDebugging) {
 				this.returnToPrompt();
-			} else{
+			} else {
 				this.terminateFromPrompt();
 			}
 		} else {
-			await this.waitForMessages();
 			this.rSession.runCommand(command);
-			await this.requestInfoFromR();
 			this.sendEvent(event);
 		}
 	}
-	
-	// evaluate an expression entered into the debug window in R
-	public evaluate(expr: string, frameId: number | undefined, context: string|undefined) {
-		var silent: boolean = false;
-		if(context==='watch'){
-			silent = true;
-		}
-		if(isUndefined(frameId)){
-			frameId = 0;
-		}
-		expr = escapeStringForR(expr, '"');
-		const rId = ++this.requestId;
-		const rArgs = {
-			expr: expr,
-			frameId: frameId,
-			silent: silent,
-			catchErrors: !this.breakOnErrorFromConsole,
-			id: rId
-		};
-		// this.rSession.callFunction('.vsc.evalInFrame', rArgs, [], false);
-		if(!silent){
-			this.requestInfoFromR();
-		}
-		return rId;
-	}
-
-	public setVariable(args: anyRArgs){
-		// this.rSession.callFunction('.vsc.setVariable', args);
-	}
 
 
-
-	//////////////////////////
-	// STACK INFO
-
-	public getStack(startFrame: number, endFrame: number) {
-		// can be returned synchronously since step-events are sent only after receiving stack info
-		return this.stack;
-	}
-
-	public getScopes(frameId: number) {
-		// can be returned synchronously since step-events are sent only after receiving stack info
-		// stack info includes scopes
-		return this.stack['frames'][frameId]['scopes'];
-	}
-
-	public async getVariables(varRef: number) {
-		if(this.variables[varRef]){
-			// variable info is already known
-			return this.variables[varRef];
-		} else{
-			// variable info is produced lazily --> request from R
-			this.requestVariablesFromR([varRef]);
-			await this.waitForMessages();
-			return this.variables[varRef];
-		}
-	}
-
-
-	///////////////////////////////
-	// COMPLETION
-
-	public async getCompletions(frameId:number, text:string, column:number, line:number){
-		if(frameId === undefined){
-			frameId = 0;
-		}
-		this.rSession.callFunction('.vsc.getCompletion', {
-			frameIdVsc: frameId,
-			text: text,
-			column: column,
-			line: line,
-			onlyGlobalEnv: (this.debugState === 'global'),
-			id: ++this.requestId
-		});
-		await this.waitForMessages();
-	}
 
 
 	////////////////////////////
@@ -838,7 +698,7 @@ export class DebugRuntime extends EventEmitter {
 		};
 
 		if(this.isRunningCustomCode){
-			this.rSession.callFunction('.vsc.addBreakpoints', rArgs);
+			// this.rSession.callFunction('.vsc.addBreakpoints', rArgs);
 		}
 
 		return bp;
@@ -856,7 +716,7 @@ export class DebugRuntime extends EventEmitter {
 				includePackages: this.setBreakpointsInPackages,
 				ids: ids
 			};
-			this.rSession.callFunction('.vsc.addBreakpoints', rArgs);
+			// this.rSession.callFunction('.vsc.addBreakpoints', rArgs);
 		});
 		if(setStoredBreakpoints){
 			this.rSession.callFunction('.vsc.setStoredBreakpoints');
@@ -872,7 +732,7 @@ export class DebugRuntime extends EventEmitter {
 	public clearBreakpoints(path: string): void {
 		this.breakPoints.delete(path);
 		if(this.isRunningCustomCode){
-			this.rSession.callFunction('.vsc.clearBreakpointsByFile', {file: path});
+			// this.rSession.callFunction('.vsc.clearBreakpointsByFile', {file: path});
 		}
 	}
 
@@ -897,11 +757,13 @@ export class DebugRuntime extends EventEmitter {
 	// functions to terminate the debug session
 
 	public killR(): void {
-		this.rSession.ignoreOutput = true;
-		this.isRunningCustomCode = false;
-		this.rSession.clearQueue();
-		this.rSession.killChildProcess();
-		// this.sendEvent('end');
+		if(this.rSession){
+			this.rSession.ignoreOutput = true;
+			this.isRunningCustomCode = false;
+			this.rSession.clearQueue();
+			this.rSession.killChildProcess();
+			// this.sendEvent('end');
+		}
 	}
 
 	public terminateFromPrompt(): void {
@@ -933,7 +795,6 @@ export class DebugRuntime extends EventEmitter {
 		this.debugState = 'global';
 		this.currentLine = 0;
 		const filename = vscode.window.activeTextEditor.document.fileName;
-		await this.requestInfoFromR({dummyFile: filename, forceDummyStack: true});
 		this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
 	}
 
@@ -947,7 +808,6 @@ export class DebugRuntime extends EventEmitter {
 
 	public async resetRInput() {
 		this.rSession.clearQueue();
-		await this.requestInfoFromR();
 		this.sendEvent('stopOnException');
 
 	}

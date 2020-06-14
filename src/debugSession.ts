@@ -1,33 +1,44 @@
-/* eslint-disable @typescript-eslint/semi */
-import {
-	Logger, logger,
-	LoggingDebugSession, ErrorDestination,
-	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, OutputEvent,
-	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent,
-	Thread, StackFrame, Scope, Handles, Breakpoint, Event
-} from 'vscode-debugadapter';
+
+"use strict";
+
+import { TerminatedEvent, StoppedEvent, OutputEvent} from 'vscode-debugadapter';
+
+
 import * as DebugAdapter from 'vscode-debugadapter'; 
-import { DebugProtocol } from 'vscode-debugprotocol';
 import { basename } from 'path';
-import { DebugRuntime, DebugBreakpoint } from './debugRuntime';
-import { anyRArgs } from './rSession';
+import { DebugRuntime } from './debugRuntime';
 const { Subject } = require('await-notify');
 
 
-/**
- * This interface describes the r-debugger specific launch attributes
- * (which are not part of the Debug Adapter Protocol).
- * The schema for these attributes lives in the package.json of the r-debug extension.
- * The interface should always match this schema.
- */
-interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
+
+import { Response } from 'vscode-debugadapter/lib/messages';
+import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
+import { DebugProtocol } from 'vscode-debugprotocol';
+
+export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	/** An absolute path to the "program" to debug. */
 
-	file: string|undefined;
 	debugMode: ("function"|"file"|"workspace")
 	allowGlobalDebugging: boolean;
-	mainFunction: string|undefined;
-	workingDirectory: string;
+	workingDirectory?: string;
+	file?: string;
+	mainFunction?: string;
+	includePackages?: boolean;
+	assignToAns?: boolean;
+}
+
+
+export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
+	rStrings?: {
+      delimiter0?: string;
+      delimiter1?: string;
+      prompt?: string;
+      continue?: string;
+      startup?: string;
+      libraryNotFound?: string;
+      packageName?: string;
+      append?: string;
+	}
 }
 
 interface Source extends DebugProtocol.Source {
@@ -38,30 +49,41 @@ interface SourceArguments extends DebugProtocol.SourceArguments {
 }
 
 
-export class DebugSession extends LoggingDebugSession {
+interface ResponseWithBody extends DebugProtocol.Response {
+    body?: {[key: string]: any};
+}
+
+export class DebugSession extends ProtocolServer {
 
 	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
-	private static THREAD_ID = 1;
+	private THREAD_ID = 1;
 
 	// a runtime (or debugger)
 	private _runtime: DebugRuntime;
 
 	private _configurationDone = new Subject();
 
-	// private _evalResponses: DebugProtocol.EvaluateResponse[] = [];
-	private _breakpointsResponses: DebugProtocol.SetBreakpointsResponse[] = [];
-	// private _evalResponses: Record<number, DebugProtocol.EvaluateResponse> = {};
-	private _evalResponses = new Map<number, DebugProtocol.EvaluateResponse>();
-	private _completionResponses: DebugProtocol.CompletionsResponse[] = [];
 
-	private _logLevel = 3;
+    sendResponse(response: DebugProtocol.Response): void {
+		console.log('response ' + response.request_seq + ': ' + response.command);
+		console.log(response);
+		super.sendResponse(response);
+	}
 
-	/**
-	 * Creates a new debug adapter that is used for one debug session.
-	 * We configure the default implementation of a debug adapter here.
-	 */
-	public constructor() {
-		super();
+
+
+    public dispatchRequestToR(request: DebugProtocol.Request): void {
+		this._runtime.dispatchRequest(request);
+	}
+
+    constructor() {
+        super();
+        this.on('close', () => {
+            this.shutdown();
+        });
+        this.on('error', (error) => {
+            this.shutdown();
+        });
 
 		// construct R runtime
 		this._runtime = new DebugRuntime();
@@ -70,26 +92,20 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('response', (response: DebugProtocol.Response) => {
 			this.sendResponse(response);
 		});
-		this._runtime.on('stopOnEntry', () => {
-			this.sendEvent(new StoppedEvent('entry', DebugSession.THREAD_ID));
-		});
-		this._runtime.on('stopOnStepPreserveFocus', () => {
-			var event: DebugProtocol.StoppedEvent;
-			event = new StoppedEvent('step', DebugSession.THREAD_ID);
-			event.body.preserveFocusHint = true;
+		this._runtime.on('event', (event: DebugProtocol.Event) => {
 			this.sendEvent(event);
 		});
+		this._runtime.on('stopOnEntry', () => {
+			this.sendEvent(new StoppedEvent('entry', this.THREAD_ID));
+		});
 		this._runtime.on('stopOnStep', () => {
-			this.sendEvent(new StoppedEvent('step', DebugSession.THREAD_ID));
+			this.sendEvent(new StoppedEvent('step', this.THREAD_ID));
 		});
 		this._runtime.on('stopOnBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('breakpoint', DebugSession.THREAD_ID));
-		});
-		this._runtime.on('stopOnDataBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('data breakpoint', DebugSession.THREAD_ID));
+			this.sendEvent(new StoppedEvent('breakpoint', this.THREAD_ID));
 		});
 		this._runtime.on('stopOnException', (args: any) => {
-			const e: DebugProtocol.StoppedEvent = new StoppedEvent('exception', DebugSession.THREAD_ID, '');
+			const e: DebugProtocol.StoppedEvent = new StoppedEvent('exception', this.THREAD_ID, '');
 			e.body = {
 				reason : 'exception',
 				threadId: 1,
@@ -98,11 +114,6 @@ export class DebugSession extends LoggingDebugSession {
 				text: args.message
 			};
 			this.sendEvent(e);
-
-			// this.sendEvent(new StoppedEvent('exception', DebugSession.THREAD_ID, 'See debug console'));
-		});
-		this._runtime.on('breakpointValidated', (bp: DebugBreakpoint) => {
-			this.sendEvent(new BreakpointEvent('changed', <DebugProtocol.Breakpoint>bp));
 		});
 		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line?: number, column?: number, group?: ("start"|"startCollapsed"|"end")) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
@@ -122,118 +133,89 @@ export class DebugSession extends LoggingDebugSession {
 		this._runtime.on('end', () => {
 			this.sendEvent(new TerminatedEvent());
 		});
-		this._runtime.on('evalResponse', (result: {result:string, type:string, variablesReference:number}, id: number) => {
-			// const response = this._evalResponses.shift();
-			const response = this._evalResponses.get(id);
-			if(result.result!==undefined && result.result!=='' || result.variablesReference>0){
-				response.body = result;
-				this.sendResponse(response);
-			} else {
-				response.success = false;
-				// do not send response to avoid empty line?
-				this.sendResponse(response);
-			}
-		});
-		this._runtime.on('breakpointResponse', (breakpoints: any) => { });
-		this._runtime.on('completionResponse', (completionsItems: DebugProtocol.CompletionItem[]) => {
-			const response = this._completionResponses.shift();
-			response.body = {
-				targets: completionsItems
-			};
-			this.sendResponse(response);
-		});
-	}
 
 
-
-	// SETUP
-	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
-
-		// build and return the capabilities of this debug adapter:
-		response.body = response.body || {};
-
-		// support restart
-		response.body.supportsRestartRequest = true;
-
-		// the adapter implements the configurationDoneRequest.
-		response.body.supportsConfigurationDoneRequest = true;
-
-		// make VS Code to use 'evaluate' when hovering over source
-		response.body.supportsEvaluateForHovers = false;
-
-		// make VS Code to show a 'step back' button
-		response.body.supportsStepBack = false;
-
-		// make VS Code to support data breakpoints
-		response.body.supportsDataBreakpoints = false;
-
-		// make VS Code to support completion in REPL
-		response.body.supportsCompletionsRequest = false;
-		response.body.completionTriggerCharacters = [ "[", "$", ":", "@" ];
-
-		// make VS Code to send cancelRequests
-		response.body.supportsCancelRequest = true;
-
-		// make VS Code send the breakpointLocations request
-		response.body.supportsBreakpointLocationsRequest = false;
-
-		// enable exception-info (not working???)
-		response.body.supportsExceptionInfoRequest = false;
-		response.body.supportsExceptionOptions = true;
-		const exceptionBreakpointFilters: DebugProtocol.ExceptionBreakpointsFilter[] = [
-			{
-				filter: 'fromFile',
-				label: 'Errors from R file',
-				default: true
-			},
-			{
-				filter: 'fromEval',
-				label: 'Errors from debug console',
-				default: false
-			}
-		];
-		response.body.exceptionBreakpointFilters = exceptionBreakpointFilters;
-		
-		// 
-		response.body.supportsClipboardContext = true;
-		response.body.supportsSetVariable = false;
-		response.body.supportsSetExpression = false;
-
-		this.sendResponse(response);
-
-		// we request them early by sending an 'initializeRequest' to the frontend.
-		// The frontend will end the configuration sequence by calling 'configurationDone' request.
-		this.sendEvent(new InitializedEvent());
-	}
-
-	protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments): void {
-		super.configurationDoneRequest(response, args);
-
-		// notify the launchRequest that configuration has finished
-		this._configurationDone.notify();
-	}
-
-
-	// LAUNCH
-	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
-
-		const trace = false;
-		const logPath = '';
-		logger.init(undefined, logPath, true);
-
-		// make sure to 'Stop' the buffered logging if 'trace' is not set
-		// logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop, false);
-		logger.setup(trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop,logPath, true);
-
+    }
+    static run(debugSession: typeof DebugSession): void {
+        const session = new debugSession();
+        process.on('SIGTERM', () => {
+            session.shutdown();
+        });
+        session.start(process.stdin, process.stdout);
+    }
+    public shutdown() {
+        // wait a bit before shutting down
+        setTimeout(() => {
+            process.exit(0);
+        }, 100);
+    }
+    protected runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void) {
+        this.sendRequest('runInTerminal', args, timeout, cb);
+    }
+    protected dispatchRequest(request: DebugProtocol.Request) {
+        const response: ResponseWithBody = new Response(request);
+        try {
+            if (request.command === 'initialize') {
+                request.arguments = {};
+                this.initializeRequest(response, request.arguments, <DebugProtocol.InitializeRequest> request);
+            }
+            else if (request.command === 'launch') {
+                this.launchRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'attach') {
+                this.attachRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'disconnect') {
+                this.disconnectRequest(response, request.arguments);
+            }
+            else if (request.command === 'terminate') {
+                this.terminateRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'restart') {
+                this.restartRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'configurationDone') {
+                this.configurationDoneRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'continue') {
+                response.body = {};
+                const continueResponse: DebugProtocol.ContinueResponse = <DebugProtocol.ContinueResponse>response;
+                this.continueRequest(continueResponse, request.arguments, request);
+            }
+            else if (request.command === 'next') {
+                this.nextRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'stepIn') {
+                this.stepInRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'stepOut') {
+                this.stepOutRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'pause') {
+                this.pauseRequest(response, request.arguments, request);
+            }
+            else if (request.command === 'source') {
+                response.body = {};
+                const sourceResponse: DebugProtocol.SourceResponse = <DebugProtocol.SourceResponse>response;
+                this.sourceRequest(sourceResponse, request.arguments, request);
+            }
+            else {
+                // is handled by the R package
+                this.dispatchRequestToR(request);
+            }
+        }
+        catch (e) {
+            // ignore
+        }
+    }
+    protected initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: DebugProtocol.InitializeRequest): void {
+		this._runtime.initializeRequest(response, args, request);
+    }
+    protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		await this._configurationDone.wait(1000);
 
-		const debugFunction = args.debugMode === 'function';
-		const debugFile = args.debugMode === 'file';
-
-
 		// start the program in the runtime
-		// this._runtime.start(args.program, args.allowGlobalDebugging, args.debugFunction, args.mainFunction);
 		this._runtime.start(
 			args.debugMode,
 			args.allowGlobalDebugging,
@@ -242,298 +224,53 @@ export class DebugSession extends LoggingDebugSession {
 			args.mainFunction
 		);
 
-
 		this.sendResponse(response);
+
+    }
+    protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request) {
+        this.sendResponse(response);
+    }
+    protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request) {
+		this._runtime.terminateFromPrompt();
+        this.sendResponse(response);
+    }
+	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
+		this._runtime.terminateFromPrompt();
+        this.shutdown();
+		// no response to be sent (?)
 	}
-
-
-
-	// BREAKPOINTS
-	// set breakpoints
-	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
-
-		const path = <string>args.source.path;
-		const lines = args.lines || [];
-
-		// clear old breakpoints
-		this._runtime.clearBreakpoints(path);
-
-		// set breakpoint locations
-		const bps = lines.map(l => {
-			const bp = <DebugProtocol.Breakpoint>this._runtime.setBreakPoint(path, l);
-			return bp;
-		});
-
-		// send back the actual breakpoint positions
-		response.body = {
-			breakpoints: bps
-		};
-		this._breakpointsResponses.push(response);
+    protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request): void {
+		this._configurationDone.notify();
+    }
+    protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request?: DebugProtocol.Request): void {
+		this._runtime.continue();
+        this.sendResponse(response);
+    }
+	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments, request?: DebugProtocol.Request) {
 		this.sendResponse(response);
+		this._runtime.step();
 	}
-
-	// get locations
-	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
-		if (args.source.path) {
-			const bps = this._runtime.getBreakpoints(args.source.path, args.line);
-			response.body = {
-				breakpoints: bps.map(col => {
-					return {
-						line: args.line,
-						column: col
-					};
-				})
-			};
-		} else {
-			response.body = {
-				breakpoints: []
-			};
-		}
+    protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request): void {
+		this._runtime.stepIn();
 		this.sendResponse(response);
-	}
-
-	// Exception-breakpoints
-    protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request): void {
-		this._runtime.breakOnErrorFromConsole =  args.filters.indexOf('fromEval') > -1;
-		this._runtime.breakOnErrorFromFile =  args.filters.indexOf('fromFile') > -1;
+    }
+    protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request): void {
+		this._runtime.stepOut();
 		this.sendResponse(response);
-	}
-
-
-
-	// STACKTRACE AND VARIABLES
-	// Threads:
-	protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
-		// supports no threads, just return dummy 
-		response.body = {
-			threads: [{
-				id: DebugSession.THREAD_ID,
-				name: "Thread 1"
-			}]
-		};
-		this.sendResponse(response);
-	}
-
-	// Stack:
-	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments) {
-		// apparently this needs to be answered synchronously to work properly
-		// therefore step-responses are sent only after getting stack-info from R
-
-		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
-		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
-		const endFrame = startFrame + maxLevels;
-
-		const stack = this._runtime.getStack(startFrame, endFrame);
-		response.body = {
-			stackFrames: stack['frames'],
-			totalFrames: stack['frames'].length
-		};
-
-		this.sendResponse(response);
-	}
-
-	// Scopes:
-	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments) {
-		// can be answered synchronously, since all scopes are received with the stack 
-		// (before the breakpoint-event is sent)
-		const scopes = this._runtime.getScopes(args.frameId);
-
-		response.body = {
-			scopes: scopes
-		};
-		this.sendResponse(response);
-	}
-
-	// Variables:
-	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
-		// is answered async since some variables need to be requested from R
-		const variables = await this._runtime.getVariables(args.variablesReference);
-		response.body = {
-			variables: variables
-		};
-		// this.sendResponse(response);
-	}
-
-
+    }
+    protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {
+		this._runtime.returnToPrompt();
+        this.sendResponse(response);
+    }
+    protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {
+        this.sendResponse(response);
+    }
     protected sourceRequest(response: DebugProtocol.SourceResponse, args: SourceArguments, request?: DebugProtocol.Request): void {
 		response.body = {
 			content: <string>args.source.srcbody
 		};
 		this.sendResponse(response);
 
-	};
 
-
-
-	// COMPLETION
-	protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {
-		this._completionResponses.push(response);
-		this._runtime.getCompletions(args.frameId, args.text, args.column, args.line);
-		// this.sendResponse(response);
-	};
-
-
-	// SET VAR
-
-    protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request) {
-		this._runtime.setVariable(<anyRArgs> <unknown>args);
-		response.body = {value: "<Evaluate an expression to update>"};
-		this.sendResponse(response);
-	};
-
-
-	// Exception:
-    protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {
-		// DUMMY
-		// NOT WORKING (why??)
-		// const details: DebugProtocol.ExceptionDetails = {
-		// 	/** Message contained in the exception. */
-		// 	message: 'messageasdf',
-		// 	/** Short type name of the exception object. */
-		// 	typeName: 'typeNameqwer'
-		// 	/** Fully-qualified type name of the exception object. */
-		// 	// fullTypeName: 'fullTypeName',
-		// 	/** Optional expression that can be evaluated in the current scope to obtain the exception object. */
-		// 	// evaluateName: 'evaluateName',
-		// 	/** Stack trace at the time the exception was thrown. */
-		// 	// stackTrace: 'stackTrace'
-		// 	/** Details of the exception contained by this exception, if any. */
-		// 	// innerException?: ExceptionDetails[];
-		// };
-		// response.body = {
-        //     /** ID of the exception that was thrown. */
-        //     exceptionId: 'dummyFilter',
-        //     /** Descriptive text for the exception provided by the debug adapter. */
-        //     description: 'description text for the exception',
-        //     /** Mode that caused the exception notification to be raised. */
-        //     breakMode: 'unhandled',
-        //     /** Detailed information about the exception. */
-        //     details: details
-		// }
-		this.sendResponse(response);
-	}
-
-
-
-
-
-	// FLOW CONTROL:
-	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
-		this._runtime.continue();
-		this.sendResponse(response);
-	}
-
-	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
-		this.sendResponse(response);
-		this._runtime.step();
-	}
-
-	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments) {
-		await this._runtime.stepIn();
-		this.sendResponse(response);
-	}
-
-	protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): void {
-		this._runtime.stepOut();
-		this.sendResponse(response);
-	}
-
-	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
-		if(args.context === 'clipboard'){
-			response.success = false;
-			this.sendResponse(response);
-		} else{
-			const requestIdR = this._runtime.evaluate(args.expression, args.frameId, args.context);
-			this._evalResponses.set(requestIdR, response);
-		}
-	}
-
-
-	protected terminateRequest(response: DebugProtocol.TerminateRequest, args: DebugProtocol.TerminateArguments) {
-		this._runtime.terminateFromPrompt();
-		this.sendMissingResponses(); // answer all open requests to avoid 'Canceled' message to debug console
-		// no response to be sent (?)
-	}
-
-	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
-		this._runtime.terminateFromPrompt();
-		this.sendMissingResponses(); // answer all open requests to avoid 'Canceled' message to debug console
-		// no response to be sent (?)
-	}
-
-    protected async restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request) {
-		await this._runtime.returnToPrompt();
-		this.sendResponse(response);
-	};
-
-
-    protected dispatchRequest(request: DebugProtocol.Request): void {
-		console.log('request ' + request.seq + ': ' + request.command);
-		console.log(request);
-		this._runtime.dispatchRequest(request);
-		super.dispatchRequest(request);
-	}
-
-    sendResponse(response: DebugProtocol.Response): void {
-		console.log('response ' + response.request_seq + ': ' + response.command);
-		console.log(response);
-		super.sendResponse(response);
-	}
-
-	private sendMissingResponses() {
-		this._breakpointsResponses.forEach(response => {
-			this.sendResponse(response);
-		});
-		this._evalResponses.forEach((response, key) => {
-			this.sendResponse(response);
-		});
-		this._completionResponses.forEach(response => {
-			this.sendResponse(response);
-		});
-	}
-
-
-
-	// Dummy code used for debugging:
-    protected sendErrorResponse(response: DebugProtocol.Response, codeOrMessage: number | DebugProtocol.Message, format?: string, variables?: any, dest?: ErrorDestination): void {};
-    runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void): void {console.log('request: runInTerminalRequest');};
-    // protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {};
-    // protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request): void {};
-    // protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments, request?: DebugProtocol.Request): void {};
-    protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request): void {};
-    // protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request): void {};
-    // protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {};
-    // protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request): void {};
-    protected setFunctionBreakPointsRequest(response: DebugProtocol.SetFunctionBreakpointsResponse, args: DebugProtocol.SetFunctionBreakpointsArguments, request?: DebugProtocol.Request): void {};
-    // protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request): void {};
-    // protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request): void {};
-    // protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request?: DebugProtocol.Request): void {};
-    // protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments, request?: DebugProtocol.Request): void {};
-    // protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request): void {};
-    // protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request): void {};
-    protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments, request?: DebugProtocol.Request): void {};
-    protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments, request?: DebugProtocol.Request): void {};
-    protected restartFrameRequest(response: DebugProtocol.RestartFrameResponse, args: DebugProtocol.RestartFrameArguments, request?: DebugProtocol.Request): void {};
-    protected gotoRequest(response: DebugProtocol.GotoResponse, args: DebugProtocol.GotoArguments, request?: DebugProtocol.Request): void {};
-    protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {};
-    // protected sourceRequest(response: DebugProtocol.SourceResponse, args: DebugProtocol.SourceArguments, request?: DebugProtocol.Request): void {};
-    // protected threadsRequest(response: DebugProtocol.ThreadsResponse, request?: DebugProtocol.Request): void {};
-    protected terminateThreadsRequest(response: DebugProtocol.TerminateThreadsResponse, args: DebugProtocol.TerminateThreadsArguments, request?: DebugProtocol.Request): void {};
-    // protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments, request?: DebugProtocol.Request): void {};
-    // protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments, request?: DebugProtocol.Request): void {};
-    // protected variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request): void {};
-    // protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request): void {};
-    protected setExpressionRequest(response: DebugProtocol.SetExpressionResponse, args: DebugProtocol.SetExpressionArguments, request?: DebugProtocol.Request): void {};
-    // protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments, request?: DebugProtocol.Request): void {};
-    protected stepInTargetsRequest(response: DebugProtocol.StepInTargetsResponse, args: DebugProtocol.StepInTargetsArguments, request?: DebugProtocol.Request): void {};
-    protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request): void {};
-    // protected completionsRequest(response: DebugProtocol.CompletionsResponse, args: DebugProtocol.CompletionsArguments, request?: DebugProtocol.Request): void {};
-    // protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request): void {};
-    protected loadedSourcesRequest(response: DebugProtocol.LoadedSourcesResponse, args: DebugProtocol.LoadedSourcesArguments, request?: DebugProtocol.Request): void {};
-    protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments, request?: DebugProtocol.Request): void {};
-    protected setDataBreakpointsRequest(response: DebugProtocol.SetDataBreakpointsResponse, args: DebugProtocol.SetDataBreakpointsArguments, request?: DebugProtocol.Request): void {};
-    protected readMemoryRequest(response: DebugProtocol.ReadMemoryResponse, args: DebugProtocol.ReadMemoryArguments, request?: DebugProtocol.Request): void {};
-    protected disassembleRequest(response: DebugProtocol.DisassembleResponse, args: DebugProtocol.DisassembleArguments, request?: DebugProtocol.Request): void {};
-    protected cancelRequest(response: DebugProtocol.CancelResponse, args: DebugProtocol.CancelArguments, request?: DebugProtocol.Request): void {};
-    // protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {};
-} 
+    }
+}

@@ -1,5 +1,8 @@
 
-
+a <- 1
+b <- 2
+l <- list(1,2,3)
+asdf <- 'qwer'
 
 print("This will be printed with debugMode==file or debugMode==function")
 print("A breakpoint here should work with debugMode==file or from .vsc.debugSource()")
