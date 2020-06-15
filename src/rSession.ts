@@ -218,7 +218,11 @@ function convertArgsToStrings(args:anyRArgs=[], escapeStrings:boolean = false): 
         //namedRArgs
         const ret = {};
         for(const arg in <namedRArgs>args){
-            ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            if(arg.substr(0,2)==='__'){
+                console.warn('Ignoring argument: ' + arg)
+            } else{
+                ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            }
         }
         args = ret;
     } else if(args === undefined){

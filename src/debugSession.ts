@@ -138,30 +138,25 @@ export class DebugSession extends ProtocolServer {
     }
     static run(debugSession: typeof DebugSession): void {
         const session = new debugSession();
-        process.on('SIGTERM', () => {
-            session.shutdown();
-        });
         session.start(process.stdin, process.stdout);
     }
     public shutdown() {
-        // wait a bit before shutting down
-        setTimeout(() => {
-            process.exit(0);
-        }, 100);
+        // dummy necessary?
     }
     protected runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void) {
         this.sendRequest('runInTerminal', args, timeout, cb);
     }
     protected dispatchRequest(request: DebugProtocol.Request) {
+		console.log("request " + request.seq + ": " + request.command);
         const response: ResponseWithBody = new Response(request);
         try {
             if (request.command === 'initialize') {
                 request.arguments = {};
                 this.initializeRequest(response, request.arguments, <DebugProtocol.InitializeRequest> request);
             }
-            else if (request.command === 'launch') {
-                this.launchRequest(response, request.arguments, request);
-            }
+            // else if (request.command === 'launch') {
+            //     this.launchRequest(response, request.arguments, request);
+            // }
             else if (request.command === 'attach') {
                 this.attachRequest(response, request.arguments, request);
             }
@@ -174,9 +169,9 @@ export class DebugSession extends ProtocolServer {
             else if (request.command === 'restart') {
                 this.restartRequest(response, request.arguments, request);
             }
-            else if (request.command === 'configurationDone') {
-                this.configurationDoneRequest(response, request.arguments, request);
-            }
+            // else if (request.command === 'configurationDone') {
+            //     this.configurationDoneRequest(response, request.arguments, request);
+            // }
             else if (request.command === 'continue') {
                 response.body = {};
                 const continueResponse: DebugProtocol.ContinueResponse = <DebugProtocol.ContinueResponse>response;
@@ -200,32 +195,18 @@ export class DebugSession extends ProtocolServer {
                 this.sourceRequest(sourceResponse, request.arguments, request);
             }
             else {
-                // is handled by the R package
+				// is handled by the R package
+				console.log("Dispatching to R!");
                 this.dispatchRequestToR(request);
             }
         }
         catch (e) {
+			console.error("Error while handling request!");
             // ignore
         }
     }
     protected initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: DebugProtocol.InitializeRequest): void {
 		this._runtime.initializeRequest(response, args, request);
-    }
-    protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
-		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
-
-		// start the program in the runtime
-		this._runtime.start(
-			args.debugMode,
-			args.allowGlobalDebugging,
-			args.workingDirectory,
-			args.file,
-			args.mainFunction
-		);
-
-		this.sendResponse(response);
-
     }
     protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request) {
         this.sendResponse(response);
