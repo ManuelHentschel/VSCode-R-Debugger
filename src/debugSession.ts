@@ -65,10 +65,17 @@ export class DebugSession extends ProtocolServer {
 
 
     sendResponse(response: DebugProtocol.Response): void {
-		console.log('response ' + response.request_seq + ': ' + response.command);
-		console.log(response);
+        console.log("reponse " + response.request_seq + ": " + response.command, response);
 		super.sendResponse(response);
-	}
+    }
+    
+    sendEvent(event: DebugProtocol.Event): void {
+        console.log("event: " + event.event);
+        if(event.body){
+            console.log(event.body);
+        }
+        super.sendEvent(event);
+    }
 
 
 
@@ -147,7 +154,7 @@ export class DebugSession extends ProtocolServer {
         this.sendRequest('runInTerminal', args, timeout, cb);
     }
     protected dispatchRequest(request: DebugProtocol.Request) {
-		console.log("request " + request.seq + ": " + request.command);
+        console.log("request " + request.seq + ": " + request.command, request);
         const response: ResponseWithBody = new Response(request);
         try {
             if (request.command === 'initialize') {
@@ -196,7 +203,6 @@ export class DebugSession extends ProtocolServer {
             }
             else {
 				// is handled by the R package
-				console.log("Dispatching to R!");
                 this.dispatchRequestToR(request);
             }
         }

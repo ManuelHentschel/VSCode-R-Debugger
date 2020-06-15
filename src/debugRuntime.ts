@@ -341,7 +341,8 @@ export class DebugRuntime extends EventEmitter {
 				this.endOutputGroup();
 				this.expectBrowser = false;
 			} else{
-				this.sendEvent('end');
+				console.log("Fix me!")
+				// this.sendEvent('end');
 			}
 			showLine = false;
 			return '';
@@ -379,8 +380,6 @@ export class DebugRuntime extends EventEmitter {
 		const message = j['message'];
 		const body = j['body'];
 		const id = j['id'];
-		console.log('message (#' + id + '): ' + message);
-		console.log(body);
 
 		// update Id of latest message
 		// requests are handled sequentially by R --> no need to check for previous message Ids
@@ -432,10 +431,6 @@ export class DebugRuntime extends EventEmitter {
 
 	// send event to the debugSession
 	private sendEvent(event: string, ... args: any[]) {
-		console.log('event:' + event);
-		if(args){
-			console.log(args);
-		}
 		setImmediate(_ => {
 			this.emit(event, ...args);
 		});
