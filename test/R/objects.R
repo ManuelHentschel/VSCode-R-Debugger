@@ -104,19 +104,10 @@ env1 <- new.env()
 makeActiveBinding("x", function() rnorm(1), env1)
 
 main <- function() {
+  asdfasdf
   print("testing objects")
   l <- list(1,2,3)
   x <- 9
   fun(1, a = 1, b = x, y = l)
   browser()
 }
-
-.vsc.addVarInfo(
-  name = 'Bytes',
-  doesApply = function(v) TRUE, # could be narrowed down
-  customAttributes = function(v) list(
-    names=list('__bytes'),
-    values=list(unclass(object.size(v)))
-  ),
-  position = -2 # append just before the default case
-)

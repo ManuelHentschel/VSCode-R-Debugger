@@ -248,7 +248,7 @@ export class DebugRuntime extends EventEmitter {
 
 
 		// only show the line to the user if it is complete & relevant
-		var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningCustomCode;
+		var showLine = isFullLine && !this.stdoutIsBrowserInfo;
 
 		// filter out info meant for vsc:
 		const jsonRegex = new RegExp(escapeForRegex(this.rStrings.delimiter0) + '(.*)' + escapeForRegex(this.rStrings.delimiter1) + '$');
@@ -341,7 +341,7 @@ export class DebugRuntime extends EventEmitter {
 				this.endOutputGroup();
 				this.expectBrowser = false;
 			} else{
-				console.log("Fix me!")
+				console.log("Fix me!");
 				// this.sendEvent('end');
 			}
 			showLine = false;
