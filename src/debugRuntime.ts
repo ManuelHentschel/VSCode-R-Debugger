@@ -180,7 +180,7 @@ export class DebugRuntime extends EventEmitter {
 		// abort if the terminal does not print the message (--> R has not started!)
 		if(!successR){
 			this.endOutputGroup();
-			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true)
+			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
 			this.writeOutput('R path:\n' + rPath, true, true);
             // vscode.window.showErrorMessage('R path not working:\n' + rPath);
 			this.terminate();
