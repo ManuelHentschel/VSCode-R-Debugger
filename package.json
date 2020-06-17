@@ -89,11 +89,10 @@
           {
             "type": "R-Debugger",
             "request": "launch",
-            "name": "R Debugger",
+            "name": "R Debug File",
+            "workingDirectory": "${fileDirname}",
+            "file": "${file}",
             "debugMode": "file",
-            "workingDirectory": "${workspaceFolder}",
-            "program": "${file}",
-            "mainFunction": "main",
             "allowGlobalDebugging": true
           }
         ],
@@ -104,8 +103,9 @@
             "body": {
               "type": "R-Debugger",
               "request": "launch",
-              "name": "R Debugger",
+              "name": "R Debug Only Workspace",
               "debugMode": "workspace",
+              "workingDirectory": "${workspaceFolder}",
               "allowGlobalDebugging": true
             }
           },
@@ -115,9 +115,9 @@
             "body": {
               "type": "R-Debugger",
               "request": "launch",
-              "name": "R Debugger",
-              "debugMode": "file",
-              "program": "${file}",
+              "name": "R Debug Only Workspace",
+              "debugMode": "workspace",
+              "workingDirectory": "${workspaceFolder}",
               "allowGlobalDebugging": true
             }
           },
@@ -127,9 +127,10 @@
             "body": {
               "type": "R-Debugger",
               "request": "launch",
-              "name": "R Debugger",
+              "name": "R Debug Function",
               "debugMode": "function",
-              "program": "${file}",
+              "workingDirectory": "${fileDirname}",
+              "file": "${file}",
               "mainFunction": "main",
               "allowGlobalDebugging": false
             }
@@ -190,6 +191,16 @@
           "type": "boolean",
           "default": false,
           "description": "Set to true to show package scopes in the variable window."
+        },
+        "rdebugger.startupTimeout": {
+          "type": "number",
+          "default": 2000,
+          "description": "The maximum time in ms that is waited for R to startup"
+        },
+        "rdebugger.printEverything": {
+          "type": "boolean",
+          "default": false,
+          "description": "For debugging the debugger: Whether to show everything printed to stdoutor stderr by the child process. Recommended to set debug.console.wordWrap=false"
         }
       }
     }

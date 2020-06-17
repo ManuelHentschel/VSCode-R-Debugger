@@ -82,6 +82,7 @@ export class DebugRuntime extends EventEmitter {
 	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
 	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
+	private debugPrintEverything = false;
 
 	// debugMode
 	private allowGlobalDebugging: boolean = false;
@@ -115,6 +116,9 @@ export class DebugRuntime extends EventEmitter {
 		// read settings from vsc-settings
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
+		this.debugPrintEverything = config().get<boolean>('printEverything', this.debugPrintEverything);
+		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
+
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
@@ -162,6 +166,8 @@ export class DebugRuntime extends EventEmitter {
 		} else{
 			const message = 'R path not working:\n' + rPath;
 			await this.abortInitializeRequest(response, message);
+			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true)
+			this.writeOutput('R path:\n' + rPath, true, true);
 			return false;
 		}
 		
@@ -220,6 +226,8 @@ export class DebugRuntime extends EventEmitter {
 		// handle output from the R process line by line
 		// is called by rSession.handleData()
 
+		// make copy of line for debugging
+		const line0 = line;
 
 		// only show the line to the user if it is complete & relevant
 		var showLine = isFullLine && !this.stdoutIsBrowserInfo;
@@ -326,7 +334,9 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// output any part of the line that was not parsed
-		if(showLine && line.length>0){
+		if(this.debugPrintEverything){
+			this.writeOutput(line0, isFullLine, fromStderr);
+		} else if(showLine && line.length>0){
 			this.writeOutput(line, isFullLine, fromStderr);
 			line = '';
 		}
