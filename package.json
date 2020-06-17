@@ -58,9 +58,18 @@
             "properties": {
               "debugMode": {
                 "type": "string",
-                "enum": ["function","file","workspace"],
+                "enum": [
+                  "function",
+                  "file",
+                  "workspace"
+                ],
                 "description": "Debug a single main-FUNCTION, run an R FILE, or just start an empty R WORKSPACE",
                 "default": "file"
+              },
+              "allowGlobalDebugging": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to allow debugging in the global workspace after running the function/file."
               },
               "workingDirectory": {
                 "type": "string",
@@ -77,10 +86,30 @@
                 "default": "main",
                 "description": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
               },
-              "allowGlobalDebugging": {
+              "overwritePrint": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to allow debugging in the global workspace after running the function/file."
+                "description": "Whether to write a new print() function to .GlobalEnv (direct calls to base::print are not affected)."
+              },
+              "overwriteCat": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to write a new cat() function to .GlobalEnv (direct calls to base::cat are not affected)."
+              },
+              "overwriteSource": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to write a new source() function to .GlobalEnv (direct calls to base::source are not affected)."
+              },
+              "setBreakpointsInPackages": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to enable breakpoints in packages. Can impact performance if set to true."
+              },
+              "includePackageScopes": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set to true to show package scopes in the variable window."
               }
             }
           }
@@ -167,31 +196,6 @@
           "default": 10,
           "description": "The time (in ms) to wait between R commands."
         },
-        "rdebugger.overwritePrint": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to write a new print() function to .GlobalEnv (direct calls to base::print are not affected)."
-        },
-        "rdebugger.overwriteCat": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to write a new cat() function to .GlobalEnv (direct calls to base::cat are not affected)."
-        },
-        "rdebugger.overwriteSource": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to write a new source() function to .GlobalEnv (direct calls to base::source are not affected)."
-        },
-        "rdebugger.setBreakpointsInPackages": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether to enable breakpoints in packages. Can impact performance if set to true."
-        },
-        "rdebugger.includePackageScopes": {
-          "type": "boolean",
-          "default": false,
-          "description": "Set to true to show package scopes in the variable window."
-        },
         "rdebugger.startupTimeout": {
           "type": "number",
           "default": 2000,
@@ -227,7 +231,7 @@
     "vscode-test": "^1.3.0"
   },
   "dependencies": {
-    "await-notify": "1.0.1",
+    "await-notify": "^1.0.1",
     "vscode-debugadapter": "^1.40.0",
     "winreg": "^1.2.4"
   }

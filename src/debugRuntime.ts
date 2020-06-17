@@ -9,9 +9,10 @@ import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequestArguments } from './debugSession';
+import { InitializeRequestArguments } from './debugProtocolModifications';
 
 const { Subject } = require('await-notify');
+// import { Subject } from 'await-notify';
 
 export interface DebugBreakpoint {
 	id: number;
@@ -166,7 +167,7 @@ export class DebugRuntime extends EventEmitter {
 		} else{
 			const message = 'R path not working:\n' + rPath;
 			await this.abortInitializeRequest(response, message);
-			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true)
+			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
 			this.writeOutput('R path:\n' + rPath, true, true);
 			return false;
 		}

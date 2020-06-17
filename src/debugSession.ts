@@ -10,53 +10,10 @@ import { DebugRuntime } from './debugRuntime';
 const { Subject } = require('await-notify');
 
 
-
 import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
-
-export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
-	/** An absolute path to the "program" to debug. */
-
-	debugMode: ("function"|"file"|"workspace")
-	allowGlobalDebugging: boolean;
-	workingDirectory?: string;
-	file?: string;
-	mainFunction?: string;
-	includePackages?: boolean;
-	assignToAns?: boolean;
-}
-
-
-export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
-	rStrings?: {
-      delimiter0?: string;
-      delimiter1?: string;
-      prompt?: string;
-      continue?: string;
-      startup?: string;
-      libraryNotFound?: string;
-      packageName?: string;
-      append?: string;
-	}
-}
-
-export interface ContinueArguments extends DebugProtocol.ContinueArguments {
-    callDebugSource?: boolean;
-    source?: DebugProtocol.Source;
-}
-
-interface Source extends DebugProtocol.Source {
-	srcbody: string;
-}
-interface SourceArguments extends DebugProtocol.SourceArguments {
-	source?: Source;
-}
-
-
-interface ResponseWithBody extends DebugProtocol.Response {
-    body?: {[key: string]: any};
-}
+import { SourceArguments, InitializeRequestArguments, ContinueArguments, StrictDebugConfiguration, ResponseWithBody } from './debugProtocolModifications';
 
 export class DebugSession extends ProtocolServer {
 
@@ -137,7 +94,10 @@ export class DebugSession extends ProtocolServer {
 				column: column
 			};
 			if(filePath !== ''){
-				var source: DebugProtocol.Source = new DebugAdapter.Source(basename(filePath), filePath);
+                const source = {
+                    name: basename(filePath),
+                    path: filePath
+                };
 				e.body.source = source;
 			}
 			this.sendEvent(e);
@@ -153,117 +113,71 @@ export class DebugSession extends ProtocolServer {
         session.start(process.stdin, process.stdout);
     }
     public shutdown() {
+        console.log('shutting down?');
         // dummy necessary?
     }
-    protected runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void) {
-        this.sendRequest('runInTerminal', args, timeout, cb);
-    }
+    // protected runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void) {
+    //     this.sendRequest('runInTerminal', args, timeout, cb);
+    // }
     protected dispatchRequest(request: DebugProtocol.Request) {
         console.log("request " + request.seq + ": " + request.command, request);
         const response: ResponseWithBody = new Response(request);
+        var dispatchToR: boolean = false; // the cases handled here are not sent to R
+        var sendResponse: boolean = true; // for cases handled here, the response must also be sent from here
         try {
-            if (request.command === 'initialize') {
-                request.arguments = {};
-                this.initializeRequest(response, request.arguments, <DebugProtocol.InitializeRequest> request);
+            switch(request.command){
+                case 'initialize':
+                    const initializeRequest: DebugProtocol.InitializeRequest = {
+                        arguments: request.arguments || {},
+                        ...request
+                    };
+                    this._runtime.initializeRequest(response, request.arguments, initializeRequest);
+                    sendResponse = false;
+                    break;
+                case 'disconnect':
+                    this._runtime.terminateFromPrompt();
+                    break;
+                case 'terminate':
+                    this._runtime.terminateFromPrompt();
+                    break;
+                case 'restart':
+                    this._runtime.returnToPrompt();
+                    break;
+                case 'continue':
+                    this._runtime.continue(request);
+                    break;
+                case 'next':
+                    this._runtime.step();
+                    break;
+                case 'stepIn':
+                    this._runtime.stepIn();
+                    break;
+                case 'stepOut':
+                    this._runtime.stepOut();
+                    break;
+                case 'pause':
+                    response.success = false;
+                    break;
+                case 'source':
+                    const srcbody = request.arguments.source.srcbody;
+                    if(srcbody){
+                        response.body = {content: srcbody};
+                    }
+                    break;
+                default:
+                    // request not handled here -> send to R
+                    dispatchToR = true;
+                    sendResponse = false;
             }
-            // else if (request.command === 'launch') {
-            //     this.launchRequest(response, request.arguments, request);
-            // }
-            else if (request.command === 'attach') {
-                this.attachRequest(response, request.arguments, request);
-            }
-            else if (request.command === 'disconnect') {
-                this.disconnectRequest(response, request.arguments);
-            }
-            else if (request.command === 'terminate') {
-                this.terminateRequest(response, request.arguments, request);
-            }
-            else if (request.command === 'restart') {
-                this.restartRequest(response, request.arguments, request);
-            }
-            // else if (request.command === 'configurationDone') {
-            //     this.configurationDoneRequest(response, request.arguments, request);
-            // }
-            else if (request.command === 'continue') {
-                response.body = {};
-                const continueResponse: DebugProtocol.ContinueResponse = <DebugProtocol.ContinueResponse>response;
-                const args: ContinueArguments = request.arguments;
-                this.continueRequest(continueResponse, request.arguments, request);
-            }
-            else if (request.command === 'next') {
-                this.nextRequest(response, request.arguments, request);
-            }
-            else if (request.command === 'stepIn') {
-                this.stepInRequest(response, request.arguments, request);
-            }
-            else if (request.command === 'stepOut') {
-                this.stepOutRequest(response, request.arguments, request);
-            }
-            else if (request.command === 'pause') {
-                this.pauseRequest(response, request.arguments, request);
-            }
-            else if (request.command === 'source') {
-                response.body = {};
-                const sourceResponse: DebugProtocol.SourceResponse = <DebugProtocol.SourceResponse>response;
-                this.sourceRequest(sourceResponse, request.arguments, request);
-            }
-            else {
-				// is handled by the R package
+            if(dispatchToR){
                 this.dispatchRequestToR(request);
+            }
+            if(sendResponse){
+                this.sendResponse(response);
             }
         }
         catch (e) {
-			console.error("Error while handling request!");
-            // ignore
+			console.error("Error while handling request " + request.seq + ": " + request.command);
         }
-    }
-    protected initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: DebugProtocol.InitializeRequest): void {
-		this._runtime.initializeRequest(response, args, request);
-    }
-    protected attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request) {
-        this.sendResponse(response);
-    }
-    protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request) {
-		this._runtime.terminateFromPrompt();
-        this.sendResponse(response);
-    }
-	protected disconnectRequest(response: DebugProtocol.DisconnectRequest, args: DebugProtocol.DisconnectArguments) {
-		this._runtime.terminateFromPrompt();
-        this.shutdown();
-		// no response to be sent (?)
-	}
-    protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request): void {
-		this._configurationDone.notify();
-    }
-    protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request: DebugProtocol.Request): void {
-		this._runtime.continue(request);
-        this.sendResponse(response);
-    }
-	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments, request?: DebugProtocol.Request) {
-		this.sendResponse(response);
-		this._runtime.step();
-	}
-    protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request): void {
-		this._runtime.stepIn();
-		this.sendResponse(response);
-    }
-    protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request): void {
-		this._runtime.stepOut();
-		this.sendResponse(response);
-    }
-    protected restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request): void {
-		this._runtime.returnToPrompt();
-        this.sendResponse(response);
-    }
-    protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request): void {
-        this.sendResponse(response);
-    }
-    protected sourceRequest(response: DebugProtocol.SourceResponse, args: SourceArguments, request?: DebugProtocol.Request): void {
-		response.body = {
-			content: <string>args.source.srcbody
-		};
-		this.sendResponse(response);
-
-
     }
 }
