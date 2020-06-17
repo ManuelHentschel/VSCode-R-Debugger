@@ -41,6 +41,11 @@ export interface InitializeRequestArguments extends DebugProtocol.InitializeRequ
 	}
 }
 
+export interface ContinueArguments extends DebugProtocol.ContinueArguments {
+    callDebugSource?: boolean;
+    source?: DebugProtocol.Source;
+}
+
 interface Source extends DebugProtocol.Source {
 	srcbody: string;
 }
@@ -182,6 +187,7 @@ export class DebugSession extends ProtocolServer {
             else if (request.command === 'continue') {
                 response.body = {};
                 const continueResponse: DebugProtocol.ContinueResponse = <DebugProtocol.ContinueResponse>response;
+                const args: ContinueArguments = request.arguments;
                 this.continueRequest(continueResponse, request.arguments, request);
             }
             else if (request.command === 'next') {
@@ -229,8 +235,8 @@ export class DebugSession extends ProtocolServer {
     protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request): void {
 		this._configurationDone.notify();
     }
-    protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request?: DebugProtocol.Request): void {
-		this._runtime.continue();
+    protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments, request: DebugProtocol.Request): void {
+		this._runtime.continue(request);
         this.sendResponse(response);
     }
 	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments, request?: DebugProtocol.Request) {

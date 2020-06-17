@@ -46,15 +46,8 @@ export class DebugRuntime extends EventEmitter {
 	// delay in ms between polls when waiting for messages from R
 	readonly pollingDelay = 10;
 
-	// The file we are debugging
-	private sourceFile: string;
-
 	// the directory in which to run the file
 	private cwd: string;
-
-	// The current line
-	private currentLine = 0;
-	private currentFile = ''; //might be different from sourceFile
 
 	// maps from sourceFile to array of breakpoints
 	private breakPoints = new Map<string, DebugBreakpoint[]>();
@@ -77,13 +70,6 @@ export class DebugRuntime extends EventEmitter {
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
 	private waitBetweenRCommands: number = 0;
 
-	// whether to show package environments
-	private includePackages: boolean = false;
-
-	// since we want to send breakpoint events, we will assign an id to every event
-	// so that the frontend can match events with breakpoints.
-	private breakpointId = 1;
-
 	// state info about the R session
 	private hasStartedR: boolean = false; // is set to true after executing the first R command successfully
 	private isRunningCustomCode: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
@@ -93,22 +79,13 @@ export class DebugRuntime extends EventEmitter {
 	private outputGroupLevel: number = 0; // counts the nesting level of output to the debug window
 
 	// info about the R stack, variables etc.
-	private stack: any = undefined; //TODO specify type!
-	private variables: Record<number, DebugProtocol.Variable[]> = {}; // stores info about variables of the R process
-	private requestId = 0; // id of the last function call made to R (not all function calls need to be numbered)
 	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
-	private lastStackId = 0; // id of the last stack-message received from R
 	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
 
 	// debugMode
-	private mainFunction: string = 'main';
 	private allowGlobalDebugging: boolean = false;
-	private debugMode: "function"|"file"|"workspace";
-	private debugState: ('prep'|'function'|'global') = 'prep';
-	private setBreakpointsInPackages: boolean = false;
-
-
+	private debugState: ('prep'|'function'|'global') = 'global';
 
 
 
@@ -138,9 +115,6 @@ export class DebugRuntime extends EventEmitter {
 		// read settings from vsc-settings
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
-
-		// move to launch config!
-		this.includePackages = config().get<boolean>('includePackageScopes', false);
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
@@ -298,6 +272,7 @@ export class DebugRuntime extends EventEmitter {
 		const browserRegex = /Browse\[\d+\]> /;
 		if(browserRegex.test(line)){
 			// R has entered the browser
+			this.debugState = 'function';
 			line = line.replace(browserRegex,'');
 			showLine = false;
 			this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
@@ -328,22 +303,12 @@ export class DebugRuntime extends EventEmitter {
 
 		// check for prompt
 		const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
-		if(promptRegex.test(line) && isFullLine){
+		if (promptRegex.test(line) && isFullLine) {
 			console.log("matches: prompt");
+			this.debugState = 'global';
 			this.rSession.showsPrompt();
-			if(this.debugState === 'prep'){
-				// ignore
-			} else if(this.allowGlobalDebugging){
-				if(this.debugState === 'function'){
-					this.sendEvent('stopOnStep');
-				}
-				this.debugState = 'global';
-				this.endOutputGroup();
-				this.expectBrowser = false;
-			} else{
-				console.log("Fix me!");
-				// this.sendEvent('end');
-			}
+			this.endOutputGroup();
+			this.expectBrowser = false;
 			showLine = false;
 			return '';
 		}
@@ -492,7 +457,7 @@ export class DebugRuntime extends EventEmitter {
 	///////////////////////////////////////////////
 
 	// continue script execution:
-	public async continue(reverse = false) {
+	public async continue(request: DebugProtocol.Request) {
 		if(this.debugState === 'global'){
 			await vscode.window.activeTextEditor.document.save();
 			const filename = vscode.window.activeTextEditor.document.fileName;
@@ -586,7 +551,6 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.runCommand('Q', [], true);
 		}
 		this.debugState = 'global';
-		this.currentLine = 0;
 		const filename = vscode.window.activeTextEditor.document.fileName;
 		this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
 	}
