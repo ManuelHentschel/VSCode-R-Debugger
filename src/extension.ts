@@ -45,8 +45,10 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 				config.type = 'R-Debugger';
 				config.name = 'Launch';
 				config.request = 'launch';
-				config.debugMode = 'workspace';
-				config.workingDirectory = "${workspaceRoot}";
+				config.debugMode = 'file';
+				config.file = '${file}';
+				config.workingDirectory = "${fileDirname}";
+				config.allowGlobalDebugging = true;
 			}
 		} else if(config.debugMode === 'function'){
 			if(!config.file || !config.mainFunction){
