@@ -37,6 +37,8 @@ export class DebugRuntime extends EventEmitter {
 
 	// delay in ms between polls when waiting for messages from R
 	readonly pollingDelay = 10;
+	private startupTimeout = 1000;
+	private debugPrintEverything = false;
 
 	// The file we are debugging
 	private sourceFile: string;
@@ -119,6 +121,7 @@ export class DebugRuntime extends EventEmitter {
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
 		this.includePackages = config().get<boolean>('includePackageScopes', false);
+		this.debugPrintEverything = config().get<boolean>('printEverything', this.debugPrintEverything);
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
@@ -162,12 +165,12 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
 
 		// set timeout
-		const ms = 1000;
+		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
 		let timeout = new Promise((resolve, reject) => {
 			let id = setTimeout(() => {
 			clearTimeout(id);
 			resolve(false);
-			}, ms);
+			}, this.startupTimeout);
 		});
 
 		// wait for message from R (or for the timeout)
@@ -177,7 +180,8 @@ export class DebugRuntime extends EventEmitter {
 		// abort if the terminal does not print the message (--> R has not started!)
 		if(!successR){
 			this.endOutputGroup();
-			this.writeOutput('R path not working:\n' + rPath, true, true);
+			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true)
+			this.writeOutput('R path:\n' + rPath, true, true);
             // vscode.window.showErrorMessage('R path not working:\n' + rPath);
 			this.terminate();
 			return;
@@ -280,6 +284,8 @@ export class DebugRuntime extends EventEmitter {
 		// handle output from the R process line by line
 		// is called by rSession.handleData()
 
+		// make copy of line for debugging
+		const line0 = line;
 
 		// only show the line to the user if it is complete & relevant
 		var showLine = isFullLine && !this.stdoutIsBrowserInfo && this.isRunningCustomCode;
@@ -394,7 +400,9 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// output any part of the line that was not parsed
-		if(showLine && line.length>0){
+		if(this.debugPrintEverything){
+			this.writeOutput(line0, isFullLine, fromStderr);
+		} else if(showLine && line.length>0){
 			this.writeOutput(line, isFullLine, fromStderr);
 			line = '';
 		}
