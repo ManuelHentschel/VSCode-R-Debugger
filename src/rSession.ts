@@ -21,7 +21,7 @@ export class RSession {
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 3; // can only be changed during construction
+    public readonly logLevelCP: number = 4;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
@@ -123,7 +123,7 @@ export class RSession {
 
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: anyRArgs=[], args2: anyRArgs=[],
+    public callFunction(fnc: string, args: any|anyRArgs=[], args2: anyRArgs=[],
         escapeStrings: boolean=true, library: string = this.defaultLibrary,
         force:boolean=false, append: string = this.defaultAppend
     ){
@@ -218,7 +218,11 @@ function convertArgsToStrings(args:anyRArgs=[], escapeStrings:boolean = false): 
         //namedRArgs
         const ret = {};
         for(const arg in <namedRArgs>args){
-            ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            if(arg.substr(0,2)==='__'){
+                console.warn('Ignoring argument: ' + arg);
+            } else{
+                ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            }
         }
         args = ret;
     } else if(args === undefined){
