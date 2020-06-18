@@ -113,6 +113,19 @@ export class DebugSession extends ProtocolServer {
                     dispatchToR = true;
                     sendResponse = false;
                     break;
+                case 'evaluate':
+                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)/.exec(request.arguments.expression);
+                    if(matches){
+                        const toStdin = matches[1];
+                        console.log('cp.stdin:\n' + toStdin);
+                        this._runtime.rSession.cp.stdin.write(
+                            toStdin + '\n'
+                        );
+                    } else{
+                        dispatchToR = true;
+                        sendResponse = false;
+                    }
+                    break;
                 case 'disconnect':
                     this._runtime.terminateFromPrompt();
                     break;

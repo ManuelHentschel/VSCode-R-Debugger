@@ -65,7 +65,7 @@ export class DebugRuntime extends EventEmitter {
 	private logLevel = 3;
 
 	// The rSession used to run the code
-	private rSession: RSession;
+	public rSession: RSession;
 	// Whether to use a queue for R commands (makes debugging slower but 'safer')
 	private useRCommandQueue: boolean = true;
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
@@ -329,6 +329,7 @@ export class DebugRuntime extends EventEmitter {
 		const continueRegex = new RegExp(escapeForRegex(this.rStrings.continue));
 		if(continueRegex.test(line) && isFullLine){
 			console.log("matches: continue prompt");
+			this.writeOutput("...");
 			showLine = false;
 		}
 
