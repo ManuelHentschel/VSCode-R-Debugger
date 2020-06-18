@@ -4,7 +4,6 @@
 import { TerminatedEvent, StoppedEvent, OutputEvent} from 'vscode-debugadapter';
 
 
-import * as DebugAdapter from 'vscode-debugadapter'; 
 import { basename } from 'path';
 import { DebugRuntime } from './debugRuntime';
 const { Subject } = require('await-notify');
@@ -13,7 +12,7 @@ const { Subject } = require('await-notify');
 import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { SourceArguments, InitializeRequestArguments, ContinueArguments, StrictDebugConfiguration, ResponseWithBody } from './debugProtocolModifications';
+import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments } from './debugProtocolModifications';
 
 export class DebugSession extends ProtocolServer {
 
@@ -22,8 +21,6 @@ export class DebugSession extends ProtocolServer {
 
 	// a runtime (or debugger)
 	private _runtime: DebugRuntime;
-
-	private _configurationDone = new Subject();
 
 
     sendResponse(response: DebugProtocol.Response): void {
@@ -39,20 +36,8 @@ export class DebugSession extends ProtocolServer {
         super.sendEvent(event);
     }
 
-
-
-    public dispatchRequestToR(request: DebugProtocol.Request): void {
-		this._runtime.dispatchRequest(request);
-	}
-
     constructor() {
         super();
-        this.on('close', () => {
-            this.shutdown();
-        });
-        this.on('error', (error) => {
-            this.shutdown();
-        });
 
 		// construct R runtime
 		this._runtime = new DebugRuntime();
@@ -72,17 +57,6 @@ export class DebugSession extends ProtocolServer {
 		});
 		this._runtime.on('stopOnBreakpoint', () => {
 			this.sendEvent(new StoppedEvent('breakpoint', this.THREAD_ID));
-		});
-		this._runtime.on('stopOnException', (args: any) => {
-			const e: DebugProtocol.StoppedEvent = new StoppedEvent('exception', this.THREAD_ID, '');
-			e.body = {
-				reason : 'exception',
-				threadId: 1,
-				description: 'Stopped on Exception',
-				// text: 'text'
-				text: args.message
-			};
-			this.sendEvent(e);
 		});
 		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line?: number, column?: number, group?: ("start"|"startCollapsed"|"end")) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
@@ -112,13 +86,7 @@ export class DebugSession extends ProtocolServer {
         const session = new debugSession();
         session.start(process.stdin, process.stdout);
     }
-    public shutdown() {
-        console.log('shutting down?');
-        // dummy necessary?
-    }
-    // protected runInTerminalRequest(args: DebugProtocol.RunInTerminalRequestArguments, timeout: number, cb: (response: DebugProtocol.RunInTerminalResponse) => void) {
-    //     this.sendRequest('runInTerminal', args, timeout, cb);
-    // }
+
     protected dispatchRequest(request: DebugProtocol.Request) {
         console.log("request " + request.seq + ": " + request.command, request);
         const response: ResponseWithBody = new Response(request);
@@ -127,11 +95,13 @@ export class DebugSession extends ProtocolServer {
         try {
             switch(request.command){
                 case 'initialize':
-                    const initializeRequest: DebugProtocol.InitializeRequest = {
-                        arguments: request.arguments || {},
+                    const initializeArguments: InitializeRequestArguments = request.arguments || {};
+                    initializeArguments.threadId = this.THREAD_ID;
+                    const initializeRequest: InitializeRequest = {
+                        arguments: initializeArguments,
                         ...request
                     };
-                    this._runtime.initializeRequest(response, request.arguments, initializeRequest);
+                    this._runtime.initializeRequest(response, initializeRequest.arguments, initializeRequest);
                     sendResponse = false;
                     break;
                 case 'disconnect':
@@ -170,7 +140,7 @@ export class DebugSession extends ProtocolServer {
                     sendResponse = false;
             }
             if(dispatchToR){
-                this.dispatchRequestToR(request);
+                this._runtime.dispatchRequest(request);
             }
             if(sendResponse){
                 this.sendResponse(response);

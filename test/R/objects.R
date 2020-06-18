@@ -104,7 +104,6 @@ env1 <- new.env()
 makeActiveBinding("x", function() rnorm(1), env1)
 
 main <- function() {
-  asdfasdf
   print("testing objects")
   l <- list(1,2,3)
   x <- 9

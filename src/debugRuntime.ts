@@ -80,7 +80,6 @@ export class DebugRuntime extends EventEmitter {
 	private outputGroupLevel: number = 0; // counts the nesting level of output to the debug window
 
 	// info about the R stack, variables etc.
-	private messageId = 0; // id of the last function call response received from R (only updated if larger than the previous)
 	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
 	private debugPrintEverything = false;
@@ -318,6 +317,7 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.showsPrompt();
 			this.endOutputGroup();
 			this.expectBrowser = false;
+			this.isCrashed = !this.allowGlobalDebugging;
 			showLine = false;
 			return '';
 		}
@@ -357,32 +357,18 @@ export class DebugRuntime extends EventEmitter {
 		const body = j['body'];
 		const id = j['id'];
 
-		// update Id of latest message
-		// requests are handled sequentially by R --> no need to check for previous message Ids
-		// use max() since unrequested messages are sent with id=0
-		this.messageId = Math.max(this.messageId, id);
-
 		switch(message){
 			case 'response':
 				this.sendEvent('response', body);
 				break;
 			case 'event':
 				this.sendEvent('event', body);
-				break;
-			// case 'breakpointVerification':
-			// 	// sent to report back after trying to set a breakpoint
-			// 	const bp = body;
-			// 	this.sendEvent('breakpointValidated', bp);
-			// 	break;
-			case 'error':
-				// sent if an error was encountered by R and 
-				this.stdoutIsBrowserInfo = true;
-				this.isCrashed = true;
-				this.expectBrowser = true;
-				this.debugState = 'function';
-				// event is sent after receiving stack from R in order to answer stack-request synchronously:
-				// (apparently required by vsc?)
-				this.sendEvent('stopOnException', body);
+				if(body.body.reason === 'exception'){
+					this.stdoutIsBrowserInfo = true;
+					this.isCrashed = true;
+					this.expectBrowser = true;
+					this.debugState = 'function';
+				}
 				break;
 			case 'end':
 				// can be sent e.g. after completing main()
@@ -392,18 +378,13 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 
-
-
 	// REQUESTS
 
+	// receive requests from the debugSession
 	public dispatchRequest(request: DebugProtocol.Request) {
 		// this.rSession.callFunction('.vsc.dispatchRequest', <anyRArgs><unknown>request);
 		this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
 	}
-
-
-	//////////////////////////////////////////////
-	// OUTPUT
 
 	// send event to the debugSession
 	private sendEvent(event: string, ... args: any[]) {
@@ -412,6 +393,12 @@ export class DebugRuntime extends EventEmitter {
 		});
 	}
 
+
+
+
+
+	//////////////////////////////////////////////
+	// OUTPUT
 	private writeOutput(text: string, addNewline = false, toStderr = false, filePath = '', line = 1, group?: ("start"|"startCollapsed"|"end")){
 		// writes output to the debug console (of the vsc instance runnning the R code)
 		if(text.slice(-1) !== '\n' && addNewline){
@@ -505,11 +492,7 @@ export class DebugRuntime extends EventEmitter {
 
 	private async runCommandAndSendEvent(command: string, event: string = 'stopOnStep'){
 		if (this.isCrashed) {
-			if (this.allowGlobalDebugging) {
-				this.returnToPrompt();
-			} else {
-				this.terminateFromPrompt();
-			}
+			this.returnToPrompt();
 		} else {
 			this.rSession.runCommand(command);
 			this.sendEvent(event);
@@ -572,12 +555,6 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.clearQueue();
 		this.rSession.killChildProcess();
 		this.sendEvent('end');
-	}
-
-	public async resetRInput() {
-		this.rSession.clearQueue();
-		this.sendEvent('stopOnException');
-
 	}
 
 	public cancel(): void {

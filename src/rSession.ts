@@ -219,7 +219,7 @@ function convertArgsToStrings(args:anyRArgs=[], escapeStrings:boolean = false): 
         const ret = {};
         for(const arg in <namedRArgs>args){
             if(arg.substr(0,2)==='__'){
-                console.warn('Ignoring argument: ' + arg)
+                console.warn('Ignoring argument: ' + arg);
             } else{
                 ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
             }

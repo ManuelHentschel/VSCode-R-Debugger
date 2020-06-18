@@ -62,6 +62,11 @@ export interface RStrings {
 
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
+    threadId?: number;
+}
+
+export interface InitializeRequest extends DebugProtocol.InitializeRequest {
+    arguments: InitializeRequestArguments;
 }
 
 export interface ContinueArguments extends DebugProtocol.ContinueArguments {
