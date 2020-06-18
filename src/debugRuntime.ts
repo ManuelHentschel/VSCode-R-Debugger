@@ -85,7 +85,7 @@ export class DebugRuntime extends EventEmitter {
 	private debugPrintEverything = false;
 
 	// debugMode
-	private allowGlobalDebugging: boolean = false;
+	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
 
 
@@ -312,14 +312,17 @@ export class DebugRuntime extends EventEmitter {
 		// check for prompt
 		const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
 		if (promptRegex.test(line) && isFullLine) {
-			console.log("matches: prompt");
-			this.debugState = 'global';
-			this.rSession.showsPrompt();
-			this.endOutputGroup();
-			this.expectBrowser = false;
-			this.isCrashed = !this.allowGlobalDebugging;
-			showLine = false;
-			return '';
+			if(this.isCrashed && !this.allowGlobalDebugging){
+				this.terminate();
+			} else{
+				console.log("matches: prompt");
+				this.debugState = 'global';
+				this.rSession.showsPrompt();
+				this.endOutputGroup();
+				this.expectBrowser = false;
+				showLine = false;
+			}
+			line = '';
 		}
 
 		// check for continue prompt

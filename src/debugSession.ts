@@ -104,6 +104,15 @@ export class DebugSession extends ProtocolServer {
                     this._runtime.initializeRequest(response, initializeRequest.arguments, initializeRequest);
                     sendResponse = false;
                     break;
+                case 'launch':
+                    if(request.arguments){
+                        if(request.arguments.allowGlobalDebugging){
+                            this._runtime.allowGlobalDebugging = true;
+                        }
+                    }
+                    dispatchToR = true;
+                    sendResponse = false;
+                    break;
                 case 'disconnect':
                     this._runtime.terminateFromPrompt();
                     break;
