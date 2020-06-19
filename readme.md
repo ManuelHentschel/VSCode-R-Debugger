@@ -104,9 +104,8 @@ Output parsing relies on parsing complete lines, so any output produced by `cat(
 Using the option to overwrite `cat()` will show output immediately, but produce a linebreak after each `cat()` call.
 * Output to stdout that looks like output from `browser()`, the input prompt, or text meant for the debugger (e.g. `<v\s\c>...</v\s\c>`)
 * Code that contains calls to `sys.calls()`, `sys.frames()`, `attr(..., 'srcref')` etc.:
-Since most code is evaluated through calls to `eval(...)` these results might be wrong.
-This problem might be reduced by using the "functional" debug mode
-(set `debugFunction` to `true` and specify a `mainFunction` in the launch config)
+Since pretty much all code is evaluated through calls to `eval(...)` these results might be wrong. <!-- This problem might be reduced by using the "functional" debug mode --> <!-- (set `debugFunction` to `true` and specify a `mainFunction` in the launch config) -->
+If required, input in the debug console can be sent directly to R's `stdin` by prepending it with `###stdin`.
 * Any use of graphical output/input, stdio-redirecting, `sink()`
 * Extensive use of lazy evaluation, promises, side-effects:
 In the general case, the debugger recognizes unevaluated promises and preserves them.
