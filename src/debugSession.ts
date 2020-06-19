@@ -8,6 +8,10 @@ import { basename } from 'path';
 import { DebugRuntime } from './debugRuntime';
 const { Subject } = require('await-notify');
 
+const { net } = require("net");
+
+
+
 
 import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
@@ -20,8 +24,8 @@ export class DebugSession extends ProtocolServer {
 	private THREAD_ID = 1;
 
 	// a runtime (or debugger)
-	private _runtime: DebugRuntime;
-
+    private _runtime: DebugRuntime;
+    
 
     sendResponse(response: DebugProtocol.Response): void {
         console.log("reponse " + response.request_seq + ": " + response.command, response);

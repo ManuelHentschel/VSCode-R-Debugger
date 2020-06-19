@@ -63,6 +63,9 @@ export interface RStrings {
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
+    host?: string;
+    port?: number;
+    useServer?: boolean;
 }
 
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {

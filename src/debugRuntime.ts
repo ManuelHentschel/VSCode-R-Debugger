@@ -9,7 +9,9 @@ import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequestArguments } from './debugProtocolModifications';
+import { InitializeRequestArguments, InitializeRequest } from './debugProtocolModifications';
+
+import { JsonServer } from './server';
 
 const { Subject } = require('await-notify');
 // import { Subject } from 'await-notify';
@@ -71,6 +73,10 @@ export class DebugRuntime extends EventEmitter {
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
 	private waitBetweenRCommands: number = 0;
 
+	public host = '127.0.0.1';
+	public port: number = 0;
+	public jsonServer: JsonServer;
+
 	// state info about the R session
 	private hasStartedR: boolean = false; // is set to true after executing the first R command successfully
 	private isRunningCustomCode: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
@@ -88,6 +94,7 @@ export class DebugRuntime extends EventEmitter {
 	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
 
+	private s: any;
 
 
 
@@ -97,7 +104,23 @@ export class DebugRuntime extends EventEmitter {
 		super();
 	}
 
-	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: DebugProtocol.InitializeRequest) {
+	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: InitializeRequest) {
+
+		const debugRuntime = this;
+		// launch server
+		this.jsonServer = new JsonServer();
+		await this.jsonServer.makeServer(debugRuntime, this.host, this.port);
+		this.host = this.jsonServer.host;
+		this.port = this.jsonServer.port;
+
+		if(this.jsonServer.port > 0){
+			args.useServer = true;
+			args.host = this.jsonServer.host;
+			args.port = this.jsonServer.port;
+		} else{
+			args.useServer = false;
+		}
+
 
 		// LAUNCH R PROCESS
 		if(args.rStrings){
@@ -136,7 +159,7 @@ export class DebugRuntime extends EventEmitter {
 		// start R in child process
 		const rPath = await getRPath(); // read OS-specific R path from config
 		const cwd = this.cwd;
-		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save']; 
+		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
 		this.writeOutput(''
@@ -148,7 +171,7 @@ export class DebugRuntime extends EventEmitter {
 		const thisDebugRuntime = this; // direct callback to this.handleLine() does not seem to work...
 		this.rSession = new RSession(rPath, cwd, rArgs, thisDebugRuntime);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
-		if(!this.rSession.successTerminal){
+		if (!this.rSession.successTerminal) {
 			const message = 'Failed to spawn a child process!';
 			await this.abortInitializeRequest(response, message);
 			return false;
@@ -161,16 +184,16 @@ export class DebugRuntime extends EventEmitter {
 
 		// set timeout
 		await this.rSessionStartup.wait(this.startupTimeout);
-		if(this.rSessionReady){
+		if (this.rSessionReady) {
 			console.log("R Session Ready");
-		} else{
+		} else {
 			const message = 'R path not working:\n' + rPath;
 			await this.abortInitializeRequest(response, message);
 			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
 			this.writeOutput('R path:\n' + rPath, true, true);
 			return false;
 		}
-		
+
 
 		// LOAD R PACKAGE
 
@@ -188,14 +211,15 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.defaultLibrary = this.rStrings.packageName;
 		this.rSession.defaultAppend = this.rStrings.append;
 
+		request.arguments = args;
 		this.dispatchRequest(request);
 
 		await this.rPackageStartup.wait(this.startupTimeout);
-		if(this.rPackageFound){
+		if (this.rPackageFound) {
 			// nice
 			this.endOutputGroup();
 			return true;
-		} else{
+		} else {
 			const message = 'Please install the R package "' + this.rStrings.packageName + '"!';
 			await this.abortInitializeRequest(response, message);
 			return false;
@@ -343,6 +367,8 @@ export class DebugRuntime extends EventEmitter {
 			this.writeOutput(line0, isFullLine, fromStderr);
 		} else if(showLine && line.length>0){
 			this.writeOutput(line, isFullLine, fromStderr);
+		}
+		if(showLine){
 			line = '';
 		}
 		return line;
@@ -350,7 +376,7 @@ export class DebugRuntime extends EventEmitter {
 
 
 
-	private async handleJson(json: string){
+	public async handleJson(json: string){
 		// handles the json that is printed by .vsc.sendToVsc()
 		// is called by this.handleLine() if the line contains a json enclosed by this.delimiter0 and this.delimiter1
 		// TODO: send json via separate pipe?
@@ -363,10 +389,10 @@ export class DebugRuntime extends EventEmitter {
 
 		switch(message){
 			case 'response':
-				this.sendEvent('response', body);
+				// this.sendEvent('response', body);
 				break;
 			case 'event':
-				this.sendEvent('event', body);
+				// this.sendEvent('event', body);
 				if(body.body.reason === 'exception'){
 					this.stdoutIsBrowserInfo = true;
 					this.isCrashed = true;
@@ -378,6 +404,16 @@ export class DebugRuntime extends EventEmitter {
 				// can be sent e.g. after completing main()
 				this.terminate();
 				break;
+		}
+	}
+
+	public handleJson2(json: any){
+		if(json.type==="response"){
+			this.sendEvent("response", json);
+		} else if(json.type==="event"){
+			this.sendEvent("event", json);
+		} else{
+			console.error("Unknown message:", json);
 		}
 	}
 
