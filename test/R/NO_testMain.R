@@ -1,9 +1,3 @@
-foo <- function(x, y) {
-  print(x)
-  print(y)
-  browser()
-  x + y
-}
 
 bar <- function(x, n) {
   z <- x
@@ -14,7 +8,9 @@ bar <- function(x, n) {
   z
 }
 
+
 main <- function(){
   bar(2, 5)
 }
 
+# main()

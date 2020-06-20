@@ -1,17 +1,19 @@
 # R Debugger
 
-This extension adds debugging capabilities for the R programming language.
-
-**UPDATE:** The Debugger is now able to debug arbitrary R files and does not depend on a main()-function anymore!
+This extension adds debugging capabilities for the R programming language to Visual Studio Code.
 
 ## Using the Debugger
 * Install the **R Debugger** extension in VS Code.
 * Install the **vscDebugger** package in R (https://github.com/ManuelHentschel/vscDebugger).
-* Make sure the settings `rdebugger.rterm.XXX` and `rdebugger.terminal.XXX` contain valid paths to R and a terminal program
+* If your R path is neither in Windows registry nor in `PATH` environment variable, make sure to provide valid R path in `rdebugger.rterm.*`.
 * Press F5 and select `R Debugger` as debugger. With the default launch configuration, the debugger will start a new R session.
 * To run a file, focus the file in the editor and press F5 (or the continue button in the debug controls)
-* Output will be printed to the debug console, expressions entered into the debug console are evaluated in the currently active frame
+* Output will be printed to the debug console,
+expressions entered into the debug console are evaluated in the currently active frame
+* During debugging in the global workspace it is often necessary to click the dummy frame
+in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv`.
 
+*For Windows users: If your R installation is from [CRAN](http://cran.r-project.org/mirrors.html) with default installation settings, especially **Save version number in registry** is enabled, then there's no need to specify `rdebugger.rterm.windows`.*
 
 ## Installation
 The VS code extension can be run from source by opening the project repo's root directory in vscode and pressing F5.
@@ -21,7 +23,7 @@ To download the correct file, filter the commits by branch (develop or master), 
 and download the file `r-debugger.vsix` under the caption "Artifacts".
 
 
-To install the latest development version from GitHub, run the following command in R:
+To install the latest development version of the required R-package from GitHub, run the following command in R:
 ```r
 devtools::install_github("ManuelHentschel/vscDebugger", ref = "develop")
 ```
@@ -35,27 +37,53 @@ To install from the master branch, omit the argument `ref`.
 The debugger includes the following features:
 * Controlling the program flow using *step*, *step in*, *step out*, *continue*
 * Breakpoints 
-* Exception handling to a very limited extent (breaks on exception)
-* Information about the stack trace, scopes, and variables in each frame/scope
+* Information about the stack trace, scopes, variables, and watch expressions in each frame/scope
+* Exception handling (breaks on exception, access to stack info)
 * Evaluation of arbitrary R code in the selected stack frame
-* Overwriting `print()` and `cat()` with modified versions that also print the current source file and line the the debug console
+* Overwriting `print()` and `cat()` with modified versions that also print the calling source file and line to the debug console
 * Overwriting `source()` with `.vsc.debugSource()` to allow recursive debugging (i.e. breakpoints in files that are `source()`d from within another file)
+* Supports VS Code's remote development extensions
 
 
 ## How it works
 The debugger works as follows:
-* A child process running a terminal application (bash, cmd.exe, ...) is started
-* An R process is started inside the child process
+* An R process is started inside a child process
 * The R package `vscDebugger` is loaded.
 * The Debugger starts and controls R programs by sending input to stdin of the child process
 * After each step, function call etc., the debugger calls functions from the package `vscDebugger` to get info about the stack/variables
 
 The output of the R process is read and parsed as follows:
-* Information sent by functions from `vscDebugger` is encoded as json and surrounded by keywords (e.g. "<v\\s\\c>").
+* Information sent by functions from `vscDebugger` is encoded as json and surrounded by keywords (`<v\s\c>...</v\s\c>`).
 These lines are parsed by the VS Code extension and not shown to the user.
 * Information printed by the `browser()` function is parsed and used to update the source file/line highlighted inside VS Code.
 These lines are also hidden from the user.
 * Everything else is printed to the debug console
+
+## Launch config
+The behaviour of the debugger can be configured with the entry `"debugMode"`,
+which can be one of the values `"function"`, `"file"`, and `"workspace"`.
+The intended usecases for these modes are:
+
+* `"workspace"`: Starts an R process in the background and sends all input into the debug console to the R process (but indirectly, through `eval()` nested in some helper functions).
+R Files can be run by focussing a file and pressing `F5`.
+The stack view contains a single dummy frame.
+To view the variables in the global environment it is often necessary to click this frame and expand the variables view.
+This method is 'abusing' the debug adapter protocol to some extent, since the protocol is apparently not designed for ongoing interactive programming in a global workspace.
+* `"file"`: Is pretty much equivalent to launching the debugger with `"workspace"` and then calling `.vsc.debugSource()` on a file.
+Is hopefully the behaviour expected by users coming from R Studio etc.
+* `"function"`: The above debug modes introduce significant overhead by passing all input through `eval()` etc.
+and use a custom version of `source()`, which makes changes to the R code in order to set breakpoints.
+To provide a somewhat 'cleaner' method of running code, this debug mode can be used.
+The call to `main()` is entered directly into R's `stdin`, hence there are no additional functions on the call stack (as is the case when entering `main()` into the debug console).
+Breakpoints are set by using R's `trace(..., tracer=browser)` function, which is more robust than the custom breakpoint mechanism.
+
+The remaining config entries are:
+* `"workingDirectory"`: An absolute path to the desired work directory. Defaults to the workspace folder.
+* `"file"`: Required for debug modes `"file"` and `"function"`. The file to be debugged/sourced before calling the main function.
+* `"mainFunction"`: The name of the main function to be debugged. Must be callable without arguments.
+* `"allowGlobalDebugging"`: Whether to keep the R session running after debugging and evaluate expressions from the debug console.
+Essential for debug moge `"workspace"`, recommended for `"file"`, usually not sensible for `"function"`.
+
 
 
 ## Warning
@@ -63,17 +91,27 @@ Since the approach of parsing text output meant for human users is rather error 
 In case of unexpected results, use `browser()` statements and run the code directly from a terminal (or RStudio).
 
 In the following cases the debugger might not work correctly:
-* Custom `trace()` or `browser()`-statements in the code
-* Custom error-handling (the debugger uses a custom `options(error=...)` to show stack trace etc. on error)
-* Any form of (interactive) user input in the terminal during runtime
-* Extensive usage of `cat()` without linebreaks (try disabling the `overwrite cat` and `overwrite print` options in the extion settings)
+* Calls to `trace()`, `tracingstate()`:
+These are used to implement breakpoints, so usage might interfere with the debugger's breakpoints
+* Calls to `browser()` without `.doTrace()`:
+In normal code, these will be recognized as breakpoints,
+but inside watch-expressions they will cause the debugger to become unresponsive
+* Custom `options(error=...)`: the debugger uses its own `options(error=...)` to show stack trace etc. on error
+* Any form of (interactive) user input in the terminal during runtime:
+The debugger passes all user input through `eval(...)`, no direct input to stdin is passed to the R process
+* Extensive usage of `cat()` without linebreaks:
+Output parsing relies on parsing complete lines, so any output produced by `cat()` will only be shown after a linebreak.
+Using the option to overwrite `cat()` will show output immediately, but produce a linebreak after each `cat()` call.
 * Output to stdout that looks like output from `browser()`, the input prompt, or text meant for the debugger (e.g. `<v\s\c>...</v\s\c>`)
-* Code that contains calls to `sys.calls()`, `sys.frames()`, `attr(..., 'srcref')` etc.,
-since these results might be altered by intermediate calls to functions from the vscDebugger package
+* Code that contains calls to `sys.calls()`, `sys.frames()`, `attr(..., 'srcref')` etc.:
+Since pretty much all code is evaluated through calls to `eval(...)` these results might be wrong. <!-- This problem might be reduced by using the "functional" debug mode --> <!-- (set `debugFunction` to `true` and specify a `mainFunction` in the launch config) -->
+If required, input in the debug console can be sent directly to R's `stdin` by prepending it with `###stdin`.
 * Any use of graphical output/input, stdio-redirecting, `sink()`
 * Extensive use of lazy evaluation, promises, side-effects:
 In the general case, the debugger recognizes unevaluated promises and preserves them.
 It might be possible, however, that the gathering of information about the stack/variables leads to unexpected side-effects.
+Especially watch-expressions must be safe to be evaluated in any frame,
+since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
 
 
 
@@ -90,33 +128,29 @@ Don't forget to remove these assignments after debugging.
 The following topics could be improved/fixed in the future.
 
 Variables/Stack view
-* Properly display info about S3/S4 classes
 * Summarize large lists (min, max, mean, ...)
+* Row-wise display of data.frames, column-wise display of matrices
 * Load large workspaces/lists in chunks (currently hardcoded 1000 items maximum)
 * Enable copying from variables list
-
-Exception handling
-* Properly display exception info (how do I show the large red box?)
-* (Getting the corresponding info from R should be doable)
-* Select behaviour for exceptions (enter browser, terminate, ...?)
+* Refine display of variables (can be customized by `.vsc.addVarInfo`, default config is to be improved)
 
 Breakpoints
 * Auto adjustment of breakpoint position to next valid position
 * Conditional breakponts, data breakpoints
-* Setting of breakpoints during runtime (currently these are silently ignored)
+* Setting of breakpoints during runtime (currently most of these are silently ignored)
 
 General
 * Improve error handling
 * Handling graphical output etc.?
-* Source line info does not work for modified `print()` when called from a line with breakpoint
 * Attach to currently open R process instead of spawning a new one?
-* Nested formatting of output in the debug console (use existing functionality from variables view)
 
 Give user more direct access to the R session:
-* Use (visible) integrated terminal instead of background process
-* Use `sink(..., split=TRUE)` to simultaneously show stdout to user and the debugger
+* Use (visible) integrated terminal instead of background process,
+use `sink(..., split=TRUE)` to simultaneously show stdout to user and the debugger
 * Return results from vscDebugger-Functions via a pipe etc. to keep stdout clean
+* Pipe a copy of stdout to a pseudo-terminal as info for the user
 
-If you have any problems, suggestions, bug fixes etc. feel free to open an issue at
+If you have problems, suggestions, bug fixes etc. feel free to open an issue at
 https://github.com/ManuelHentschel/VSCode-R-Debugger/issues
 or submit a pull request.
+Any feedback or support is welcome :)

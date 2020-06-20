@@ -5,3 +5,4 @@ testR
 R/test*
 temp*
 *.temp
+*.vsix
