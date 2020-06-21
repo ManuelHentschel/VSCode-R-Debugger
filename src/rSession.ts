@@ -32,7 +32,7 @@ export class RSession {
     private restOfStdout: string='';
 
 
-    constructor(rPath: string, cwd: string, rArgs: string[]=[],
+    constructor(rPath: string, rArgs: string[]=[],
         // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
         debugRuntime: DebugRuntime,
         logLevel=undefined, logLevelCP=undefined)
@@ -46,7 +46,7 @@ export class RSession {
             this.logLevelCP = logLevelCP;
         }
 
-        this.cp = spawnRProcess(rPath, cwd, rArgs, this.logLevelCP);
+        this.cp = spawnRProcess(rPath, rArgs, this.logLevelCP);
 
         if(this.cp.pid === undefined){
             this.successTerminal = false;
@@ -303,9 +303,8 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
 /////////////////////////////////
 // Child Process
 
-function spawnRProcess(rPath: string, cwd: string, rArgs: string[] = [], logLevel=3){
+function spawnRProcess(rPath: string, rArgs: string[] = [], logLevel=3){
     const options = {
-        cwd: cwd,
         env: {
             VSCODE_DEBUG_SESSION: "1",
             ...process.env

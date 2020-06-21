@@ -25,7 +25,7 @@ export class DebugSession extends ProtocolServer {
 
 	// a runtime (or debugger)
     private _runtime: DebugRuntime;
-    
+
 
     sendResponse(response: DebugProtocol.Response): void {
         console.log("reponse " + response.request_seq + ": " + response.command, response);
@@ -62,7 +62,7 @@ export class DebugSession extends ProtocolServer {
 		this._runtime.on('stopOnBreakpoint', () => {
 			this.sendEvent(new StoppedEvent('breakpoint', this.THREAD_ID));
 		});
-		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line?: number, column?: number, group?: ("start"|"startCollapsed"|"end")) => {
+		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line?: number, column?: number, group?: ("start"|"startCollapsed"|"end"), data?: object) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
 			e.body = {
 				category: category,
@@ -77,14 +77,15 @@ export class DebugSession extends ProtocolServer {
                     path: filePath
                 };
 				e.body.source = source;
-			}
+            }
+            if(data){
+                e.body.data = data;
+            }
 			this.sendEvent(e);
 		});
 		this._runtime.on('end', () => {
 			this.sendEvent(new TerminatedEvent());
 		});
-
-
     }
     static run(debugSession: typeof DebugSession): void {
         const session = new debugSession();
@@ -100,6 +101,7 @@ export class DebugSession extends ProtocolServer {
             switch(request.command){
                 case 'initialize':
                     const initializeArguments: InitializeRequestArguments = request.arguments || {};
+                    initializeArguments.useServer = true;
                     initializeArguments.threadId = this.THREAD_ID;
                     const initializeRequest: InitializeRequest = {
                         arguments: initializeArguments,
@@ -116,9 +118,11 @@ export class DebugSession extends ProtocolServer {
                     }
                     dispatchToR = true;
                     sendResponse = false;
+                    this._runtime.writeOutput('Launch Arguments:\n' + JSON.stringify(request.arguments, undefined, 2));
+                    this._runtime.endOutputGroup();
                     break;
                 case 'evaluate':
-                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)/.exec(request.arguments.expression);
+                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments.expression);
                     if(matches){
                         const toStdin = matches[1];
                         console.log('cp.stdin:\n' + toStdin);

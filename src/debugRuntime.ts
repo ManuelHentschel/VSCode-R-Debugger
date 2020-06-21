@@ -16,12 +16,6 @@ import { JsonServer } from './server';
 const { Subject } = require('await-notify');
 // import { Subject } from 'await-notify';
 
-export interface DebugBreakpoint {
-	id: number;
-	line: number;
-	verified: boolean;
-}
-
 function timeout(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -53,7 +47,6 @@ export class DebugRuntime extends EventEmitter {
 	private cwd: string;
 
 	// maps from sourceFile to array of breakpoints
-	private breakPoints = new Map<string, DebugBreakpoint[]>();
 	public breakOnErrorFromFile: boolean = true;
 	public breakOnErrorFromConsole: boolean = false;
 
@@ -94,8 +87,6 @@ export class DebugRuntime extends EventEmitter {
 	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
 
-	private s: any;
-
 
 
 
@@ -108,15 +99,19 @@ export class DebugRuntime extends EventEmitter {
 
 		const debugRuntime = this;
 		// launch server
-		this.jsonServer = new JsonServer();
-		await this.jsonServer.makeServer(debugRuntime, this.host, this.port);
-		this.host = this.jsonServer.host;
-		this.port = this.jsonServer.port;
+		if(args.useServer){
+			this.jsonServer = new JsonServer();
+			await this.jsonServer.makeServer(debugRuntime, this.host, this.port);
+			this.host = this.jsonServer.host;
+			this.port = this.jsonServer.port;
 
-		if(this.jsonServer.port > 0){
-			args.useServer = true;
-			args.host = this.jsonServer.host;
-			args.port = this.jsonServer.port;
+			if(this.jsonServer.port > 0){
+				args.useServer = true;
+				args.host = this.jsonServer.host;
+				args.port = this.jsonServer.port;
+			} else{
+				args.useServer = false;
+			}
 		} else{
 			args.useServer = false;
 		}
@@ -135,6 +130,7 @@ export class DebugRuntime extends EventEmitter {
 			this.rStrings.packageName = rs1.packageName || rs0.packageName;
 			this.rStrings.append = rs1.append || rs0.append;
 		}
+		args.rStrings = this.rStrings;
 
 		// read settings from vsc-settings
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
@@ -146,30 +142,17 @@ export class DebugRuntime extends EventEmitter {
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
 		this.startOutputGroup('Starting R session...', true);
-		this.writeOutput(''
-			+ 'rDelimiter0: ' + this.rStrings.delimiter0
-			+ '\nrDelimiter1: ' + this.rStrings.delimiter1
-			+ '\nrPrompt: ' + this.rStrings.prompt
-			+ '\nrContinue: ' + this.rStrings.continue
-			+ '\nrStartup: ' + this.rStrings.startup
-			+ '\nrLibraryNotFound: ' + this.rStrings.libraryNotFound
-			+ '\nrAppend: ' + this.rStrings.append
-		);
+		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
+		console.log(args);
 
 		// start R in child process
 		const rPath = await getRPath(); // read OS-specific R path from config
-		const cwd = this.cwd;
 		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
+		this.writeOutput('R Startup:\n' + JSON.stringify({path: rPath, arguments: rArgs}, undefined, 2));
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
-		this.writeOutput(''
-			+ 'cwd: ' + cwd
-			+ '\nrPath: ' + rPath
-			+ '\nrArgs: ' + rArgs.join(' ')
-		);
-
 		const thisDebugRuntime = this; // direct callback to this.handleLine() does not seem to work...
-		this.rSession = new RSession(rPath, cwd, rArgs, thisDebugRuntime);
+		this.rSession = new RSession(rPath, rArgs, thisDebugRuntime);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		if (!this.rSession.successTerminal) {
 			const message = 'Failed to spawn a child process!';
@@ -199,7 +182,6 @@ export class DebugRuntime extends EventEmitter {
 
 		// load R package, wrapped in a try-catch-function
 		// missing R package will be handled by this.handleLine()
-		this.writeOutput('library: ' + this.rStrings.packageName);
 		const tryCatchArgs: anyRArgs = {
 			expr: makeFunctionCall('library', this.rStrings.packageName, [], false, 'base'),
 			error: 'function(e)' + makeFunctionCall('cat', this.rStrings.libraryNotFound, '\n', true, 'base'),
@@ -217,7 +199,7 @@ export class DebugRuntime extends EventEmitter {
 		await this.rPackageStartup.wait(this.startupTimeout);
 		if (this.rPackageFound) {
 			// nice
-			this.endOutputGroup();
+			// this.endOutputGroup(); // is called after launch request
 			return true;
 		} else {
 			const message = 'Please install the R package "' + this.rStrings.packageName + '"!';
@@ -251,7 +233,9 @@ export class DebugRuntime extends EventEmitter {
 		// is called by rSession.handleData()
 
 		// make copy of line for debugging
-		const line0 = line;
+		if(this.debugPrintEverything){
+			this.writeOutput(line, isFullLine, fromStderr);
+		}
 
 		// only show the line to the user if it is complete & relevant
 		var showLine = isFullLine && !this.stdoutIsBrowserInfo;
@@ -342,7 +326,7 @@ export class DebugRuntime extends EventEmitter {
 				console.log("matches: prompt");
 				this.debugState = 'global';
 				this.rSession.showsPrompt();
-				this.endOutputGroup();
+				// this.endOutputGroup();
 				this.expectBrowser = false;
 				showLine = false;
 			}
@@ -363,9 +347,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// output any part of the line that was not parsed
-		if(this.debugPrintEverything){
-			this.writeOutput(line0, isFullLine, fromStderr);
-		} else if(showLine && line.length>0){
+		if(!this.debugPrintEverything && showLine && line.length>0){
 			this.writeOutput(line, isFullLine, fromStderr);
 		}
 		if(showLine){
@@ -387,33 +369,43 @@ export class DebugRuntime extends EventEmitter {
 		const body = j['body'];
 		const id = j['id'];
 
-		switch(message){
-			case 'response':
-				// this.sendEvent('response', body);
-				break;
-			case 'event':
-				// this.sendEvent('event', body);
-				if(body.body.reason === 'exception'){
-					this.stdoutIsBrowserInfo = true;
-					this.isCrashed = true;
-					this.expectBrowser = true;
-					this.debugState = 'function';
-				}
-				break;
-			case 'end':
-				// can be sent e.g. after completing main()
-				this.terminate();
-				break;
-		}
+		this.handleJson2(body);
+
+		// switch(message){
+		// 	case 'response':
+		// 		// this.sendEvent('response', body);
+		// 		// if(body.reason = )
+		// 		break;
+		// 	case 'event':
+		// 		// this.sendEvent('event', body);
+		// 		if(body.body.reason === 'exception'){
+		// 			this.stdoutIsBrowserInfo = true;
+		// 			this.isCrashed = true;
+		// 			this.expectBrowser = true;
+		// 			this.debugState = 'function';
+		// 		}
+		// 		break;
+		// }
 	}
 
 	public handleJson2(json: any){
+		if(!this.rPackageFound){
+			this.rPackageFound = true;
+			this.rPackageStartup.notify();
+		}
 		if(json.type==="response"){
 			this.sendEvent("response", json);
 		} else if(json.type==="event"){
+			if(json.body.reason === 'exception'){
+				this.stdoutIsBrowserInfo = true;
+				this.isCrashed = true;
+				this.expectBrowser = true;
+				this.debugState = 'function';
+			}
 			this.sendEvent("event", json);
 		} else{
-			console.error("Unknown message:", json);
+			console.error("Unknown message:");
+			console.log(json);
 		}
 	}
 
@@ -439,7 +431,7 @@ export class DebugRuntime extends EventEmitter {
 
 	//////////////////////////////////////////////
 	// OUTPUT
-	private writeOutput(text: string, addNewline = false, toStderr = false, filePath = '', line = 1, group?: ("start"|"startCollapsed"|"end")){
+	public writeOutput(text: string, addNewline = false, toStderr = false, filePath = '', line = 1, group?: ("start"|"startCollapsed"|"end"), data?: object){
 		// writes output to the debug console (of the vsc instance runnning the R code)
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
@@ -457,7 +449,7 @@ export class DebugRuntime extends EventEmitter {
 		if(doSendEvent){
 			const category = (toStderr ? "stderr" : "stdout");
 			const column = 1;
-			this.sendEvent("output", text, category, filePath, line, column, group);
+			this.sendEvent("output", text, category, filePath, line, column, group, data);
 		}
 	}
 	private startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, filePath = '', line = 1){
@@ -469,7 +461,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 		this.writeOutput(text, addNewline, toStderr, filePath, line, group);
 	}
-	private endOutputGroup(){
+	public endOutputGroup(){
 		this.writeOutput("", false, false, '', 1, "end");
 	}
 

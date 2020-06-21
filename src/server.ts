@@ -29,6 +29,7 @@ export class JsonServer {
             // Add a 'data' event handler to this instance of socket
             sock.on('data', (data) => {
                 // post data to a server so it can be saved and stuff
+                // console.info(data.toString());
                 this.handleData(data);
             });
 
@@ -59,12 +60,12 @@ export class JsonServer {
             lines[0] = this.restOfLine + lines[0];
         }
 
-        console.error(data.toString());
+        // console.error(data.toString());
 
 		for(var i = 0; i<lines.length - 1; i++){
             const j = JSON.parse(lines[i]);
             // this.debugRuntime.handleJson(j);
-            console.error("Json:", j);
+            // console.error("Json:", j);
             this.debugRuntime.handleJson2(j);
         }
         if(lines.length > 0){

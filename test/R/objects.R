@@ -2,6 +2,8 @@ options(vsc.trySilent = FALSE)
 
 options(error = traceback)
 
+options(vsc.matricesByRow = FALSE)
+
 # trace(.vsc.setVariable, tracer=browser)
 
 # NULL
@@ -110,3 +112,4 @@ main <- function() {
   fun(1, a = 1, b = x, y = l)
   browser()
 }
+
