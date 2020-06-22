@@ -4,12 +4,12 @@
 
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
-import { config, getRPath, escapeForRegex } from "./utils";
+import { config, escapeForRegex, getRStartupArguments } from "./utils";
 import { isUndefined } from 'util';
 
 import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequestArguments, InitializeRequest } from './debugProtocolModifications';
+import { InitializeRequestArguments, InitializeRequest, RStartupArguments } from './debugProtocolModifications';
 
 import { JsonServer } from './server';
 
@@ -39,16 +39,6 @@ export class DebugRuntime extends EventEmitter {
 		packageName: 'vscDebugger',
 		append: ' ### <v\\s\\c\\COMMAND>'
 	};
-
-	// delay in ms between polls when waiting for messages from R
-	readonly pollingDelay = 10;
-
-	// the directory in which to run the file
-	private cwd: string;
-
-	// maps from sourceFile to array of breakpoints
-	public breakOnErrorFromFile: boolean = true;
-	public breakOnErrorFromConsole: boolean = false;
 
 	private rSessionStartup = new Subject();
 	private rSessionReady: boolean = false;
@@ -146,13 +136,13 @@ export class DebugRuntime extends EventEmitter {
 		console.log(args);
 
 		// start R in child process
-		const rPath = await getRPath(); // read OS-specific R path from config
-		const rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
-		this.writeOutput('R Startup:\n' + JSON.stringify({path: rPath, arguments: rArgs}, undefined, 2));
+		const rStartupArguments: RStartupArguments = await getRStartupArguments();
+		rStartupArguments.logLevelCP = 4;
+		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
 		const thisDebugRuntime = this; // direct callback to this.handleLine() does not seem to work...
-		this.rSession = new RSession(rPath, rArgs, thisDebugRuntime);
+		this.rSession = new RSession(rStartupArguments, thisDebugRuntime);
 		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		if (!this.rSession.successTerminal) {
 			const message = 'Failed to spawn a child process!';
@@ -170,6 +160,7 @@ export class DebugRuntime extends EventEmitter {
 		if (this.rSessionReady) {
 			console.log("R Session Ready");
 		} else {
+			const rPath = rStartupArguments.path;
 			const message = 'R path not working:\n' + rPath;
 			await this.abortInitializeRequest(response, message);
 			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
@@ -370,22 +361,6 @@ export class DebugRuntime extends EventEmitter {
 		const id = j['id'];
 
 		this.handleJson2(body);
-
-		// switch(message){
-		// 	case 'response':
-		// 		// this.sendEvent('response', body);
-		// 		// if(body.reason = )
-		// 		break;
-		// 	case 'event':
-		// 		// this.sendEvent('event', body);
-		// 		if(body.body.reason === 'exception'){
-		// 			this.stdoutIsBrowserInfo = true;
-		// 			this.isCrashed = true;
-		// 			this.expectBrowser = true;
-		// 			this.debugState = 'function';
-		// 		}
-		// 		break;
-		// }
 	}
 
 	public handleJson2(json: any){
@@ -415,7 +390,9 @@ export class DebugRuntime extends EventEmitter {
 	// receive requests from the debugSession
 	public dispatchRequest(request: DebugProtocol.Request) {
 		// this.rSession.callFunction('.vsc.dispatchRequest', <anyRArgs><unknown>request);
-		this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
+		const json = JSON.stringify(request);
+		this.rSession.callFunction('.vsc.handleJson', {json: json});
+		// this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
 	}
 
 	// send event to the debugSession
@@ -424,8 +401,6 @@ export class DebugRuntime extends EventEmitter {
 			this.emit(event, ...args);
 		});
 	}
-
-
 
 
 

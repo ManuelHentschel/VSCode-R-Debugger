@@ -35,4 +35,4 @@ main <- function(){
   foo(2,3)
 }
 
-
+main()

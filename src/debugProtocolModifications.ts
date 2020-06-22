@@ -9,6 +9,16 @@ export enum DebugMode {
     Workspace = "workspace"
 }
 
+
+
+export interface RStartupArguments {
+    path: string;
+    args: string[];
+    logLevel?: number;
+    logLevelCP?: number;
+}
+
+
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
     // specify what to debug (required)
     debugMode: DebugMode;
