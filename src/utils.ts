@@ -54,10 +54,10 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
         rArgs = ['--ess', '--quiet', '--no-save'];
     } else if (platform === "darwin") {
         rpath = config().get<string>("rterm.mac", "");
-        rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
+        rArgs = ['--ess', '--quiet', '--interactive', '--no-save', '--no-echo'];
     } else if (platform === "linux") {
         rpath = config().get<string>("rterm.linux", "");
-        rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
+        rArgs = ['--ess', '--quiet', '--interactive', '--no-save', '--no-echo'];
     }
 
     if (rpath === "") {
