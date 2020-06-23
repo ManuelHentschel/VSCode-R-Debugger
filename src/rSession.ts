@@ -23,7 +23,8 @@ export type RFunctionName = (
     ".vsc.handleJson" |
     "tryCatch" |
     ".vsc.debugSource" |
-    "quit"
+    "quit" |
+    ".vsc.listenOnPort"
 );
 
 

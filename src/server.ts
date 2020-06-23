@@ -19,6 +19,7 @@ export class JsonServer {
     public server: net.Server;
     public restOfLine: string = "";
     public debugRuntime: DebugRuntime;
+    public socket: net.Socket;
     
     async makeServer(debugRuntime: DebugRuntime, host: string = '127.0.0.1', port: number = 0) {
         this.debugRuntime = debugRuntime;
@@ -33,15 +34,19 @@ export class JsonServer {
                 this.handleData(data);
             });
 
-
+            _this.socket = sock;
         });
+
         const serverReady = new Subject();
         this.server.listen(0, this.host, function () {
             serverReady.notify();
         });
 
+        // this.socket.on('data', this.handleData);
+
         await serverReady.wait(1000);
 
+        // const address = this.socket.address();
         const address = this.server.address();
         if (typeof address === 'string' || address === undefined) {
             this.port = 0;

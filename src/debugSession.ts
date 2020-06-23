@@ -17,6 +17,7 @@ import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments } from './debugProtocolModifications';
+import { config } from './utils';
 
 export class DebugSession extends ProtocolServer {
 
@@ -28,7 +29,7 @@ export class DebugSession extends ProtocolServer {
 
 
     sendResponse(response: DebugProtocol.Response): void {
-        console.log("reponse " + response.request_seq + ": " + response.command, response);
+        console.log("response " + response.request_seq + ": " + response.command, response);
 		super.sendResponse(response);
     }
     
@@ -101,7 +102,7 @@ export class DebugSession extends ProtocolServer {
             switch(request.command){
                 case 'initialize':
                     const initializeArguments: InitializeRequestArguments = request.arguments || {};
-                    initializeArguments.useServer = true;
+                    initializeArguments.useServer = config().get<boolean>('useServer', true);
                     initializeArguments.threadId = this.THREAD_ID;
                     const initializeRequest: InitializeRequest = {
                         arguments: initializeArguments,

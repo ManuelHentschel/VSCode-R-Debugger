@@ -389,11 +389,24 @@ export class DebugRuntime extends EventEmitter {
 
 	// receive requests from the debugSession
 	public dispatchRequest(request: DebugProtocol.Request) {
-		// this.rSession.callFunction('.vsc.dispatchRequest', <anyRArgs><unknown>request);
 		const json = JSON.stringify(request);
 		this.rSession.callFunction('.vsc.handleJson', {json: json});
-		// this.rSession.callFunction('.vsc.dispatchRequest', {request: request});
 	}
+
+	// // This version dispatches requests to the tcp connection instead of stdin
+	// // Is not yet working properly. Current problems/todos:
+	// //  - Some requests not handled by R (step, stepIn, stepOut, ...)
+	// //  - .vsc.listenOnPort needs to be called everytime the prompt is shown
+	// //    Is possible using addTaskCallback, but this does not work e.g. when stepping through code
+	//
+	// public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = false) {
+	// 	if(this.jsonServer.socket && usePort){
+	// 		this.jsonServer.socket.write(json + '\n');
+	// 	} else{
+	// 		this.rSession.callFunction('.vsc.handleJson', {json: json});
+	// 		this.rSession.callFunction('.vsc.listenOnPort', {timeout: 3});
+	// 	}
+	// }
 
 	// send event to the debugSession
 	private sendEvent(event: string, ... args: any[]) {
