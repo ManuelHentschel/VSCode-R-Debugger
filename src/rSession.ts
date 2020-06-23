@@ -34,7 +34,7 @@ export class RSession {
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 4;
+    public readonly logLevelCP: number = 3;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
