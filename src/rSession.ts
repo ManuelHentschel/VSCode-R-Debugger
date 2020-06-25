@@ -3,6 +3,7 @@
 import * as child from 'child_process';
 import { TextDecoder } from 'util';
 import { DebugRuntime } from'./debugRuntime';
+import { RStartupArguments } from './debugProtocolModifications';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -14,6 +15,18 @@ export type namedRArgs = {[arg:string]: unnamedRArg|rList};
 export type rList = (unnamedRArgs|namedRArgs);
 export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
 
+// this is only typed to avoid typos in the function names
+export type RFunctionName = (
+    ".vsc.dispatchRequest" |
+    "cat" |
+    "print" |
+    ".vsc.handleJson" |
+    "tryCatch" |
+    ".vsc.debugSource" |
+    "quit" |
+    ".vsc.listenOnPort"
+);
+
 
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
@@ -21,7 +34,7 @@ export class RSession {
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 4;
+    public readonly logLevelCP: number = 3;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
@@ -32,21 +45,18 @@ export class RSession {
     private restOfStdout: string='';
 
 
-    constructor(rPath: string, cwd: string, rArgs: string[]=[],
-        // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
-        debugRuntime: DebugRuntime,
-        logLevel=undefined, logLevelCP=undefined)
+    // constructor(rPath: string, rArgs: string[]=[],
+    //     // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
+    //     debugRuntime: DebugRuntime,
+    //     logLevel=undefined, logLevelCP=undefined)
+    constructor(args: RStartupArguments, debugRuntime: DebugRuntime)
     {
         // spawn new terminal process (necessary for interactive R session)
 
-        if(!logLevel === undefined){
-            this.logLevel = logLevel;
-        }
-        if(!logLevelCP === undefined){
-            this.logLevelCP = logLevelCP;
-        }
+        this.logLevel = args.logLevel || this.logLevel;
+        this.logLevelCP = args.logLevelCP || this.logLevelCP;
 
-        this.cp = spawnRProcess(rPath, cwd, rArgs, this.logLevelCP);
+        this.cp = spawnRProcess(args);
 
         if(this.cp.pid === undefined){
             this.successTerminal = false;
@@ -123,7 +133,7 @@ export class RSession {
 
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: string, args: any|anyRArgs=[], args2: anyRArgs=[],
+    public callFunction(fnc: RFunctionName, args: any|anyRArgs=[], args2: anyRArgs=[],
         escapeStrings: boolean=true, library: string = this.defaultLibrary,
         force:boolean=false, append: string = this.defaultAppend
     ){
@@ -303,9 +313,8 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
 /////////////////////////////////
 // Child Process
 
-function spawnRProcess(rPath: string, cwd: string, rArgs: string[] = [], logLevel=3){
+function spawnRProcess(args: RStartupArguments){
     const options = {
-        cwd: cwd,
         env: {
             VSCODE_DEBUG_SESSION: "1",
             ...process.env
@@ -313,8 +322,12 @@ function spawnRProcess(rPath: string, cwd: string, rArgs: string[] = [], logLeve
         shell: true
     };
 
+    const rPath = args.path;
+    const rArgs = args.args;
+
     const cp = child.spawn(rPath, rArgs, options);
 
+    const logLevel = args.logLevelCP || 0;
     // log output to console.log:
     if(logLevel>=4){
         cp.stdout.on("data", data => {

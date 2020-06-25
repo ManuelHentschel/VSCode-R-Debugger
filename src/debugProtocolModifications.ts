@@ -9,6 +9,16 @@ export enum DebugMode {
     Workspace = "workspace"
 }
 
+
+
+export interface RStartupArguments {
+    path: string;
+    args: string[];
+    logLevel?: number;
+    logLevelCP?: number;
+}
+
+
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
     // specify what to debug (required)
     debugMode: DebugMode;
@@ -63,6 +73,9 @@ export interface RStrings {
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
+    host?: string;
+    port?: number;
+    useServer?: boolean;
 }
 
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {
