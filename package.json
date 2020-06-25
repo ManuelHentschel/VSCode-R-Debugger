@@ -199,12 +199,18 @@
         "rdebugger.startupTimeout": {
           "type": "number",
           "default": 2000,
-          "description": "The maximum time in ms that is waited for R to startup"
+          "description": "The maximum time in ms that is waited for R to startup."
         },
-        "rdebugger.printEverything": {
+        "rdebugger.printStderr": {
           "type": "boolean",
-          "default": false,
-          "description": "For debugging the debugger: Whether to show everything printed to stdoutor stderr by the child process. Recommended to set debug.console.wordWrap=false"
+          "default": true,
+          "description": "Whether to print stderr to the debug console."
+        },
+        "rdebugger.printStdout": {
+          "type": "string",
+          "enum": ["all", "filtered", "nothing"],
+          "default": "filtered",
+          "description": "How much of stdout to print to the debug console."
         }
       }
     }
