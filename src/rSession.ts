@@ -3,17 +3,15 @@
 import * as child from 'child_process';
 import { TextDecoder } from 'util';
 import { DebugRuntime } from'./debugRuntime';
-import { RStartupArguments } from './debugProtocolModifications';
+import { RStartupArguments, DataSource } from './debugProtocolModifications';
+import { makeFunctionCall, anyRArgs  } from './rUtils';
+import * as net from 'net';
+const { Subject } = require('await-notify');
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export type unnamedRArg = (number|string|boolean|undefined);
-export type unnamedRArgs = (unnamedRArg|rList)[];
-export type namedRArgs = {[arg:string]: unnamedRArg|rList};
-export type rList = (unnamedRArgs|namedRArgs);
-export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
 
 // this is only typed to avoid typos in the function names
 export type RFunctionName = (
@@ -34,22 +32,36 @@ export class RSession {
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
     public logLevel: number = 3;
-    public readonly logLevelCP: number = 3;
+    public logLevelCP: number = 3;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
-    public readonly successTerminal: boolean = false;
+    public successTerminal: boolean = false;
     public ignoreOutput: boolean=false;
-    public readonly debugRuntime: DebugRuntime;
+    public debugRuntime: DebugRuntime;
     private restOfStderr: string='';
     private restOfStdout: string='';
+    private handleLine: (line: string, from: DataSource, isFullLine: boolean) => string;
+    private handleJsonString: (j: string, from: DataSource, isFullLine: boolean) => string;
+    public jsonSocket: net.Socket;
+    public sinkSocket: net.Socket;
+    public jsonServer: net.Server;
+    public sinkServer: net.Server;
+    public host: string = 'localhost';
+    public jsonPort: number = -1;
+    public sinkPort: number = -1;
+
+    // private restOfLine: Record<DataSource, string>;
+    private restOfLine: {[k in DataSource]?: string} = {};
 
 
     // constructor(rPath: string, rArgs: string[]=[],
     //     // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
     //     debugRuntime: DebugRuntime,
     //     logLevel=undefined, logLevelCP=undefined)
-    constructor(args: RStartupArguments, debugRuntime: DebugRuntime)
+    constructor(){};
+    
+    public async startR(args: RStartupArguments, debugRuntime: DebugRuntime)
     {
         // spawn new terminal process (necessary for interactive R session)
 
@@ -66,14 +78,58 @@ export class RSession {
         // store line handler
         // is only used for debugRuntim.handleLine()
         this.debugRuntime = debugRuntime;
+        // this.handleLine = debugRuntime.handleLine;
+        this.handleLine = (line, from, isFullLine) => debugRuntime.handleLine(line, from, isFullLine);
+        // this.handleJsonString = debugRuntime.handleJson;
+        this.handleJsonString = (j, from, isFullLine) => debugRuntime.handleJsonString(j, from, isFullLine);
 
 		// handle output from the R-process
 		this.cp.stdout.on("data", data => {
-			this.handleData(data, false);
+			this.handleData(data, "stdout");
 		});
 		this.cp.stderr.on("data", data => {
-			this.handleData(data, true);
-		});
+			this.handleData(data, "stderr");
+        });
+
+        const useJsonServer: boolean = args.useJsonServer || false;
+        const useSinkServer: boolean = args.useSinkServer || false;
+
+        const jsonPort = args.jsonPort || 0;
+        const sinkPort = args.sinkPort || 0;
+
+        const jsonServerReady = new Subject();
+        const sinkServerReady = new Subject();
+
+        if(useJsonServer && jsonPort>=0){
+            const server = net.createServer((socket) => {
+                socket.on('data', (data) => {
+                    this.handleData(data, 'jsonSocket');
+                });
+                this.jsonSocket = socket;
+            });
+            server.listen(jsonPort, this.host, () => {
+                this.jsonPort = getPortNumber(server);
+                jsonServerReady.notify();
+            });
+            this.jsonServer = server;
+        }
+
+        if(useSinkServer && sinkPort>=0){
+            const server = net.createServer((socket) => {
+                socket.on('data', (data) => {
+                    this.handleData(data, 'sinkSocket');
+                });
+                this.sinkSocket = socket;
+            });
+            server.listen(jsonPort, this.host, () => {
+                this.sinkPort = getPortNumber(server);
+                sinkServerReady.notify();
+            });
+            this.sinkServer = server;
+        }
+
+        await jsonServerReady.wait(1000);
+        await sinkServerReady.wait(1000);
 
 
         this.successTerminal = true;
@@ -147,167 +203,97 @@ export class RSession {
         this.cp.kill('SIGKILL');
     }
 
-    public async handleData(data: any, fromStderr: boolean = false){
-		// handles output from the R child process
-		// splits cp.stdout into lines / waits for complete lines
-		// calls handleLine() on each line
+    public handleData(data: Buffer, from: DataSource){
+        var s = data.toString();
+        s = s.replace(/\r/g,''); //keep only \n as linebreak
 
-		const dec = new TextDecoder;
-		var s = dec.decode(data);
-		s = s.replace(/\r/g,''); //keep only \n as linebreak
+        console.log("Handle data from " + from + ":", {data: s});
 
-		// join with rest text from previous call(s)
-		if(fromStderr){
-			s = this.restOfStderr + s;
-			this.restOfStderr = "";
-		} else {
-			s = this.restOfStdout + s;
-			this.restOfStdout = "";
-		}
+        s = (this.restOfLine[from] || "") + s;
 
-		// split into lines
-		const lines = s.split(/\n/);
-
-		// handle all the complete lines
-		for(var i = 0; i<lines.length - 1; i++){
+        const lines = s.split(/\n/);
+        
+        for(var i = 0; i<lines.length; i++){
 			// abort output handling if ignoreOutput has been set to true
 			// used to avoid handling remaining output after debugging has been stopped
-            if(this.ignoreOutput){ return; }
-			this.debugRuntime.handleLine(lines[i], fromStderr, true);
-		}
-
-		if(lines.length > 0) {
-			// abort output handling if ignoreOutput has been set to true
-			if(this.ignoreOutput){ return; }
-
-			// calls this.handleLine on the remainder of the last line
-			// necessary, since e.g. an input prompt does not send a newline
-			// handleLine returns the parts of a line that were not 'understood'
-			const remainingText = await this.debugRuntime.handleLine(lines[lines.length - 1], fromStderr, false);
-			
-			// remember parts that were no understood for next call
-			if(fromStderr){
-				this.restOfStderr = remainingText;
-			} else {
-				this.restOfStdout = remainingText;
-			}
-		}
-    }
-}
-
-
-
-/////////////////////////////////////////////////
-// Construction of R function calls
-
-export function makeFunctionCall(
-    fnc: string, args: anyRArgs=[], args2: anyRArgs=[],
-    escapeStrings: boolean=true, library: string = '', append: string = ''
-): string{
-    // args and args2 are handled identically and only necessary when combining named and unnamed arguments
-    args = convertToUnnamedArgs(convertArgsToStrings(args, escapeStrings));
-    args2 = convertToUnnamedArgs(convertArgsToStrings(args2, escapeStrings));
-    args = args.concat(args2);
-    const argString = args.join(',');
-
-    if(library !== ''){
-        library = library + '::';
-    }
-
-    // construct and execute function-call
-    const cmd = library + fnc + '(' + argString + ')' + append;
-    return cmd;
-}
-
-function convertArgsToStrings(args:anyRArgs=[], escapeStrings:boolean = false): anyRArgs {
-    // Recursively converts all atomic arguments to strings, without changing the structure of arrays/lists
-    if(Array.isArray(args)){
-        //unnamedRArgs
-        args = args.map((arg) => convertArgsToStrings(arg, escapeStrings));
-    } else if(args!==null && typeof args === 'object'){
-        //namedRArgs
-        const ret = {};
-        for(const arg in <namedRArgs>args){
-            if(arg.substr(0,2)==='__'){
-                console.warn('Ignoring argument: ' + arg);
-            } else{
-                ret[arg] = convertArgsToStrings(args[arg], escapeStrings);
+            if(this.ignoreOutput){
+                return;
             }
+            const isLastLine = i === lines.length-1;
+            const line = lines[i];
+            var restOfLine: string = "";
+            if(isLastLine && line===""){
+                restOfLine = "";
+            } else if(from === "jsonSocket"){
+                restOfLine = this.handleJsonString(lines[i], from, !isLastLine);
+            } else{
+                restOfLine = this.handleLine(lines[i], from, !isLastLine);
+            }
+            this.restOfLine[from] = restOfLine;
         }
-        args = ret;
-    } else if(args === undefined){
-        //undefined
-        args = 'NULL';
-    } else if(typeof args === 'boolean'){
-        //boolean
-        if(args){
-            args = 'TRUE';
-        } else{
-            args = 'FALSE';
-        }
-    } else if(typeof args === 'number'){
-        //number
-        args = '' + args;
+    }
+
+
+
+    // public async handleData2(data: any, fromStderr: boolean = false){
+	// 	// handles output from the R child process
+	// 	// splits cp.stdout into lines / waits for complete lines
+	// 	// calls handleLine() on each line
+
+	// 	const dec = new TextDecoder;
+	// 	var s = dec.decode(data);
+	// 	s = s.replace(/\r/g,''); //keep only \n as linebreak
+
+	// 	// join with rest text from previous call(s)
+	// 	if(fromStderr){
+	// 		s = this.restOfStderr + s;
+	// 		this.restOfStderr = "";
+	// 	} else {
+	// 		s = this.restOfStdout + s;
+	// 		this.restOfStdout = "";
+	// 	}
+
+	// 	// split into lines
+	// 	const lines = s.split(/\n/);
+
+	// 	// handle all the complete lines
+	// 	for(var i = 0; i<lines.length - 1; i++){
+	// 		// abort output handling if ignoreOutput has been set to true
+	// 		// used to avoid handling remaining output after debugging has been stopped
+    //         if(this.ignoreOutput){ return; }
+	// 		this.debugRuntime.handleLine(lines[i], fromStderr, true);
+	// 	}
+
+	// 	if(lines.length > 0) {
+	// 		// abort output handling if ignoreOutput has been set to true
+	// 		if(this.ignoreOutput){ return; }
+
+	// 		// calls this.handleLine on the remainder of the last line
+	// 		// necessary, since e.g. an input prompt does not send a newline
+	// 		// handleLine returns the parts of a line that were not 'understood'
+	// 		const remainingText = await this.debugRuntime.handleLine(lines[lines.length - 1], fromStderr, false);
+			
+	// 		// remember parts that were no understood for next call
+	// 		if(fromStderr){
+	// 			this.restOfStderr = remainingText;
+	// 		} else {
+	// 			this.restOfStdout = remainingText;
+	// 		}
+	// 	}
+    // }
+}
+
+
+
+
+function getPortNumber(server: net.Server){
+    const address = server.address();
+    if (typeof address === 'string' || address === undefined) {
+        return -1;
     } else {
-        //string
-        if(escapeStrings){
-            args = escapeStringForR(<string>args);
-        }
-    }
-    return(args);
-}
-
-export function escapeStringForR(s: string, quote: string='"') {
-    if (s === undefined) {
-        return "NULL";
-    } else {
-        return(
-            quote
-            + s.replace(/\\/g, "\\\\")
-                .replace(RegExp(quote, "g"), `\\${quote}`)
-                .replace(/\n/g, "\\n")
-                // .replace(/\r/g, "\\r")
-                .replace(/\r/g, "")
-                .replace(/\t/g, "\\t")
-                .replace(/\f/g, "\\f")
-                .replace(/\v/g, "\\v")
-            + quote);
+        return address.port;
     }
 }
-
-function convertToUnnamedArgs(args: anyRArgs): unnamedRArgs{
-    // converts anyRArgs to unnamed args by recursively converting named args "{key: arg}" to "key=arg"
-    var ret: unnamedRArgs;
-    if(Array.isArray(args)){
-        // might be a nested list -> call recursively
-        ret = args.map(convertToUnnamedArg);
-    } else if(args!==null && typeof args === 'object'){
-        ret = [];
-        for(const arg in <namedRArgs>args){
-            // again, each args[arg] might be a list itself
-            ret.push(arg + '=' + convertToUnnamedArg(args[arg]));
-        }
-    } else{
-        ret = [<unnamedRArg>args];
-    }
-    return ret;
-}
-
-function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
-    // recursively converts an array of arguments to a single argument by turning it into a call to base::list()
-    var ret: unnamedRArg;
-    if(Array.isArray(arg)){
-        // is rList
-        ret = makeFunctionCall('list', arg, [], false,'base', '');
-    } else if(arg!==null && typeof arg === 'object'){
-        ret = makeFunctionCall('list', arg, [], false, 'base', '');
-    } else{
-        ret = <unnamedRArg>arg;
-    }
-    return ret;
-}
-
-
 
 
 /////////////////////////////////
