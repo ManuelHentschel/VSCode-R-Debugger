@@ -129,7 +129,7 @@ export class DebugRuntime extends EventEmitter {
 		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
 		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
 		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
-		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'all');
+		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
 
 		// print some info about the rSession
