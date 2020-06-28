@@ -5,7 +5,7 @@ l <- list(1,2,3)
 asdf <- 'qwer'
 
 print("This will be printed with debugMode==file or debugMode==function")
-print("A breakpoint here should work with debugMode==file or from .vsc.debugSource()")
+base::print("A breakpoint here should work with debugMode==file or from .vsc.debugSource()")
 print("A breakpoint here should NOT work with debugMode==function")
 
 
@@ -31,8 +31,6 @@ main <- function(){
   a <- 1
   b <- 2
   l <- list(a=1, b=2, c=3)
-  print("This should only be printed if debugMode==function or main() was entered into the debug console")
+  base::print("This should only be printed if debugMode==function or main() was entered into the debug console")
   foo(2,3)
 }
-
-main()

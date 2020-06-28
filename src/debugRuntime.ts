@@ -7,11 +7,11 @@ import * as vscode from 'vscode';
 import { config, escapeForRegex, getRStartupArguments } from "./utils";
 import { isUndefined } from 'util';
 
-import { RSession, makeFunctionCall, anyRArgs, escapeStringForR } from './rSession';
+import { RSession } from './rSession';
+import { makeFunctionCall, anyRArgs } from './rUtils';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequestArguments, InitializeRequest, RStartupArguments } from './debugProtocolModifications';
+import { InitializeRequestArguments, InitializeRequest, RStartupArguments, DataSource, OutputMode } from './debugProtocolModifications';
 
-import { JsonServer } from './server';
 
 const { Subject } = require('await-notify');
 // import { Subject } from 'await-notify';
@@ -41,13 +41,14 @@ export class DebugRuntime extends EventEmitter {
 	};
 
 	private rSessionStartup = new Subject();
-	private rSessionReady: boolean = false;
 
 	private rPackageStartup = new Subject();
-	private rPackageFound: boolean = false;
+
+	private initArgs: InitializeRequestArguments;
 
 	// debugging
 	private logLevel = 3;
+	private logLevelCp = 3;
 
 	// The rSession used to run the code
 	public rSession: RSession;
@@ -56,13 +57,12 @@ export class DebugRuntime extends EventEmitter {
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
 	private waitBetweenRCommands: number = 0;
 
-	public host = '127.0.0.1';
+	public host = 'localhost';
 	public port: number = 0;
-	public jsonServer: JsonServer;
 
 	// state info about the R session
-	private hasStartedR: boolean = false; // is set to true after executing the first R command successfully
-	private isRunningCustomCode: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
+	private rSessionReady: boolean = false; // is set to true after executing the first R command successfully
+	private rPackageFound: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
 	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
 	private isCrashed: boolean = false; // is set to true upon encountering an error (in R)
 	private expectBrowser: boolean = false; // is set to true if a known breakpoint is encountered (indicated by "tracing...")
@@ -76,6 +76,7 @@ export class DebugRuntime extends EventEmitter {
 	// debugMode
 	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
+	private outputModes: {[key in DataSource]?: OutputMode} = {};
 
 
 
@@ -87,24 +88,23 @@ export class DebugRuntime extends EventEmitter {
 
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: InitializeRequest) {
 
-		const debugRuntime = this;
-		// launch server
-		if(args.useServer){
-			this.jsonServer = new JsonServer();
-			await this.jsonServer.makeServer(debugRuntime, this.host, this.port);
-			this.host = this.jsonServer.host;
-			this.port = this.jsonServer.port;
+		// const debugRuntime = this;
+		// // launch server
+		// if(args.useServer){
+		// 	await this.jsonServer.makeServer(debugRuntime, this.host, this.port);
+		// 	this.host = this.jsonServer.host;
+		// 	this.port = this.jsonServer.port;
 
-			if(this.jsonServer.port > 0){
-				args.useServer = true;
-				args.host = this.jsonServer.host;
-				args.port = this.jsonServer.port;
-			} else{
-				args.useServer = false;
-			}
-		} else{
-			args.useServer = false;
-		}
+		// 	if(this.jsonServer.port > 0){
+		// 		args.useServer = true;
+		// 		args.host = this.jsonServer.host;
+		// 		args.port = this.jsonServer.port;
+		// 	} else{
+		// 		args.useServer = false;
+		// 	}
+		// } else{
+		// 	args.useServer = false;
+		// }
 
 
 		// LAUNCH R PROCESS
@@ -127,28 +127,47 @@ export class DebugRuntime extends EventEmitter {
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
 		this.debugPrintEverything = config().get<boolean>('printEverything', this.debugPrintEverything);
 		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
+		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
+		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
+		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
 		this.startOutputGroup('Starting R session...', true);
-		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
-		console.log(args);
 
 		// start R in child process
 		const rStartupArguments: RStartupArguments = await getRStartupArguments();
-		rStartupArguments.logLevelCP = 4;
+		rStartupArguments.useJsonServer = args.useJsonServer;
+		rStartupArguments.useSinkServer = args.useSinkServer;
+		rStartupArguments.logLevelCP = this.logLevelCp;
 		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
 		const thisDebugRuntime = this; // direct callback to this.handleLine() does not seem to work...
-		this.rSession = new RSession(rStartupArguments, thisDebugRuntime);
-		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
+		this.rSession = new RSession();
+		await this.rSession.startR(rStartupArguments, thisDebugRuntime);
 		if (!this.rSession.successTerminal) {
 			const message = 'Failed to spawn a child process!';
 			await this.abortInitializeRequest(response, message);
 			return false;
 		}
+
+		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
+
+		args.useJsonServer = this.rSession.jsonPort > 0;
+		if(args.useJsonServer){
+			args.jsonHost = this.rSession.host;
+			args.jsonPort = this.rSession.jsonPort;
+		}
+
+		args.useSinkServer = this.rSession.sinkPort > 0;
+		if(args.useSinkServer){
+			args.sinkHost = this.rSession.host;
+			args.sinkPort = this.rSession.sinkPort;
+		}
+
+		this.initArgs = args;
 
 		// CHECK IF R HAS STARTED
 
@@ -183,6 +202,9 @@ export class DebugRuntime extends EventEmitter {
 		// all R function calls from here on are (by default) meant for functions from the vsc-extension:
 		this.rSession.defaultLibrary = this.rStrings.packageName;
 		this.rSession.defaultAppend = this.rStrings.append;
+
+		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
+		console.log(args);
 
 		request.arguments = args;
 		this.dispatchRequest(request);
@@ -219,17 +241,28 @@ export class DebugRuntime extends EventEmitter {
 	// Output-handlers: (for output of the R process to stdout/stderr)
 	//////////
 
-	public async handleLine(line: string, fromStderr = false, isFullLine = true) {
+	public handleLine(line: string, from: DataSource, isFullLine: boolean): string {
 		// handle output from the R process line by line
 		// is called by rSession.handleData()
 
-		// make copy of line for debugging
-		if(this.debugPrintEverything){
-			this.writeOutput(line, isFullLine, fromStderr);
+		const line0 = line;
+
+		const isStderr = (from === "stderr");
+		const outputMode = this.outputModes[from] || "all";
+
+		var isSink: boolean;
+		var isStdout: boolean;
+		if(this.initArgs.useSinkServer){
+			isSink = from === "sinkSocket";
+			isStdout = from === "stdout";
+
+		} else{
+			isSink = (from === "sinkSocket") || (from === "stdout");
+			isStdout = isSink;
 		}
 
 		// only show the line to the user if it is complete & relevant
-		var showLine = isFullLine && !this.stdoutIsBrowserInfo;
+		var showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
 
 		// filter out info meant for vsc:
 		const jsonRegex = new RegExp(escapeForRegex(this.rStrings.delimiter0) + '(.*)' + escapeForRegex(this.rStrings.delimiter1) + '$');
@@ -238,109 +271,128 @@ export class DebugRuntime extends EventEmitter {
 			// is meant for the debugger, not the user
 			this.rPackageFound = true;
 			this.rPackageStartup.notify();
-			this.handleJson(jsonMatch[1]);
+			this.handleJsonString(jsonMatch[1]);
 			line = line.replace(jsonRegex, '');
 		}
 
+		// differentiate data source. Is non exclusive, in case sinkServer is not used
+		if(isStdout){
+			if(!this.rPackageFound && isFullLine){
+				// This message is only sent once to verify that R has started
+				// Check for R-Startup message
+				if(RegExp(escapeForRegex(this.rStrings.startup)).test(line)){
+					this.rSessionReady = true;
+					this.rSessionStartup.notify();
+					this.rSessionReady = true;
+				}
+				// This message is sent only if loading the R package throws an error
+				// Check for Library-Not-Found-Message
+				if(RegExp(escapeForRegex(this.rStrings.libraryNotFound)).test(line)){
+					this.rPackageFound = false;
+					this.rPackageStartup.notify();
+				}
+			} else {
+				// Check for browser prompt
+				const browserRegex = /Browse\[\d+\]> /;
+				if(browserRegex.test(line)){
+					// R has entered the browser
+					this.debugState = 'function';
+					line = line.replace(browserRegex,'');
+					showLine = false;
+					this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
+					if(!this.expectBrowser){
+						// unexpected breakpoint:
+						this.hitBreakpoint(false);
+					}
+					console.log('matches: browser prompt');
+					this.rSession.showsPrompt();
+				} 
 
 
-		// Check for R-Startup message
-		if(!this.isRunningCustomCode && RegExp(escapeForRegex(this.rStrings.startup)).test(line)){
-			this.rSessionReady = true;
-			this.rSessionStartup.notify();
-			this.hasStartedR = true;
-		}
-		// Check for Library-Not-Found-Message
-		if(!this.isRunningCustomCode && RegExp(escapeForRegex(this.rStrings.libraryNotFound)).test(line)){
-			this.rPackageFound = false;
-			this.rPackageStartup.notify();
-		}
+				// identify echo of browser commands sent by vsc
+				if(isFullLine && /^[ncsfQ]$/.test(line)) {
+					// commands used to control the browser
+					console.log('matches: [ncsfQ]');
+					showLine = false;
+				}
+
+				// matches echo of calls made by the debugger
+				const echoRegex = new RegExp(escapeForRegex(this.rStrings.append) + '$');
+				if(isFullLine && echoRegex.test(line)){
+					// line = line.replace(echoRegex, '');
+					showLine = false;
+					console.log('matches: echo');
+				}
 
 
-		// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
-		const tracingInfoRegex = /Tracing (.*)step.*$/;
-		if(isFullLine && tracingInfoRegex.test(line)){
-			// showLine = false;
-			line = line.replace(tracingInfoRegex, '');
-			this.stdoutIsBrowserInfo = true;
-			this.expectBrowser = true;
-			this.hitBreakpoint(true);
-		}
+				// check for prompt
+				const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
+				if (promptRegex.test(line) && isFullLine) {
+					if(this.isCrashed && !this.allowGlobalDebugging){
+						this.terminate();
+					} else{
+						console.log("matches: prompt");
+						this.debugState = 'global';
+						this.rSession.showsPrompt();
+						// this.endOutputGroup();
+						this.expectBrowser = false;
+						showLine = false;
+					}
+					line = '';
+				}
 
-		// filter out additional browser info:
-		const browserInfoRegex = /(?:debug:|exiting from|debugging|Called from|debug at):? .*$/;
-		if(isFullLine && (browserInfoRegex.test(line))){
-			// showLine = false; // part of browser-info
-			line = line.replace(browserInfoRegex, '');
-			this.stdoutIsBrowserInfo = true;
-		}
-
-		// Check for browser prompt
-		const browserRegex = /Browse\[\d+\]> /;
-		if(browserRegex.test(line)){
-			// R has entered the browser
-			this.debugState = 'function';
-			line = line.replace(browserRegex,'');
-			showLine = false;
-			this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
-			if(!this.expectBrowser){
-				// unexpected breakpoint:
-				this.hitBreakpoint(false);
+				// check for continue prompt
+				const continueRegex = new RegExp(escapeForRegex(this.rStrings.continue));
+				if(continueRegex.test(line) && isFullLine){
+					console.log("matches: continue prompt");
+					this.writeOutput("...");
+					showLine = false;
+				}
 			}
-			console.log('matches: browser prompt');
-			this.rSession.showsPrompt();
-		} 
-
-
-		// identify echo of browser commands sent by vsc
-		if(isFullLine && /^[ncsfQ]$/.test(line)) {
-			// commands used to control the browser
-			console.log('matches: [ncsfQ]');
-			showLine = false;
 		}
-
-		// matches echo of calls made by the debugger
-		const echoRegex = new RegExp(escapeForRegex(this.rStrings.append) + '$');
-		if(isFullLine && echoRegex.test(line)){
-			// line = line.replace(echoRegex, '');
-			showLine = false;
-			console.log('matches: echo');
-		}
-
-
-		// check for prompt
-		const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
-		if (promptRegex.test(line) && isFullLine) {
-			if(this.isCrashed && !this.allowGlobalDebugging){
-				this.terminate();
-			} else{
-				console.log("matches: prompt");
-				this.debugState = 'global';
-				this.rSession.showsPrompt();
-				// this.endOutputGroup();
-				this.expectBrowser = false;
-				showLine = false;
+		
+		if(isSink){
+			// contains 'normal' output
+			// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
+			const tracingInfoRegex = /Tracing (.*)step.*$/;
+			if(isFullLine && tracingInfoRegex.test(line)){
+				// showLine = false;
+				line = line.replace(tracingInfoRegex, '');
+				this.stdoutIsBrowserInfo = true;
+				this.expectBrowser = true;
+				this.hitBreakpoint(true);
 			}
-			line = '';
+
+			// filter out additional browser info:
+			const browserInfoRegex = /(?:debug:|exiting from|debugging|Called from|debug at):? .*$/;
+			if(isFullLine && (browserInfoRegex.test(line))){
+				// showLine = false; // part of browser-info
+				line = line.replace(browserInfoRegex, '');
+				this.stdoutIsBrowserInfo = true;
+			}
 		}
 
-		// check for continue prompt
-		const continueRegex = new RegExp(escapeForRegex(this.rStrings.continue));
-		if(continueRegex.test(line) && isFullLine){
-			console.log("matches: continue prompt");
-			this.writeOutput("...");
-			showLine = false;
-		}
-
-		// check for StdErr (show everything):
-		if(fromStderr){
+		if(isStderr){
 			showLine = true;
 		}
 
-		// output any part of the line that was not parsed
-		if(!this.debugPrintEverything && showLine && line.length>0){
-			this.writeOutput(line, isFullLine, fromStderr);
+		// determine if/what part of line is printed
+		var lineOut: string;
+		if(outputMode === "all"){
+			lineOut = line0;
+			line = "";
+		} else if(showLine && outputMode === "filtered"){
+			lineOut = line;
+		} else{
+			lineOut = "";
 		}
+
+		// output line
+		if(lineOut.length>0){
+			this.writeOutput(lineOut, isFullLine, isStderr);
+		}
+
+		// if line is shown it counts as handled
 		if(showLine){
 			line = '';
 		}
@@ -349,21 +401,17 @@ export class DebugRuntime extends EventEmitter {
 
 
 
-	public async handleJson(json: string){
-		// handles the json that is printed by .vsc.sendToVsc()
-		// is called by this.handleLine() if the line contains a json enclosed by this.delimiter0 and this.delimiter1
-		// TODO: send json via separate pipe?
-
-		// jsons are of the form: {message: string; body: any; id: number}
-		const j = JSON.parse(json);
-		const message = j['message'];
-		const body = j['body'];
-		const id = j['id'];
-
-		this.handleJson2(body);
+	public handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true){
+		if(!isFullLine){
+			return json;
+		} else{
+			const j = JSON.parse(json);
+			this.handleJson(j);
+			return "";
+		}
 	}
 
-	public handleJson2(json: any){
+	public handleJson(json: any){
 		if(!this.rPackageFound){
 			this.rPackageFound = true;
 			this.rPackageStartup.notify();
@@ -400,8 +448,8 @@ export class DebugRuntime extends EventEmitter {
 	// //    Is possible using addTaskCallback, but this does not work e.g. when stepping through code
 	//
 	// public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = false) {
-	// 	if(this.jsonServer.socket && usePort){
-	// 		this.jsonServer.socket.write(json + '\n');
+	// 	if(this.jsonServer.jsonSocket && usePort){
+	// 		this.jsonServer.jsonSocket.write(json + '\n');
 	// 	} else{
 	// 		this.rSession.callFunction('.vsc.handleJson', {json: json});
 	// 		this.rSession.callFunction('.vsc.listenOnPort', {timeout: 3});
@@ -531,7 +579,6 @@ export class DebugRuntime extends EventEmitter {
 	public killR(): void {
 		if(this.rSession){
 			this.rSession.ignoreOutput = true;
-			this.isRunningCustomCode = false;
 			this.rSession.clearQueue();
 			this.rSession.killChildProcess();
 			// this.sendEvent('end');
@@ -540,7 +587,6 @@ export class DebugRuntime extends EventEmitter {
 
 	public terminateFromPrompt(): void {
 		this.rSession.ignoreOutput = true;
-		this.isRunningCustomCode = false;
 		this.rSession.clearQueue();
 		if(this.debugState === 'function'){
 			this.rSession.runCommand('Q', [], true);
@@ -571,7 +617,6 @@ export class DebugRuntime extends EventEmitter {
 
 	public terminate(ignoreOutput: boolean = true): void {
 		this.rSession.ignoreOutput = ignoreOutput;
-		this.isRunningCustomCode = false;
 		this.rSession.clearQueue();
 		this.rSession.killChildProcess();
 		this.sendEvent('end');

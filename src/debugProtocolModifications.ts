@@ -10,12 +10,18 @@ export enum DebugMode {
 }
 
 
+export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket";
+export type OutputMode = "all"|"filtered"|"nothing";
 
 export interface RStartupArguments {
     path: string;
     args: string[];
     logLevel?: number;
     logLevelCP?: number;
+    useJsonServer?: boolean;
+    useSinkServer?: boolean;
+    jsonPort?: number;
+    sinkPort?: number;
 }
 
 
@@ -73,9 +79,12 @@ export interface RStrings {
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
-    host?: string;
-    port?: number;
-    useServer?: boolean;
+    useJsonServer?: boolean;
+    jsonPort?: number;
+    jsonHost?: string;
+    useSinkServer?: boolean;
+    sinkPort?: number;
+    sinkHost?: string;
 }
 
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {

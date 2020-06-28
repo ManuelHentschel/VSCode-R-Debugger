@@ -102,7 +102,8 @@ export class DebugSession extends ProtocolServer {
             switch(request.command){
                 case 'initialize':
                     const initializeArguments: InitializeRequestArguments = request.arguments || {};
-                    initializeArguments.useServer = config().get<boolean>('useServer', true);
+                    initializeArguments.useJsonServer = config().get<boolean>('useJsonServer', true);
+                    initializeArguments.useSinkServer = config().get<boolean>('useSinkServer', true);
                     initializeArguments.threadId = this.THREAD_ID;
                     const initializeRequest: InitializeRequest = {
                         arguments: initializeArguments,
