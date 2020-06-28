@@ -71,12 +71,11 @@ export class DebugRuntime extends EventEmitter {
 	// info about the R stack, variables etc.
 	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
+	private debugPrintEverything = false;
 
 	// debugMode
 	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
-	private printStdout: ('all'|'filtered'|'nothing') = 'filtered';
-	private printStderr: boolean = true;
 
 
 
@@ -126,8 +125,7 @@ export class DebugRuntime extends EventEmitter {
 		// read settings from vsc-settings
 		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
-		this.printStdout = config().get<'all'|'filtered'|'nothing'>('printStdout', this.printStdout);
-		this.printStderr = config().get<boolean>('printStderr', this.printStderr);
+		this.debugPrintEverything = config().get<boolean>('printEverything', this.debugPrintEverything);
 		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
 
 
@@ -226,7 +224,7 @@ export class DebugRuntime extends EventEmitter {
 		// is called by rSession.handleData()
 
 		// make copy of line for debugging
-		if((this.printStderr && fromStderr) || (this.printStdout === 'all' && !fromStderr)){
+		if(this.debugPrintEverything){
 			this.writeOutput(line, isFullLine, fromStderr);
 		}
 
@@ -334,11 +332,16 @@ export class DebugRuntime extends EventEmitter {
 			showLine = false;
 		}
 
+		// check for StdErr (show everything):
+		if(fromStderr){
+			showLine = true;
+		}
+
 		// output any part of the line that was not parsed
-		if(!fromStderr && this.printStdout === 'filtered' && showLine && line.length>0){
+		if(!this.debugPrintEverything && showLine && line.length>0){
 			this.writeOutput(line, isFullLine, fromStderr);
 		}
-		if(showLine || fromStderr){
+		if(showLine){
 			line = '';
 		}
 		return line;
