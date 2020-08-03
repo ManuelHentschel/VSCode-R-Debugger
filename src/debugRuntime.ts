@@ -28,7 +28,6 @@ export class DebugRuntime extends EventEmitter {
 	// delimiters used when printing info from R which is meant for the debugger
 	// need to occurr on the same line!
 	// need to match those used in the R-package
-	// TODO: replace with a dedicated pipe between R and vsc?
 	private rStrings = {
 		delimiter0: '<v\\s\\c>',
 		delimiter1: '</v\\s\\c>',
@@ -87,25 +86,6 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: InitializeRequest) {
-
-		// const debugRuntime = this;
-		// // launch server
-		// if(args.useServer){
-		// 	await this.jsonServer.makeServer(debugRuntime, this.host, this.port);
-		// 	this.host = this.jsonServer.host;
-		// 	this.port = this.jsonServer.port;
-
-		// 	if(this.jsonServer.port > 0){
-		// 		args.useServer = true;
-		// 		args.host = this.jsonServer.host;
-		// 		args.port = this.jsonServer.port;
-		// 	} else{
-		// 		args.useServer = false;
-		// 	}
-		// } else{
-		// 	args.useServer = false;
-		// }
-
 
 		// LAUNCH R PROCESS
 		if(args.rStrings){
