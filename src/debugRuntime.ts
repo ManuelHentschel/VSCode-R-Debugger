@@ -76,6 +76,7 @@ export class DebugRuntime extends EventEmitter {
 	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
 	private outputModes: {[key in DataSource]?: OutputMode} = {};
+	public sendContinueOnBrowser: boolean = false;
 
 
 
@@ -275,17 +276,21 @@ export class DebugRuntime extends EventEmitter {
 				// Check for browser prompt
 				const browserRegex = /Browse\[\d+\]> /;
 				if(browserRegex.test(line)){
-					// R has entered the browser
-					this.debugState = 'function';
-					line = line.replace(browserRegex,'');
-					showLine = false;
-					this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
-					if(!this.expectBrowser){
-						// unexpected breakpoint:
-						this.hitBreakpoint(false);
-					}
 					console.log('matches: browser prompt');
-					this.rSession.showsPrompt();
+					if(this.sendContinueOnBrowser){
+						this.rSession.runCommand("c", [], true);
+					} else{
+						// R has entered the browser
+						this.debugState = 'function';
+						line = line.replace(browserRegex,'');
+						showLine = false;
+						this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
+						if(!this.expectBrowser){
+							// unexpected breakpoint:
+							this.hitBreakpoint(false);
+						}
+						this.rSession.showsPrompt();
+					}
 				} 
 
 
@@ -399,13 +404,19 @@ export class DebugRuntime extends EventEmitter {
 		if(json.type==="response"){
 			this.sendEvent("response", json);
 		} else if(json.type==="event"){
-			if(json.body.reason === 'exception'){
+			if(json.event === "stopped" && json.body.reason === 'exception'){
 				this.stdoutIsBrowserInfo = true;
 				this.isCrashed = true;
 				this.expectBrowser = true;
 				this.debugState = 'function';
+				this.sendEvent("event", json);
+			} else if(json.event === 'custom'){
+				if(json.body.reason === "continueOnBrowserPrompt"){
+					this.sendContinueOnBrowser = json.body.value;
+				}
+			} else{
+				this.sendEvent("event", json);
 			}
-			this.sendEvent("event", json);
 		} else{
 			console.error("Unknown message:");
 			console.log(json);
