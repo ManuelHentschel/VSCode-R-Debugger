@@ -1,15 +1,19 @@
 {
   "name": "r-debugger",
   "displayName": "R Debugger",
-  "description": "R Debugger",
-  "version": "0.0.1",
+  "description": "R Debugger Support",
+  "version": "0.1.0",
   "publisher": "ManuelHentschel",
+  "license": "MIT",
   "author": {
     "name": "Manuel Hentschel"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ManuelHentschel/VSCode-R-Debugger.git"
+    "url": "https://github.com/ManuelHentschel/VSCode-R-Debugger"
+  },
+  "bugs": {
+    "url": "https://github.com/ManuelHentschel/VSCode-R-Debugger/issues"
   },
   "icon": "images/Rlogo.png",
   "engines": {
@@ -22,6 +26,11 @@
     "onLanguage:r",
     "onLanguage:rd",
     "onLanguage:rmd"
+  ],
+  "keywords": [
+    "R",
+    "R Language",
+    "Debugger"
   ],
   "main": "./out/extension.js",
   "contributes": {
