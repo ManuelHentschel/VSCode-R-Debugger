@@ -1,8 +1,8 @@
 # R Debugger
 
 This extension adds debugging capabilities for the R programming language to Visual Studio Code.
-For further R support see e.g. [vscode-R](https://github.com/Ikuyadeu/vscode-R).
 This extension depends on the R package [vscDebugger](https://github.com/ManuelHentschel/vscDebugger).
+For further R support see e.g. [vscode-R](https://github.com/Ikuyadeu/vscode-R).
 
 ## Using the Debugger
 * Install the **R Debugger** extension in VS Code.
