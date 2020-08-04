@@ -108,3 +108,19 @@ export interface SourceArguments extends DebugProtocol.SourceArguments {
 export interface ResponseWithBody extends DebugProtocol.Response {
     body?: { [key: string]: any; };
 }
+
+export interface CustomEvent extends DebugProtocol.Event {
+    event: "custom";
+    body: {
+        reason: string;
+    }
+}
+
+export interface ContinueOnBrowserPromptEvent extends CustomEvent {
+    body: {
+        reason: "continueOnBrowserPrompt";
+        value: boolean;
+        message?: string;
+        repeatMessage?: boolean;
+    }
+}
