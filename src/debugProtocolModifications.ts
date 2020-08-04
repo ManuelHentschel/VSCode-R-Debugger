@@ -9,6 +9,22 @@ export enum DebugMode {
     Workspace = "workspace"
 }
 
+
+export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket";
+export type OutputMode = "all"|"filtered"|"nothing";
+
+export interface RStartupArguments {
+    path: string;
+    args: string[];
+    logLevel?: number;
+    logLevelCP?: number;
+    useJsonServer?: boolean;
+    useSinkServer?: boolean;
+    jsonPort?: number;
+    sinkPort?: number;
+}
+
+
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
     // specify what to debug (required)
     debugMode: DebugMode;
@@ -63,6 +79,12 @@ export interface RStrings {
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
+    useJsonServer?: boolean;
+    jsonPort?: number;
+    jsonHost?: string;
+    useSinkServer?: boolean;
+    sinkPort?: number;
+    sinkHost?: string;
 }
 
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {
@@ -85,4 +107,20 @@ export interface SourceArguments extends DebugProtocol.SourceArguments {
 
 export interface ResponseWithBody extends DebugProtocol.Response {
     body?: { [key: string]: any; };
+}
+
+export interface CustomEvent extends DebugProtocol.Event {
+    event: "custom";
+    body: {
+        reason: string;
+    }
+}
+
+export interface ContinueOnBrowserPromptEvent extends CustomEvent {
+    body: {
+        reason: "continueOnBrowserPrompt";
+        value: boolean;
+        message?: string;
+        repeatMessage?: boolean;
+    }
 }

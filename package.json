@@ -118,51 +118,29 @@
           {
             "type": "R-Debugger",
             "request": "launch",
-            "name": "R Debug File",
+            "name": "Launch Workspace",
+            "debugMode": "workspace",
+            "workingDirectory": "${workspaceFolder}",
+            "allowGlobalDebugging": true
+          },
+          {
+            "type": "R-Debugger",
+            "request": "launch",
+            "name": "Debug R-File",
+            "debugMode": "file",
+            "workingDirectory": "${workspaceFolder}",
+            "file": "${file}",
+            "allowGlobalDebugging": true
+          },
+          {
+            "type": "R-Debugger",
+            "request": "launch",
+            "name": "Debug R-Function",
+            "debugMode": "function",
             "workingDirectory": "${fileDirname}",
             "file": "${file}",
-            "debugMode": "file",
-            "allowGlobalDebugging": true
-          }
-        ],
-        "configurationSnippets": [
-          {
-            "label": "R Debug: Launch Global Workspace",
-            "description": "Start a Global R Workspace",
-            "body": {
-              "type": "R-Debugger",
-              "request": "launch",
-              "name": "R Debug Only Workspace",
-              "debugMode": "workspace",
-              "workingDirectory": "${workspaceFolder}",
-              "allowGlobalDebugging": true
-            }
-          },
-          {
-            "label": "R Debug: Debug a .R file",
-            "description": "Start R do debug a .R file",
-            "body": {
-              "type": "R-Debugger",
-              "request": "launch",
-              "name": "R Debug Only Workspace",
-              "debugMode": "workspace",
-              "workingDirectory": "${workspaceFolder}",
-              "allowGlobalDebugging": true
-            }
-          },
-          {
-            "label": "R Debug: Debug a single function",
-            "description": "Start R to debug a single function call, then exit",
-            "body": {
-              "type": "R-Debugger",
-              "request": "launch",
-              "name": "R Debug Function",
-              "debugMode": "function",
-              "workingDirectory": "${fileDirname}",
-              "file": "${file}",
-              "mainFunction": "main",
-              "allowGlobalDebugging": false
-            }
+            "mainFunction": "main",
+            "allowGlobalDebugging": false
           }
         ]
       }
@@ -232,6 +210,7 @@
   },
   "dependencies": {
     "await-notify": "^1.0.1",
+    "net": "^1.0.2",
     "vscode-debugadapter": "^1.40.0",
     "winreg": "^1.2.4"
   }
