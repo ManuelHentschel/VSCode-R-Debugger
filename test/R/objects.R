@@ -1,6 +1,6 @@
 options(vsc.trySilent = FALSE)
 
-options(error = traceback)
+# options(error = traceback)
 
 options(vsc.matricesByRow = FALSE)
 options(vsc.dataFramesByRow = TRUE)
@@ -17,7 +17,7 @@ nul <- NULL
 env <- new.env()
 env$a <- 1
 env$b <- 1:5
-l <- .vsc.getCustomInfo(env, 'childVars')
+# l <- .vsc.getCustomInfo(env, 'childVars')
 
 # data.frame
 df1 <- mtcars
