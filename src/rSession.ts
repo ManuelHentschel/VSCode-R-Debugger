@@ -31,8 +31,8 @@ export class RSession {
     public isBusy: boolean = false;
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
-    public logLevel: number = 3;
-    public logLevelCP: number = 3;
+    public logLevel: number = 0;
+    public logLevelCP: number = 0;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
@@ -180,7 +180,7 @@ export class RSession {
         if(this.cmdQueue.length>0){
             this.isBusy = true;
             const cmd = this.cmdQueue.shift();
-            console.log('rSession: calling from list: "' + cmd.trim() + '"');
+            // console.log('rSession: calling from list: "' + cmd.trim() + '"');
             this.runCommand(cmd, [], true, '');
         } else{
             this.isBusy = false;
@@ -207,7 +207,7 @@ export class RSession {
         var s = data.toString();
         s = s.replace(/\r/g,''); //keep only \n as linebreak
 
-        console.log("Handle data from " + from + ":", {data: s});
+        // console.log("Handle data from " + from + ":", {data: s});
 
         s = (this.restOfLine[from] || "") + s;
 

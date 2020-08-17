@@ -173,11 +173,6 @@
           "default": "/usr/bin/R",
           "description": "R path for Linux."
         },
-        "rdebugger.useRCommandQueue": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to queue R commands and send them only if the R-process is idle."
-        },
         "rdebugger.waitBetweenRCommands": {
           "type": "integer",
           "default": 10,
@@ -187,11 +182,6 @@
           "type": "number",
           "default": 2000,
           "description": "The maximum time in ms that is waited for R to startup"
-        },
-        "rdebugger.printEverything": {
-          "type": "boolean",
-          "default": false,
-          "description": "For debugging the debugger: Whether to show everything printed to stdoutor stderr by the child process. Recommended to set debug.console.wordWrap=false"
         }
       }
     }

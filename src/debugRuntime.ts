@@ -46,13 +46,10 @@ export class DebugRuntime extends EventEmitter {
 	private initArgs: InitializeRequestArguments;
 
 	// debugging
-	private logLevel = 3;
-	private logLevelCp = 3;
+	private logLevel = 0;
 
 	// The rSession used to run the code
 	public rSession: RSession;
-	// Whether to use a queue for R commands (makes debugging slower but 'safer')
-	private useRCommandQueue: boolean = true;
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
 	private waitBetweenRCommands: number = 0;
 
@@ -70,7 +67,6 @@ export class DebugRuntime extends EventEmitter {
 	// info about the R stack, variables etc.
 	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
-	private debugPrintEverything = false;
 
 	// debugMode
 	public allowGlobalDebugging: boolean = false;
@@ -104,9 +100,7 @@ export class DebugRuntime extends EventEmitter {
 		args.rStrings = this.rStrings;
 
 		// read settings from vsc-settings
-		this.useRCommandQueue = config().get<boolean>('useRCommandQueue', true);
 		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
-		this.debugPrintEverything = config().get<boolean>('printEverything', this.debugPrintEverything);
 		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
 		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
 		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
@@ -121,7 +115,7 @@ export class DebugRuntime extends EventEmitter {
 		const rStartupArguments: RStartupArguments = await getRStartupArguments();
 		rStartupArguments.useJsonServer = args.useJsonServer;
 		rStartupArguments.useSinkServer = args.useSinkServer;
-		rStartupArguments.logLevelCP = this.logLevelCp;
+		rStartupArguments.logLevelCP = this.logLevel;
 		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
@@ -316,7 +310,7 @@ export class DebugRuntime extends EventEmitter {
 					if(this.isCrashed && !this.allowGlobalDebugging){
 						this.terminate();
 					} else{
-						console.log("matches: prompt");
+						// console.log("matches: prompt");
 						this.debugState = 'global';
 						this.rSession.showsPrompt();
 						// this.endOutputGroup();
