@@ -119,6 +119,11 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Set to true to show package scopes in the variable window."
+              },
+              "packagesBeforeLaunch": {
+                "type": "array",
+                "default": [],
+                "description": "Packages to be loaded before launching the R script."
               }
             }
           }

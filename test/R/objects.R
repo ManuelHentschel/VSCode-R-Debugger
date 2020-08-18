@@ -1,9 +1,11 @@
-options(vsc.trySilent = FALSE)
+# options(vsc.trySilent = FALSE)
 
 # options(error = traceback)
 
 options(vsc.matricesByRow = FALSE)
 options(vsc.dataFramesByRow = TRUE)
+
+options(vsc.includeFrameColumn = FALSE)
 
 # options(vsc.showCustomAttributes = FALSE)
 # options(vsc.showAttributes = FALSE)
