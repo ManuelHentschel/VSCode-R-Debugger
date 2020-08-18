@@ -84,6 +84,11 @@ Essential for debug moge `"workspace"`, recommended for `"file"`, usually not se
 Set to `true` to debug packages (currently a little buggy, use together with `"includePackageScopes"`).
 * `"includePackageScopes"`: Set to `true` to view variables from the scopes of packages.
 
+There is also a number of settings that are managed within R, using `getOption(...)`.
+These are not documented yet and might change in the future.
+The names of these settings are of the form `vsc.XXXXX` and most are "self-explanatory" booleans.
+To get an idea of the available settings you can search the source code for `getOption('vsc.`/`getOption("vsc.`.
+Alternatively, don't hesitate to open an issue if you are looking for a particular setting/behaviour.
 
 ## How it works
 The debugger works as follows:
