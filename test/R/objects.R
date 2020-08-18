@@ -17,6 +17,10 @@ nul <- NULL
 env <- new.env()
 env$a <- 1
 env$b <- 1:5
+env2 <- new.env()
+env2$b <- 1000
+assign('_a', 100, envir=env2)
+attr(env2, 'a') <- 300
 # l <- .vsc.getCustomInfo(env, 'childVars')
 
 # data.frame
@@ -47,6 +51,8 @@ lst0 <- list()
 lst1 <- list(1:5, rnorm(5))
 lst2 <- list(a = 1:5, b = rnorm(5), c = letters)
 lst3 <- list(a = 1:5, b = rnorm(5), c = list(x = 1, y = 5:1))
+lst4 <- list(a = 1, a = 2, a = 3)
+lst5 <- list(x=0,b=9,b=10,b=11,b=12)
 
 # vector
 v1 <- c(TRUE, TRUE, FALSE)
@@ -111,9 +117,8 @@ makeActiveBinding("x", function() rnorm(1), env1)
 
 main <- function() {
   print("testing objects")
-  l <- list(1,2,3)
-  x <- 9
-  fun(1, a = 1, b = x, y = l)
-  browser()
+  print('asdf')
+  fun(1, 2, 4)
+  print('q  wer')
 }
 
