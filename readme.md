@@ -81,8 +81,8 @@ The remaining config entries are:
 * `"allowGlobalDebugging"`: Whether to keep the R session running after debugging and evaluate expressions from the debug console.
 Essential for debug moge `"workspace"`, recommended for `"file"`, usually not sensible for `"function"`.
 * `"setBreakpointsInPackages"`: Defaults to `false` for performance reasons.
-Set to `true` to debug packages (currently a little buggy, use together with `"includePackageScopes"`).
-* `"includePackageScopes"`: Set to `true` to view variables from the scopes of packages.
+Set to `true` to debug packages.
+* `"includePackageScopes"`: Set to `true` to view the scopes of packages in the variable view.
 
 There is also a number of settings that are managed within R, using `getOption(...)`.
 These are not documented yet and might change in the future.
@@ -106,21 +106,36 @@ These lines are also hidden from the user.
 
 
 ## Debugging R Packages
-In principle R packages can also be debugged using this extension.
-For this to work, the proper source information must be retained during installation of the package
-(check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')`).
-I personally do not know a bullet proof way to achieve this, but the following things might help:
+In general, R packages can also be debugged using this extension.
+For this to work, the proper source information must be retained during the installation of the package
+(check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')` for some function from the package).
+I personally do not know a bulletproof way to achieve this, but the following might help:
 * The package must be installed from source code (not CRAN or `.tar.gz`)
 * The flag `--with-keep.source` should be set
 * Extensions containing C code seem to cause problems sometimes
 
-Furthermore, the debug config entries `"setBreakpointsInPackages"` and `"includePackageScopes"` need to be set to `true`.
+To set breakpoints, the debug config entry `"setBreakpointsInPackages"` needs to be set to `true`.
+If `debugMode=="file"` or `debugMode=="workspace"` it is also necessary to specify the debugged package(s) in the launch config to be loaded before launch, e.g.: 
+```json
+"debugMode": "file",
+"setBreakpointsInPackages": true,
+"packagesBeforeLaunch": ["MyPackage"],
+...
+```
 
-In order to use the modified `print` and `cat` functions,
-import the `vscDebugger` extension in your package,
-assign `print <- vscDebugger::.vsc.print` and `cat <- vscDebugger::.vsc.cat`,
-and deactivate the modified `print`/`cat` statements in the debugger settings.
-Don't forget to remove these assignments after debugging.
+The modified `print` and `cat` functions also work if source information is retained during the installation,
+but some modifications to the package are necessary.
+To use `.vsc.print` and `.vsc.cat` without breaking the package when not using the debugger,
+add the following code to the package:
+```r
+print <- print
+cat <- cat
+
+.onLoad <- function(){
+    try(print <<- vscDebugger::.vsc.print, silent=TRUE)
+    try(cat <<- vscDebugger::.vsc.cat, silent=TRUE)
+}
+```
 
 ## Warning
 In the following cases the debugger might not work correctly/as expected:
