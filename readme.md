@@ -106,10 +106,10 @@ These lines are also hidden from the user.
 
 
 ## Debugging R Packages
-In general R packages can also be debugged using this extension.
+In general, R packages can also be debugged using this extension.
 For this to work, the proper source information must be retained during the installation of the package
 (check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')` for some function from the package).
-I personally do not know a bulletproof way to achieve this, but the following things might help:
+I personally do not know a bulletproof way to achieve this, but the following might help:
 * The package must be installed from source code (not CRAN or `.tar.gz`)
 * The flag `--with-keep.source` should be set
 * Extensions containing C code seem to cause problems sometimes
