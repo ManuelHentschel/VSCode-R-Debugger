@@ -72,6 +72,11 @@
                   "file",
                   "workspace"
                 ],
+                "enumDescriptions": [
+                  "Debug a single main-function",
+                  "Run an R file",
+                  "Start an empty R workspace"
+                ],
                 "description": "Debug a single main-FUNCTION, run an R FILE, or just start an empty R WORKSPACE",
                 "default": "file"
               },
@@ -122,6 +127,9 @@
               },
               "packagesBeforeLaunch": {
                 "type": "array",
+                "items": {
+                  "type": "string"
+                },
                 "default": [],
                 "description": "Packages to be loaded before launching the R script."
               }
@@ -180,7 +188,7 @@
         },
         "rdebugger.waitBetweenRCommands": {
           "type": "integer",
-          "default": 10,
+          "default": 0,
           "description": "The time (in ms) to wait between R commands."
         },
         "rdebugger.startupTimeout": {
