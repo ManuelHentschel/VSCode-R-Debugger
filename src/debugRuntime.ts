@@ -340,6 +340,7 @@ export class DebugRuntime extends EventEmitter {
 				this.stdoutIsBrowserInfo = true;
 				this.expectBrowser = true;
 				this.hitBreakpoint(true);
+				showLine = false;
 			}
 
 			// filter out additional browser info:
@@ -348,6 +349,7 @@ export class DebugRuntime extends EventEmitter {
 				// showLine = false; // part of browser-info
 				line = line.replace(browserInfoRegex, '');
 				this.stdoutIsBrowserInfo = true;
+				showLine = false;
 			}
 		}
 
@@ -360,6 +362,7 @@ export class DebugRuntime extends EventEmitter {
 		if(outputMode === "all"){
 			lineOut = line0;
 			line = "";
+			showLine = true;
 		} else if(showLine && outputMode === "filtered"){
 			lineOut = line;
 		} else{
@@ -367,7 +370,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// output line
-		if(lineOut.length>0){
+		if(lineOut.length>0 || showLine){
 			this.writeOutput(lineOut, isFullLine, isStderr);
 		}
 
