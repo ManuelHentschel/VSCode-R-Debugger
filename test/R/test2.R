@@ -1,31 +1,39 @@
 
-gen_data <- function(n) {
-  x <- rnorm(n)
-  y <- 2 * x
-  out <- data.frame(x = x, y = x)
-  out
+# options(vsc.showCustomAttributes = FALSE)
+# options(vsc.verboseVarInfos=TRUE)
+
+# l <- list(a=1, b=2)
+
+# l <- list(a=1, b=2, c=3)
+
+# l$nested <- l
+
+# x <- array(1:1000000, c(100,100,100))
+
+# v <- 1:10000
+
+
+# l <- replicate(10000, v, simplify=FALSE)
+
+# v <- 1:3
+
+
+f <- function(x=9){
+    print('ja....')
+    print(x)
+    print('..woll')
 }
 
-calc_stats <- function(x, na.rm = TRUE) {
-  qs <- quantile(x, c(0, 0.25, 0.5, 0.75, 1), na.rm = na.rm, names = FALSE)
-  data.frame(
-    mean = mean(x, na.rm = na.rm),
-    sd = sd(x, na.rm = TRUE),
-    min = qs[[1]],
-    q25 = qs[[2]],
-    median = qs[[3]],
-    q75 = qs[[4]],
-    max = qs[[5]]
-  )
+main <- function(){
+    print('hello world')
+    f(4)
+    print('done.')
 }
 
-main <- function() {
-  xy_data <- gen_data(100)  ###
-  lm_obj <- lm(y ~ x, data = xy_data)
-  beta <- coef(lm_obj)
-  stats <- lapply(names(xy_data), function(name) {
-    cbind(name, calc_stats(xy_data[[name]])) ###
-  })
-  print(beta)
-  print(stats)
-}
+# main()
+
+print(1)
+print(2)
+print(3)
+
+

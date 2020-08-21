@@ -47,6 +47,7 @@ arr0 <- array(numeric())
 arr1 <- array(1:10, c(10, 1, 1))
 arr2 <- array(1:10, c(1, 10, 1))
 arr3 <- array(1:10, c(1, 1, 10))
+arr4 <- array(1:12, c(2,3,2))
 
 # list
 lst0 <- list()
