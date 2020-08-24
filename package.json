@@ -3,7 +3,7 @@
   "displayName": "R Debugger",
   "description": "R Debugger Support",
   "version": "0.1.1",
-  "publisher": "ManuelHentschel",
+  "publisher": "RDebugger",
   "license": "MIT",
   "author": {
     "name": "Manuel Hentschel"
@@ -12,6 +12,7 @@
     "type": "git",
     "url": "https://github.com/ManuelHentschel/VSCode-R-Debugger"
   },
+  "preview": true,
   "bugs": {
     "url": "https://github.com/ManuelHentschel/VSCode-R-Debugger/issues"
   },
