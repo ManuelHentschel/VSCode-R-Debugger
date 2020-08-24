@@ -1,9 +1,11 @@
-options(vsc.trySilent = FALSE)
+# options(vsc.trySilent = FALSE)
 
-options(error = traceback)
+# options(error = traceback)
 
 options(vsc.matricesByRow = FALSE)
 options(vsc.dataFramesByRow = TRUE)
+
+options(vsc.includeFrameColumn = FALSE)
 
 # options(vsc.showCustomAttributes = FALSE)
 # options(vsc.showAttributes = FALSE)
@@ -17,7 +19,11 @@ nul <- NULL
 env <- new.env()
 env$a <- 1
 env$b <- 1:5
-l <- .vsc.getCustomInfo(env, 'childVars')
+env2 <- new.env()
+env2$b <- 1000
+assign('_a', 100, envir=env2)
+attr(env2, 'a') <- 300
+# l <- .vsc.getCustomInfo(env, 'childVars')
 
 # data.frame
 df1 <- mtcars
@@ -41,12 +47,15 @@ arr0 <- array(numeric())
 arr1 <- array(1:10, c(10, 1, 1))
 arr2 <- array(1:10, c(1, 10, 1))
 arr3 <- array(1:10, c(1, 1, 10))
+arr4 <- array(1:12, c(2,3,2))
 
 # list
 lst0 <- list()
 lst1 <- list(1:5, rnorm(5))
 lst2 <- list(a = 1:5, b = rnorm(5), c = letters)
 lst3 <- list(a = 1:5, b = rnorm(5), c = list(x = 1, y = 5:1))
+lst4 <- list(a = 1, a = 2, a = 3)
+lst5 <- list(x=0,b=9,b=10,b=11,b=12)
 
 # vector
 v1 <- c(TRUE, TRUE, FALSE)
@@ -111,9 +120,8 @@ makeActiveBinding("x", function() rnorm(1), env1)
 
 main <- function() {
   print("testing objects")
-  l <- list(1,2,3)
-  x <- 9
-  fun(1, a = 1, b = x, y = l)
-  browser()
+  print('asdf')
+  fun(1, 2, 4)
+  print('q  wer')
 }
 

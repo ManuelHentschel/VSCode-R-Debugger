@@ -72,6 +72,11 @@
                   "file",
                   "workspace"
                 ],
+                "enumDescriptions": [
+                  "Debug a single main-function",
+                  "Run an R file",
+                  "Start an empty R workspace"
+                ],
                 "description": "Debug a single main-FUNCTION, run an R FILE, or just start an empty R WORKSPACE",
                 "default": "file"
               },
@@ -119,6 +124,14 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Set to true to show package scopes in the variable window."
+              },
+              "packagesBeforeLaunch": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "Packages to be loaded before launching the R script."
               }
             }
           }
@@ -173,25 +186,15 @@
           "default": "/usr/bin/R",
           "description": "R path for Linux."
         },
-        "rdebugger.useRCommandQueue": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to queue R commands and send them only if the R-process is idle."
-        },
         "rdebugger.waitBetweenRCommands": {
           "type": "integer",
-          "default": 10,
+          "default": 0,
           "description": "The time (in ms) to wait between R commands."
         },
         "rdebugger.startupTimeout": {
           "type": "number",
           "default": 2000,
           "description": "The maximum time in ms that is waited for R to startup"
-        },
-        "rdebugger.printEverything": {
-          "type": "boolean",
-          "default": false,
-          "description": "For debugging the debugger: Whether to show everything printed to stdoutor stderr by the child process. Recommended to set debug.console.wordWrap=false"
         }
       }
     }
