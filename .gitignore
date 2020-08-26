@@ -3,6 +3,13 @@ node_modules
 .vscode-test/
 testR
 R/test*
-temp*
-*.temp
 *.vsix
+
+*.temp
+*.tmp
+tmp.*
+temp.*
+tmp
+temp
+
+
