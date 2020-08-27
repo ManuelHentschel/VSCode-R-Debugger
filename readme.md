@@ -33,7 +33,7 @@ For compatibility reasons make sure to install both from the same release.
 
 If you want to install a development version, the VS Code extension can be installed from the .vsix-files found 
 [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain).
-To download the correct file, filter the commits by branch (develop or master), select the latest commit,
+To download the correct file, filter the commits by branch, select the latest commit,
 and download the file `r-debugger.vsix` under the caption "Artifacts".
 To install the latest development version of the required R-package from GitHub, run
 `devtools::install_github("ManuelHentschel/vscDebugger")`

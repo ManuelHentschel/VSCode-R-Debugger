@@ -1,7 +1,7 @@
 {
   "name": "r-debugger",
   "displayName": "R Debugger",
-  "description": "R Debugger Support",
+  "description": "R Debugger for VS Code",
   "version": "0.1.1",
   "publisher": "RDebugger",
   "license": "MIT",
