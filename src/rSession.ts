@@ -22,7 +22,8 @@ export type RFunctionName = (
     "tryCatch" |
     ".vsc.debugSource" |
     "quit" |
-    ".vsc.listenOnPort"
+    ".vsc.listenOnPort" |
+    "install.packages"
 );
 
 
@@ -232,58 +233,7 @@ export class RSession {
             this.restOfLine[from] = restOfLine;
         }
     }
-
-
-
-    // public async handleData2(data: any, fromStderr: boolean = false){
-	// 	// handles output from the R child process
-	// 	// splits cp.stdout into lines / waits for complete lines
-	// 	// calls handleLine() on each line
-
-	// 	const dec = new TextDecoder;
-	// 	var s = dec.decode(data);
-	// 	s = s.replace(/\r/g,''); //keep only \n as linebreak
-
-	// 	// join with rest text from previous call(s)
-	// 	if(fromStderr){
-	// 		s = this.restOfStderr + s;
-	// 		this.restOfStderr = "";
-	// 	} else {
-	// 		s = this.restOfStdout + s;
-	// 		this.restOfStdout = "";
-	// 	}
-
-	// 	// split into lines
-	// 	const lines = s.split(/\n/);
-
-	// 	// handle all the complete lines
-	// 	for(var i = 0; i<lines.length - 1; i++){
-	// 		// abort output handling if ignoreOutput has been set to true
-	// 		// used to avoid handling remaining output after debugging has been stopped
-    //         if(this.ignoreOutput){ return; }
-	// 		this.debugRuntime.handleLine(lines[i], fromStderr, true);
-	// 	}
-
-	// 	if(lines.length > 0) {
-	// 		// abort output handling if ignoreOutput has been set to true
-	// 		if(this.ignoreOutput){ return; }
-
-	// 		// calls this.handleLine on the remainder of the last line
-	// 		// necessary, since e.g. an input prompt does not send a newline
-	// 		// handleLine returns the parts of a line that were not 'understood'
-	// 		const remainingText = await this.debugRuntime.handleLine(lines[lines.length - 1], fromStderr, false);
-			
-	// 		// remember parts that were no understood for next call
-	// 		if(fromStderr){
-	// 			this.restOfStderr = remainingText;
-	// 		} else {
-	// 			this.restOfStdout = remainingText;
-	// 		}
-	// 	}
-    // }
 }
-
-
 
 
 function getPortNumber(server: net.Server){
@@ -300,12 +250,13 @@ function getPortNumber(server: net.Server){
 // Child Process
 
 function spawnRProcess(args: RStartupArguments){
-    const options = {
+    const options: child.SpawnOptionsWithoutStdio = {
         env: {
             VSCODE_DEBUG_SESSION: "1",
             ...process.env
         },
-        shell: true
+        shell: true,
+        cwd: args.cwd
     };
 
     const rPath = args.path;

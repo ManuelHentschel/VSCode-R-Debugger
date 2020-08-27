@@ -1,7 +1,7 @@
 # R Debugger
 
 ***Note: v0.1.1 is now available as a preview version on the [VSCode market place](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).***
-***The R package still needs to be installed from [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/tag/v0.1.1)***
+***The R package still needs to be installed from [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/)***
 
 This extension adds debugging capabilities for the
 [R](https://www.r-project.org/)
@@ -33,13 +33,12 @@ For compatibility reasons make sure to install both from the same release.
 
 If you want to install a development version, the VS Code extension can be installed from the .vsix-files found 
 [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain).
-To download the correct file, filter the commits by branch (develop or master), select the latest commit,
+To download the correct file, filter the commits by branch, select the latest commit,
 and download the file `r-debugger.vsix` under the caption "Artifacts".
-To install the latest development version of the required R-package from GitHub, run the following command in R
-(to install from the master branch, omit the argument `ref="develop"`):
-```r
-devtools::install_github("ManuelHentschel/vscDebugger", ref = "develop")
-```
+To install the latest development version of the required R-package from GitHub, run
+`devtools::install_github("ManuelHentschel/vscDebugger")`
+or install from the artifacts found 
+[here](https://github.com/ManuelHentschel/vscDebugger/actions).
 
 Installing/running from code is a little more involved, but the files `.vscode/tasks.json` and `tsconfig.json` from this repo
 as well as `build.R` and `.vscode/tasks.json` from [vscDebugger](https://github.com/ManuelHentschel/vscDebugger)
@@ -159,8 +158,9 @@ It might be possible, however, that the gathering of information about the stack
 Especially watch-expressions must be safe to be evaluated in any frame,
 since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
 
-## To Do
-The following topics could be improved/fixed in the future:
+## Work in Progress
+This package is still under development.
+The following topics are on the todo list:
 
 * Auto adjustment of breakpoint position to next valid position
 * Conditional breakponts, data breakpoints
@@ -171,10 +171,17 @@ The following topics could be improved/fixed in the future:
 * Use (visible) integrated terminal instead of background process,
 use `sink(..., split=TRUE)` to simultaneously show stdout to user and the debugger
 * Pipe a copy of stdout to a pseudo-terminal as info for the user
-* Improve performance when viewing very large lists/vectors in the variables windows
 * Handling parallel computing (currently not looking very promising...)
+* Cleaner adoption of the Debug Adapter Protocol in R
+* Smoother installation/troubleshooting process
 
+## Contributing
 If you have problems, suggestions, bug fixes etc. feel free to open an
 [issue](https://github.com/ManuelHentschel/VSCode-R-Debugger/issues)
 or submit a pull request.
-Any feedback or support is welcome :)
+Any feedback or support is appreciated!
+Special thanks to
+[@tdeenes](https://github.com/tdeenes)
+for providing the C code used in the R package, and
+[@renkun-ken](https://github.com/renkun-ken)
+for his numerous contributions and feedback!

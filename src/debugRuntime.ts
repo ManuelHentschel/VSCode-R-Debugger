@@ -11,6 +11,7 @@ import { RSession } from './rSession';
 import { makeFunctionCall, anyRArgs } from './rUtils';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { InitializeRequestArguments, InitializeRequest, RStartupArguments, DataSource, OutputMode } from './debugProtocolModifications';
+import { installRPackage } from './installRPackage';
 
 
 const { Subject } = require('await-notify');
@@ -116,6 +117,10 @@ export class DebugRuntime extends EventEmitter {
 		rStartupArguments.useJsonServer = args.useJsonServer;
 		rStartupArguments.useSinkServer = args.useSinkServer;
 		rStartupArguments.logLevelCP = this.logLevel;
+		const openFolders = vscode.workspace.workspaceFolders;
+		if(openFolders){
+			rStartupArguments.cwd = openFolders[0].uri.fsPath;
+		}
 		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
@@ -190,16 +195,30 @@ export class DebugRuntime extends EventEmitter {
 			// this.endOutputGroup(); // is called after launch request
 			return true;
 		} else {
-			const message = 'Please install the R package "' + this.rStrings.packageName + '"!';
-			await this.abortInitializeRequest(response, message);
+			this.endOutputGroup();
+			let message: string;
+			const tmpWriteOutput = (text: string) => {
+				this.writeOutput(text, true, 'console');
+			};
+			const hasInstalledPackages = await installRPackage(this.rSession, this.rStrings.packageName, tmpWriteOutput);
+			if(hasInstalledPackages){
+				message = 'R package "' + this.rStrings.packageName + '" installed.' + '\nLaunch a new debug request to continue.';
+			} else{
+				message = 'Please install the R package "' + this.rStrings.packageName + '"!';
+			}
+			// if(hasInstalledPackages){
+			// } else{
+			// }
+			await this.abortInitializeRequest(response, message, false);
 			return false;
 		}
-
 	}
 
-	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string){
+	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
 		console.error(message);
-		this.endOutputGroup();
+		if(endOutputGroup){
+			this.endOutputGroup();
+		}
 		this.writeOutput(message, true, true);
 		await timeout(this.terminateTimeout);
 
@@ -455,7 +474,15 @@ export class DebugRuntime extends EventEmitter {
 
 	//////////////////////////////////////////////
 	// OUTPUT
-	public writeOutput(text: string, addNewline = false, toStderr = false, filePath = '', line = 1, group?: ("start"|"startCollapsed"|"end"), data?: object){
+	public writeOutput(
+		text: string,
+		addNewline = false,
+		toStderr: (boolean|'console'|'stdout'|'stderr'|'telemetry') = false,
+		filePath = '',
+		line = 1,
+		group?: ("start"|"startCollapsed"|"end"),
+		data?: object
+	){
 		// writes output to the debug console (of the vsc instance runnning the R code)
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
@@ -471,7 +498,15 @@ export class DebugRuntime extends EventEmitter {
 			}
 		}
 		if(doSendEvent){
-			const category = (toStderr ? "stderr" : "stdout");
+			let category: string;
+			if(toStderr===true){
+				category = 'stderr';
+			} else if(toStderr===false){
+				category = 'stdout';
+			} else{
+				category = toStderr;
+			}
+			// const category = (toStderr ? "stderr" : "stdout");
 			const column = 1;
 			this.sendEvent("output", text, category, filePath, line, column, group, data);
 		}

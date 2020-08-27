@@ -6,6 +6,8 @@ import winreg = require("winreg");
 import { platform } from "os";
 import { RStartupArguments } from './debugProtocolModifications';
 
+const packageJson = require('../package.json');
+
 export function config() {
     return workspace.getConfiguration("rdebugger");
 }
@@ -77,6 +79,31 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
     }
 }
 
+
+export function getRDownloadLink(packageName: string): String{
+    let url: string = config().get<string>("packageURL", "");
+
+    if(url === ""){
+        const platform: string = process.platform;
+        const version: string = packageJson.version; // e.g. "0.1.2"
+        const urlBase = 
+            "https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/download/v" +
+            version +
+            "/" +
+            packageName +
+            "_" +
+            version;
+
+        if(platform === "win32"){
+            url = urlBase + ".zip";
+        } else if(platform === "darwin"){
+            url = urlBase + ".tgz";
+        } else{
+            url = urlBase + ".tar.gz";
+        }
+    }
+    return url;
+}
 
 export function escapeForRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
