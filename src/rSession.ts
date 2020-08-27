@@ -22,7 +22,8 @@ export type RFunctionName = (
     "tryCatch" |
     ".vsc.debugSource" |
     "quit" |
-    ".vsc.listenOnPort"
+    ".vsc.listenOnPort" |
+    "install.packages"
 );
 
 
