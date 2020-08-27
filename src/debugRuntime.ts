@@ -116,6 +116,10 @@ export class DebugRuntime extends EventEmitter {
 		rStartupArguments.useJsonServer = args.useJsonServer;
 		rStartupArguments.useSinkServer = args.useSinkServer;
 		rStartupArguments.logLevelCP = this.logLevel;
+		const openFolders = vscode.workspace.workspaceFolders;
+		if(openFolders){
+			rStartupArguments.cwd = openFolders[0].uri.fsPath;
+		}
 		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
 		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 

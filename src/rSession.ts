@@ -300,12 +300,13 @@ function getPortNumber(server: net.Server){
 // Child Process
 
 function spawnRProcess(args: RStartupArguments){
-    const options = {
+    const options: child.SpawnOptionsWithoutStdio = {
         env: {
             VSCODE_DEBUG_SESSION: "1",
             ...process.env
         },
-        shell: true
+        shell: true,
+        cwd: args.cwd
     };
 
     const rPath = args.path;

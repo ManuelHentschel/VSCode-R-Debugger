@@ -22,6 +22,7 @@ export interface RStartupArguments {
     useSinkServer?: boolean;
     jsonPort?: number;
     sinkPort?: number;
+    cwd?: string;
 }
 
 
