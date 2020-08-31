@@ -16,7 +16,7 @@ const { net } = require("net");
 import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments } from './debugProtocolModifications';
+import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
 import { config } from './utils';
 
 import * as log from 'loglevel';
@@ -147,21 +147,21 @@ export class DebugSession extends ProtocolServer {
                 case 'terminate':
                     this._runtime.terminateFromPrompt();
                     break;
-                case 'restart':
-                    this._runtime.returnToPrompt();
-                    break;
+                // case 'restart':
+                    // this._runtime.returnToPrompt();
+                //     break;
                 case 'continue':
-                    this._runtime.continue(request);
+                    this._runtime.continue(<ContinueRequest>request);
                     break;
-                case 'next':
-                    this._runtime.step();
-                    break;
-                case 'stepIn':
-                    this._runtime.stepIn();
-                    break;
-                case 'stepOut':
-                    this._runtime.stepOut();
-                    break;
+                // case 'next':
+                //     this._runtime.step();
+                //     break;
+                // case 'stepIn':
+                //     this._runtime.stepIn();
+                //     break;
+                // case 'stepOut':
+                //     this._runtime.stepOut();
+                //     break;
                 case 'pause':
                     response.success = false;
                     break;

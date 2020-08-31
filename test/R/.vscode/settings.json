@@ -1,6 +1,8 @@
 {
     "rdebugger.useJsonServer": true,
     "rdebugger.useSinkServer": true,
-    "rdebugger.printStdout": "nothing",
-    "rdebugger.printSinkSocket": "filtered"
+    // "rdebugger.printStdout": "all",
+    // "rdebugger.printSinkSocket": "all",
+    // "rdebugger.logLevelRSession": "debug",
+    // "rdebugger.logLevelDebugSession": "none"
 }

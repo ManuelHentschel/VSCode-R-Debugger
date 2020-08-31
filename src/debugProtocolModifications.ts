@@ -96,6 +96,10 @@ export interface ContinueArguments extends DebugProtocol.ContinueArguments {
     source?: DebugProtocol.Source;
 }
 
+export interface ContinueRequest extends DebugProtocol.ContinueRequest {
+    arguments: ContinueArguments;
+}
+
 export interface Source extends DebugProtocol.Source {
     srcbody?: string;
 }
@@ -109,6 +113,7 @@ export interface ResponseWithBody extends DebugProtocol.Response {
     body?: { [key: string]: any; };
 }
 
+// Used to send info to VS Code that is not part of the DAP
 export interface CustomEvent extends DebugProtocol.Event {
     event: "custom";
     body: {
@@ -116,6 +121,7 @@ export interface CustomEvent extends DebugProtocol.Event {
     }
 }
 
+// Deprecated
 export interface ContinueOnBrowserPromptEvent extends CustomEvent {
     body: {
         reason: "continueOnBrowserPrompt";
@@ -124,3 +130,35 @@ export interface ContinueOnBrowserPromptEvent extends CustomEvent {
         repeatMessage?: boolean;
     }
 }
+
+// Indicate that VS-Code should write a given text to R's stdin
+export interface WriteToStdinEvent extends CustomEvent {
+    body: WriteToStdinBody;
+}
+export interface WriteToStdinBody {
+    reason: "writeToStdin";
+    text: string;
+    when?: "now"|"browserPrompt"|"topLevelPrompt"|"prompt";
+    addNewLine?: boolean; //=false (in vscode), =true (in R)
+    changeExpectBrowser?: boolean;
+    expectBrowser?: boolean;
+}
+
+// Used to send info to R that is not part of the DAP
+export interface CustomRequest extends DebugProtocol.Request {
+    command: "custom"
+    arguments: {
+        reason: string;
+    }
+}
+
+// Indicate that R is showing the input prompt in its stdout
+export interface ShowingPromptRequest extends CustomRequest {
+    arguments: {
+        reason: "showingPrompt";
+        which?: "browser"|"topLevel";
+        text?: string;
+    }
+}
+
+

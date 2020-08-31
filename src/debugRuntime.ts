@@ -10,7 +10,17 @@ import { isUndefined } from 'util';
 import { RSession } from './rSession';
 import { makeFunctionCall, anyRArgs } from './rUtils';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequestArguments, InitializeRequest, RStartupArguments, DataSource, OutputMode } from './debugProtocolModifications';
+import {
+	InitializeRequestArguments,
+	InitializeRequest,
+	RStartupArguments,
+	DataSource,
+	OutputMode,
+	WriteToStdinBody,
+	ShowingPromptRequest,
+	ContinueRequest,
+	ContinueArguments
+} from './debugProtocolModifications';
 import { installRPackage } from './installRPackage';
 
 import * as log from 'loglevel';
@@ -74,6 +84,8 @@ export class DebugRuntime extends EventEmitter {
 	private outputModes: {[key in DataSource]?: OutputMode} = {};
 	public sendContinueOnBrowser: boolean = false;
 
+	public writeOnBrowserPrompt: string = "";
+	public writeOnTopLevelPrompt: string = "";
 
 
 
@@ -288,8 +300,10 @@ export class DebugRuntime extends EventEmitter {
 				const browserRegex = /Browse\[\d+\]> /;
 				if(browserRegex.test(line)){
 					logger.debug('matches: browser prompt');
+					this.writeToStdin(this.writeOnBrowserPrompt);
 					if(this.sendContinueOnBrowser){
-						this.rSession.runCommand("c", [], true);
+						// logger.debug("Continuing on browser!");
+						// this.rSession.runCommand("c", [], true);
 					} else{
 						// R has entered the browser
 						this.debugState = 'function';
@@ -298,7 +312,8 @@ export class DebugRuntime extends EventEmitter {
 						this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
 						if(!this.expectBrowser){
 							// unexpected breakpoint:
-							this.hitBreakpoint(false);
+							// this.hitBreakpoint(false);
+							this.sendShowingPromptRequest("browser");
 						}
 						this.rSession.showsPrompt();
 					}
@@ -324,6 +339,7 @@ export class DebugRuntime extends EventEmitter {
 				// check for prompt
 				const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
 				if (promptRegex.test(line) && isFullLine) {
+					this.writeToStdin(this.writeOnTopLevelPrompt);
 					if(this.isCrashed && !this.allowGlobalDebugging){
 						this.terminate();
 					} else{
@@ -356,7 +372,7 @@ export class DebugRuntime extends EventEmitter {
 				line = line.replace(tracingInfoRegex, '');
 				this.stdoutIsBrowserInfo = true;
 				this.expectBrowser = true;
-				this.hitBreakpoint(true);
+				// this.hitBreakpoint(true);
 				showLine = false;
 			}
 
@@ -398,6 +414,19 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
+	private sendShowingPromptRequest(which: "browser"|"topLevel", text?: string){
+		const request: ShowingPromptRequest = {
+			command: "custom",
+			arguments: {
+				reason: "showingPrompt",
+				which: which,
+				text: text
+			},
+			seq: 0,
+			type: "request"
+		};
+		this.dispatchRequest(request);
+	}
 
 
 	public handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true){
@@ -418,15 +447,17 @@ export class DebugRuntime extends EventEmitter {
 		if(json.type==="response"){
 			this.sendEvent("response", json);
 		} else if(json.type==="event"){
-			if(json.event === "stopped" && json.body.reason === 'exception'){
+			if(json.event === 'stopped'){
 				this.stdoutIsBrowserInfo = true;
-				this.isCrashed = true;
 				this.expectBrowser = true;
 				this.debugState = 'function';
-				this.sendEvent("event", json);
+				this.isCrashed = (json.body.reason === 'exception');
+				this.sendEvent('event', json);
 			} else if(json.event === 'custom'){
 				if(json.body.reason === "continueOnBrowserPrompt"){
 					this.sendContinueOnBrowser = json.body.value;
+				} else if(json.body.reason === "writeToStdin"){
+					this.handleWriteToStdinEvent(json.body);
 				}
 			} else{
 				this.sendEvent("event", json);
@@ -435,6 +466,31 @@ export class DebugRuntime extends EventEmitter {
 			logger.error("Unknown message:");
 			logger.error(json);
 		}
+	}
+
+	public handleWriteToStdinEvent(args: WriteToStdinBody){
+		if(args.addNewLine && args.text.slice(-1)!=="\n"){
+			args.text = args.text + "\n";
+		}
+		if(args.when==="now"){
+			this.writeToStdin(args.text);
+		}
+		// Don't use else since when==="prompt" is handled twice!
+		if(args.when==="browserPrompt" || args.when==="prompt"){
+			this.writeOnBrowserPrompt = args.text;
+		}
+		if(args.when==="topLevelPrompt" || args.when==="prompt"){
+			this.writeOnTopLevelPrompt = args.text;
+		}
+		if(args.changeExpectBrowser){
+			this.expectBrowser = args.expectBrowser;
+		}
+	}
+
+	public writeToStdin(text: string){
+		if(text){
+			logger.debug("Writing to stdin: ", text);
+			this.rSession.runCommand(text, [], true, "");
 		}
 	}
 
@@ -523,71 +579,56 @@ export class DebugRuntime extends EventEmitter {
 		this.writeOutput("", false, false, '', 1, "end");
 	}
 
-	private async hitBreakpoint(expected: boolean = true){
-		this.expectBrowser = true; //indicates that following browser statements are no 'new' breakpoint
-		this.debugState = 'function'; //browser is only called from inside a function/evaluated expression
-		if(expected){
-			// is sent BEFORE parsing all the browserInfo
-			this.stdoutIsBrowserInfo = true; 
-			// sent if the breakpoint was set by the debugger -> skip the browser() statement
-			this.rSession.clearQueue();
-			this.rSession.runCommand('n');
-		} else{
-			// unexpected breakpoint --> browser() statement is part of the actual source code
-			// this.rSession.clearQueue();
-		}
-		this.sendEvent('stopOnBreakpoint');
-	}
-
 
 	///////////////////////////////////////////////
 	// FLOW CONTROL
 	///////////////////////////////////////////////
 
 	// continue script execution:
-	public async continue(request: DebugProtocol.Request) {
+	public async continue(request: ContinueRequest) {
 		if(this.debugState === 'global'){
 			await vscode.window.activeTextEditor.document.save();
 			const filename = vscode.window.activeTextEditor.document.fileName;
-			this.debugSource(filename);
+			// this.debugSource(filename);
+			request.arguments = {
+				...request.arguments,
+				callDebugSource: true,
+				source: {
+					path: filename
+				}
+			};
+			// request.arguments.callDebugSource = true;
+			// request.arguments.source.path = filename;
 		} else{
 			this.expectBrowser = false;
-			this.runCommandAndSendEvent('c', '');
+			// this.runCommandAndSendEvent('c', '');
 		}
+		this.dispatchRequest(request);
 	}
 
-	// debug source:
-	public async debugSource(filename: string){
-		this.rSession.callFunction('.vsc.debugSource', { file: filename });
-		const rCall = makeFunctionCall('.vsc.debugSource', { file: filename });
-		this.startOutputGroup(rCall, true);
-		this.endOutputGroup();
-		this.sendEvent('stopOnStep');
-	}
+	// // step:
+	// public async step(reverse = false, event = 'stopOnStep') {
+	// 	this.runCommandAndSendEvent('n');
+	// }
 
-	// step:
-	public async step(reverse = false, event = 'stopOnStep') {
-		this.runCommandAndSendEvent('n');
-	}
+	// // step into function:
+	// public async stepIn(event = 'stopOnStep') {
+	// 	this.runCommandAndSendEvent('s');
+	// }
 
-	// step into function:
-	public async stepIn(event = 'stopOnStep') {
-		this.runCommandAndSendEvent('s');
-	}
+	// // execute rest of function:
+	// public async stepOut(reverse = false, event = 'stopOnStep') {
+	// 	this.runCommandAndSendEvent('f');
+	// }
 
-	// execute rest of function:
-	public async stepOut(reverse = false, event = 'stopOnStep') {
-		this.runCommandAndSendEvent('f');
-	}
-
-	private async runCommandAndSendEvent(command: string, event: string = 'stopOnStep'){
-		if (this.isCrashed) {
-			this.returnToPrompt();
-		} else {
-			this.rSession.runCommand(command);
-			this.sendEvent(event);
-		}
-	}
+	// private async runCommandAndSendEvent(command: string, event: string = 'stopOnStep'){
+	// 	if (this.isCrashed) {
+	// 		this.returnToPrompt();
+	// 	} else {
+	// 		this.rSession.runCommand(command);
+	// 		this.sendEvent(event);
+	// 	}
+	// }
 
 
 
