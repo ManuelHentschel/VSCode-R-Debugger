@@ -13,6 +13,8 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import { InitializeRequestArguments, InitializeRequest, RStartupArguments, DataSource, OutputMode } from './debugProtocolModifications';
 import { installRPackage } from './installRPackage';
 
+import * as log from 'loglevel';
+const logger = log.getLogger("DebugRuntime");
 
 const { Subject } = require('await-notify');
 // import { Subject } from 'await-notify';
@@ -46,9 +48,6 @@ export class DebugRuntime extends EventEmitter {
 
 	private initArgs: InitializeRequestArguments;
 
-	// debugging
-	private logLevel = 0;
-
 	// The rSession used to run the code
 	public rSession: RSession;
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
@@ -81,6 +80,7 @@ export class DebugRuntime extends EventEmitter {
 	// constructor
 	constructor() {
 		super();
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 	}
 
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: InitializeRequest) {
@@ -116,7 +116,6 @@ export class DebugRuntime extends EventEmitter {
 		const rStartupArguments: RStartupArguments = await getRStartupArguments();
 		rStartupArguments.useJsonServer = args.useJsonServer;
 		rStartupArguments.useSinkServer = args.useSinkServer;
-		rStartupArguments.logLevelCP = this.logLevel;
 		const openFolders = vscode.workspace.workspaceFolders;
 		if(openFolders){
 			rStartupArguments.cwd = openFolders[0].uri.fsPath;
@@ -157,7 +156,7 @@ export class DebugRuntime extends EventEmitter {
 		// set timeout
 		await this.rSessionStartup.wait(this.startupTimeout);
 		if (this.rSessionReady) {
-			console.log("R Session Ready");
+			logger.info("R Session ready");
 		} else {
 			const rPath = rStartupArguments.path;
 			const message = 'R path not working:\n' + rPath;
@@ -184,7 +183,6 @@ export class DebugRuntime extends EventEmitter {
 		this.rSession.defaultAppend = this.rStrings.append;
 
 		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
-		console.log(args);
 
 		request.arguments = args;
 		this.dispatchRequest(request);
@@ -215,7 +213,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
-		console.error(message);
+		logger.error(message);
 		if(endOutputGroup){
 			this.endOutputGroup();
 		}
@@ -289,7 +287,7 @@ export class DebugRuntime extends EventEmitter {
 				// Check for browser prompt
 				const browserRegex = /Browse\[\d+\]> /;
 				if(browserRegex.test(line)){
-					console.log('matches: browser prompt');
+					logger.debug('matches: browser prompt');
 					if(this.sendContinueOnBrowser){
 						this.rSession.runCommand("c", [], true);
 					} else{
@@ -310,7 +308,7 @@ export class DebugRuntime extends EventEmitter {
 				// identify echo of browser commands sent by vsc
 				if(isFullLine && /^[ncsfQ]$/.test(line)) {
 					// commands used to control the browser
-					console.log('matches: [ncsfQ]');
+					logger.debug('matches: [ncsfQ]');
 					showLine = false;
 				}
 
@@ -319,7 +317,7 @@ export class DebugRuntime extends EventEmitter {
 				if(isFullLine && echoRegex.test(line)){
 					// line = line.replace(echoRegex, '');
 					showLine = false;
-					console.log('matches: echo');
+					logger.debug('matches: echo');
 				}
 
 
@@ -329,7 +327,7 @@ export class DebugRuntime extends EventEmitter {
 					if(this.isCrashed && !this.allowGlobalDebugging){
 						this.terminate();
 					} else{
-						// console.log("matches: prompt");
+						logger.debug("matches: prompt");
 						this.debugState = 'global';
 						this.rSession.showsPrompt();
 						// this.endOutputGroup();
@@ -342,7 +340,7 @@ export class DebugRuntime extends EventEmitter {
 				// check for continue prompt
 				const continueRegex = new RegExp(escapeForRegex(this.rStrings.continue));
 				if(continueRegex.test(line) && isFullLine){
-					console.log("matches: continue prompt");
+					logger.debug("matches: continue prompt");
 					this.writeOutput("...");
 					showLine = false;
 				}
@@ -434,8 +432,9 @@ export class DebugRuntime extends EventEmitter {
 				this.sendEvent("event", json);
 			}
 		} else{
-			console.error("Unknown message:");
-			console.log(json);
+			logger.error("Unknown message:");
+			logger.error(json);
+		}
 		}
 	}
 

@@ -19,6 +19,9 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments } from './debugProtocolModifications';
 import { config } from './utils';
 
+import * as log from 'loglevel';
+const logger = log.getLogger("DebugSession");
+
 export class DebugSession extends ProtocolServer {
 
 	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
@@ -29,20 +32,22 @@ export class DebugSession extends ProtocolServer {
 
 
     sendResponse(response: DebugProtocol.Response): void {
-        console.log("response " + response.request_seq + ": " + response.command, response);
+        logger.info("response " + response.request_seq + ": " + response.command, response);
 		super.sendResponse(response);
     }
     
     sendEvent(event: DebugProtocol.Event): void {
-        console.log("event: " + event.event);
+        logger.info("event: " + event.event);
         if(event.body){
-            console.log(event.body);
+            logger.info(event.body);
         }
         super.sendEvent(event);
     }
 
     constructor() {
         super();
+
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'INFO'));
 
 		// construct R runtime
 		this._runtime = new DebugRuntime();
@@ -94,7 +99,7 @@ export class DebugSession extends ProtocolServer {
     }
 
     protected dispatchRequest(request: DebugProtocol.Request) {
-        console.log("request " + request.seq + ": " + request.command, request);
+        logger.info("request " + request.seq + ": " + request.command, request);
         const response: ResponseWithBody = new Response(request);
         var dispatchToR: boolean = false; // the cases handled here are not sent to R
         var sendResponse: boolean = true; // for cases handled here, the response must also be sent from here
@@ -127,7 +132,7 @@ export class DebugSession extends ProtocolServer {
                     const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments.expression);
                     if(matches){
                         const toStdin = matches[1];
-                        console.log('cp.stdin:\n' + toStdin);
+                        logger.debug('user cp.stdin:\n' + toStdin);
                         this._runtime.rSession.cp.stdin.write(
                             toStdin + '\n'
                         );
@@ -179,7 +184,7 @@ export class DebugSession extends ProtocolServer {
             }
         }
         catch (e) {
-			console.error("Error while handling request " + request.seq + ": " + request.command);
+			logger.error("Error while handling request " + request.seq + ": " + request.command);
         }
     }
 }

@@ -16,8 +16,6 @@ export type OutputMode = "all"|"filtered"|"nothing";
 export interface RStartupArguments {
     path: string;
     args: string[];
-    logLevel?: number;
-    logLevelCP?: number;
     useJsonServer?: boolean;
     useSinkServer?: boolean;
     jsonPort?: number;

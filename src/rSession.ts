@@ -4,9 +4,13 @@ import * as child from 'child_process';
 import { TextDecoder } from 'util';
 import { DebugRuntime } from'./debugRuntime';
 import { RStartupArguments, DataSource } from './debugProtocolModifications';
-import { makeFunctionCall, anyRArgs  } from './rUtils';
+import { makeFunctionCall, anyRArgs } from './rUtils';
+import { config } from './utils';
 import * as net from 'net';
 const { Subject } = require('await-notify');
+
+import * as log from 'loglevel';
+const logger = log.getLogger("RSession");
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -32,8 +36,6 @@ export class RSession {
     public isBusy: boolean = false;
     public useQueue: boolean = false;
     public cmdQueue: string[] = [];
-    public logLevel: number = 0;
-    public logLevelCP: number = 0;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
     public defaultAppend: string = '';
@@ -56,18 +58,13 @@ export class RSession {
     private restOfLine: {[k in DataSource]?: string} = {};
 
 
-    // constructor(rPath: string, rArgs: string[]=[],
-    //     // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
-    //     debugRuntime: DebugRuntime,
-    //     logLevel=undefined, logLevelCP=undefined)
-    constructor(){};
+    constructor(){
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'silent'));
+    };
     
     public async startR(args: RStartupArguments, debugRuntime: DebugRuntime)
     {
         // spawn new terminal process (necessary for interactive R session)
-
-        this.logLevel = args.logLevel || this.logLevel;
-        this.logLevelCP = args.logLevelCP || this.logLevelCP;
 
         this.cp = spawnRProcess(args);
 
@@ -157,17 +154,13 @@ export class RSession {
         // execute command or add to command queue
         if(!force && this.useQueue && this.isBusy){
             this.cmdQueue.push(cmd);
-            if(this.logLevel>=3){
-                console.log('rSession: stored command "' + cmd.trim() + '" to position ' + this.cmdQueue.length);
-            }
+            logger.debug('rSession: stored command "' + cmd.trim() + '" to position ' + this.cmdQueue.length);
         } else{
             this.isBusy = true;
-            if(this.logLevel>=3){
-                console.log('cp.stdin:\n' + cmd.trim());
-            }
             if(this.waitBetweenCommands>0){
                 await timeout(this.waitBetweenCommands);
             }
+            logger.info('cp.stdin:\n' + cmd.trim());
             this.cp.stdin.write(cmd);
         }
     }
@@ -181,7 +174,6 @@ export class RSession {
         if(this.cmdQueue.length>0){
             this.isBusy = true;
             const cmd = this.cmdQueue.shift();
-            // console.log('rSession: calling from list: "' + cmd.trim() + '"');
             this.runCommand(cmd, [], true, '');
         } else{
             this.isBusy = false;
@@ -208,7 +200,6 @@ export class RSession {
         var s = data.toString();
         s = s.replace(/\r/g,''); //keep only \n as linebreak
 
-        // console.log("Handle data from " + from + ":", {data: s});
 
         s = (this.restOfLine[from] || "") + s;
 
@@ -264,27 +255,18 @@ function spawnRProcess(args: RStartupArguments){
 
     const cp = child.spawn(rPath, rArgs, options);
 
-    const logLevel = args.logLevelCP || 0;
-    // log output to console.log:
-    if(logLevel>=4){
-        cp.stdout.on("data", data => {
-            console.log('cp.stdout:\n' + data);
-        });
-    }
-    if(logLevel>=3){
-        cp.stderr.on("data", data => {
-            console.warn('cp.stderr:\n' + data);
-        });
-    }
-    if(logLevel>=2){
-        cp.on("close", code => {
-            console.log('Child process exited with code: ' + code);
-        });
-    }
-    if(logLevel>=1){
-        cp.on("error", (error) => {
-            console.log('cp.error:\n' + error.message);
-        });
-    }
+    // log output
+    cp.stdout.on("data", data => {
+        logger.debug('cp.stdout:\n' + data);
+    });
+    cp.stderr.on("data", data => {
+        logger.debug('cp.stderr:\n' + data);
+    });
+    cp.on("close", code => {
+        logger.debug('Child process exited with code: ' + code);
+    });
+    cp.on("error", (error) => {
+        logger.debug('cp.error:\n' + error.message);
+    });
     return cp;
 }
