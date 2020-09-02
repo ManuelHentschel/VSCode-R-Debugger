@@ -1,10 +1,12 @@
 
 import { window, workspace } from "vscode";
+import { platform } from "os";
+import { RStartupArguments } from './debugProtocolModifications';
+import * as net from 'net';
+
 import path = require("path");
 import fs = require("fs");
 import winreg = require("winreg");
-import { platform } from "os";
-import { RStartupArguments } from './debugProtocolModifications';
 
 const packageJson = require('../package.json');
 
@@ -30,6 +32,22 @@ function getRfromEnvPath(platform: string) {
     }
     return "";
 }
+
+
+export function getPortNumber(server: net.Server){
+    const address = server.address();
+    if (typeof address === 'string' || address === undefined) {
+        return -1;
+    } else {
+        return address.port;
+    }
+}
+
+
+export function timeout(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 
 export async function getRStartupArguments(): Promise<RStartupArguments> {
     let rpath: string = "";
@@ -68,7 +86,8 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
     }
     const ret: RStartupArguments = {
         path: rpath,
-        args: rArgs
+        args: rArgs,
+        cwd: undefined
     };
 
     if (rpath !== "") {
@@ -80,7 +99,7 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
 }
 
 
-export function getRDownloadLink(packageName: string): String{
+export function getRDownloadLink(packageName: string): string{
     let url: string = config().get<string>("packageURL", "");
 
     if(url === ""){

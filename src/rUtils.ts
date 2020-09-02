@@ -11,8 +11,11 @@ export type anyRArgs = (unnamedRArg|unnamedRArgs|namedRArgs);
 // Construction of R function calls
 
 export function makeFunctionCall(
-    fnc: string, args: anyRArgs=[], args2: anyRArgs=[],
-    escapeStrings: boolean=true, library: string = '', append: string = ''
+    fnc: string,
+    args: anyRArgs=[],
+    args2: anyRArgs=[],
+    escapeStrings: boolean=true,
+    library: string = ''
 ): string{
     // args and args2 are handled identically and only necessary when combining named and unnamed arguments
     args = convertToUnnamedArgs(convertArgsToStrings(args, escapeStrings));
@@ -25,7 +28,7 @@ export function makeFunctionCall(
     }
 
     // construct and execute function-call
-    const cmd = library + fnc + '(' + argString + ')' + append;
+    const cmd = library + fnc + '(' + argString + ')';
     return cmd;
 }
 
@@ -108,9 +111,9 @@ function convertToUnnamedArg(arg: unnamedRArg|rList): unnamedRArg{
     var ret: unnamedRArg;
     if(Array.isArray(arg)){
         // is rList
-        ret = makeFunctionCall('list', arg, [], false,'base', '');
+        ret = makeFunctionCall('list', arg, [], false,'base');
     } else if(arg!==null && typeof arg === 'object'){
-        ret = makeFunctionCall('list', arg, [], false, 'base', '');
+        ret = makeFunctionCall('list', arg, [], false, 'base');
     } else{
         ret = <unnamedRArg>arg;
     }

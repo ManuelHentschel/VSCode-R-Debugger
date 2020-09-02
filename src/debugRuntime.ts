@@ -4,36 +4,26 @@
 
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
-import { config, escapeForRegex, getRStartupArguments } from "./utils";
-import { isUndefined } from 'util';
+import { config, escapeForRegex, getRStartupArguments, timeout } from "./utils";
+import { checkPackageVersion } from './installRPackage';
 
 import { RSession } from './rSession';
 import { makeFunctionCall, anyRArgs } from './rUtils';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import {
-	InitializeRequestArguments,
-	InitializeRequest,
-	RStartupArguments,
-	DataSource,
-	OutputMode,
-	WriteToStdinBody,
-	ShowingPromptRequest,
-	ContinueRequest,
-	ContinueArguments
-} from './debugProtocolModifications';
-import { installRPackage } from './installRPackage';
+import * as MDebugProtocol from './debugProtocolModifications';
+import { explainRPackage, PackageVersionInfo } from './installRPackage';
+
+const { Subject } = require('await-notify');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
 
-const { Subject } = require('await-notify');
-// import { Subject } from 'await-notify';
 
-function timeout(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
+export type JsonHandler = (json: string, from: DataSource, isFullLine: boolean) => string;
 
-
+export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket";
+export type OutputMode = "all"|"filtered"|"nothing";
 
 
 export class DebugRuntime extends EventEmitter {
@@ -49,34 +39,36 @@ export class DebugRuntime extends EventEmitter {
 		startup: '<v\\s\\c\\R\\STARTUP>',
 		libraryNotFound: '<v\\s\\c\\LIBRARY\\NOT\\FOUND>',
 		packageName: 'vscDebugger',
-		append: ' ### <v\\s\\c\\COMMAND>'
 	};
 
-	private rSessionStartup = new Subject();
 
-	private rPackageStartup = new Subject();
-
-	private initArgs: InitializeRequestArguments;
+	private initArgs: MDebugProtocol.InitializeRequestArguments;
 
 	// The rSession used to run the code
 	public rSession: RSession;
-	// Time in ms to wait before sending an R command (makes debugging slower but 'safer')
+	// Time in ms to wait before sending an R command (makes debugging slower but 'safer'?)
 	private waitBetweenRCommands: number = 0;
 
 	public host = 'localhost';
 	public port: number = 0;
 
-	// state info about the R session
+	// // state info about the R session
+	// R session
+	private rSessionStartup = new Subject(); // used to wait for R session to start
 	private rSessionReady: boolean = false; // is set to true after executing the first R command successfully
+	// R package
+	private rPackageStartup = new Subject(); // used to wait for package to load
 	private rPackageFound: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
 	private rPackageInfo: MDebugProtocol.PackageInfo = undefined;
 	private rPackageVersionCheck: PackageVersionInfo = {versionOk: false, shortMessage: '', longMessage: ''};
+	// output state (of R process)
 	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
 	private isCrashed: boolean = false; // is set to true upon encountering an error (in R)
 	private expectBrowser: boolean = false; // is set to true if a known breakpoint is encountered (indicated by "tracing...")
+	// output state (of this extension)
 	private outputGroupLevel: number = 0; // counts the nesting level of output to the debug window
 
-	// info about the R stack, variables etc.
+	// timeouts
 	private startupTimeout = 1000; // time to wait for R and the R package to laod before throwing an error
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
 
@@ -84,7 +76,6 @@ export class DebugRuntime extends EventEmitter {
 	public allowGlobalDebugging: boolean = false;
 	private debugState: ('prep'|'function'|'global') = 'global';
 	private outputModes: {[key in DataSource]?: OutputMode} = {};
-	public sendContinueOnBrowser: boolean = false;
 
 	public writeOnBrowserPrompt: string = "";
 	public writeOnTopLevelPrompt: string = "";
@@ -97,9 +88,16 @@ export class DebugRuntime extends EventEmitter {
 		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 	}
 
-	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: InitializeRequestArguments, request: InitializeRequest) {
+	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: MDebugProtocol.InitializeRequestArguments, request: MDebugProtocol.InitializeRequest) {
+		// This function initializes a debug session with the following steps:
+		// 1. Handle arguments
+		// 2. Launch a child process 
+		// 3. Check that the child process started 
+		// 4. Load the R package vscDebugger
+		// 5. Check that the R package is present and has a correct version
 
-		// LAUNCH R PROCESS
+
+		//// (1) Handle arguments
 		if(args.rStrings){
 			const rs1 = args.rStrings;
 			const rs0 = this.rStrings;
@@ -110,7 +108,6 @@ export class DebugRuntime extends EventEmitter {
 			this.rStrings.startup = rs1.startup || rs0.startup;
 			this.rStrings.libraryNotFound = rs1.libraryNotFound || rs0.libraryNotFound;
 			this.rStrings.packageName = rs1.packageName || rs0.packageName;
-			this.rStrings.append = rs1.append || rs0.append;
 		}
 		args.rStrings = this.rStrings;
 
@@ -121,33 +118,38 @@ export class DebugRuntime extends EventEmitter {
 		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
-
-		// print some info about the rSession
-		// everything following this is printed in (collapsed) group
-		this.startOutputGroup('Starting R session...', true);
-
 		// start R in child process
-		const rStartupArguments: RStartupArguments = await getRStartupArguments();
+		const rStartupArguments: MDebugProtocol.RStartupArguments = await getRStartupArguments();
 		rStartupArguments.useJsonServer = args.useJsonServer;
 		rStartupArguments.useSinkServer = args.useSinkServer;
 		const openFolders = vscode.workspace.workspaceFolders;
 		if(openFolders){
 			rStartupArguments.cwd = openFolders[0].uri.fsPath;
 		}
-		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
-		// (essential R args: --interactive (linux) and --ess (windows) to force an interactive session)
 
-		const thisDebugRuntime = this; // direct callback to this.handleLine() does not seem to work...
+		// print some info about the rSession
+		// everything following this is printed in (collapsed) group
+		this.startOutputGroup('Starting R session...', true);
+		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
+
+
+		//// (2) Launch child process
+		const tmpHandleLine: LineHandler = (line: string, from: DataSource, isFullLine: boolean) => {
+			return this.handleLine(line, from, isFullLine);
+		};
+		const tmpHandleJsonString: JsonHandler = (json: string, from?: DataSource, isFullLine: boolean = true) => {
+			return this.handleJsonString(json, from, isFullLine);
+		};
 		this.rSession = new RSession();
-		await this.rSession.startR(rStartupArguments, thisDebugRuntime);
-		if (!this.rSession.successTerminal) {
+		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
+		// check that the child process launched properly
+		const successTerminal = await this.rSession.startR(rStartupArguments, tmpHandleLine, tmpHandleJsonString);
+		if (!successTerminal) {
 			const message = 'Failed to spawn a child process!';
 			await this.abortInitializeRequest(response, message);
 			return false;
 		}
-
-		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
-
+		// read ports that were assigned to the child process and add to initialize args
 		args.useJsonServer = this.rSession.jsonPort > 0;
 		if(args.useJsonServer){
 			args.jsonHost = this.rSession.host;
@@ -159,15 +161,12 @@ export class DebugRuntime extends EventEmitter {
 			args.sinkHost = this.rSession.host;
 			args.sinkPort = this.rSession.sinkPort;
 		}
-
 		this.initArgs = args;
 
-		// CHECK IF R HAS STARTED
-
+		//// (3) CHECK IF R HAS STARTED
 		// cat message from R
 		this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
-
-		// set timeout
+		// `this.rSessionStartup` is notified when the output of the above `cat()` call is received
 		await this.rSessionStartup.wait(this.startupTimeout);
 		if (this.rSessionReady) {
 			logger.info("R Session ready");
@@ -180,9 +179,7 @@ export class DebugRuntime extends EventEmitter {
 			return false;
 		}
 
-
-		// LOAD R PACKAGE
-
+		//// (4) Load R package
 		// load R package, wrapped in a try-catch-function
 		// missing R package will be handled by this.handleLine()
 		const tryCatchArgs: anyRArgs = {
@@ -194,13 +191,14 @@ export class DebugRuntime extends EventEmitter {
 
 		// all R function calls from here on are (by default) meant for functions from the vsc-extension:
 		this.rSession.defaultLibrary = this.rStrings.packageName;
-		this.rSession.defaultAppend = this.rStrings.append;
-
 		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
 
+		// actually dispatch the (modified) initialize request to the R package
 		request.arguments = args;
 		this.dispatchRequest(request);
 
+		//// (5) Check that the package started and has ok version
+		// `rPackageStartup` is notified when the response to the initialize request is received
 		await this.rPackageStartup.wait(this.startupTimeout);
 
 		if (this.rPackageFound && this.rPackageVersionCheck.versionOk) {
@@ -232,20 +230,20 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
+		// used to abort the debug session and return an unsuccessful InitializeResponse
 		logger.error(message);
 		if(endOutputGroup){
 			this.endOutputGroup();
 		}
-		this.writeOutput(message, true, true);
+		// timeout to give messages time to appear before shutdown
 		await timeout(this.terminateTimeout);
-
+		// prep and send response
 		response.success = false;
 		response.message = message;
 		this.sendEvent('response', response);
 		this.killR();
 		return false;
 	}
-
 
 
 	//////////
@@ -266,7 +264,6 @@ export class DebugRuntime extends EventEmitter {
 		if(this.initArgs.useSinkServer){
 			isSink = from === "sinkSocket";
 			isStdout = from === "stdout";
-
 		} else{
 			isSink = (from === "sinkSocket") || (from === "stdout");
 			isStdout = isSink;
@@ -308,21 +305,15 @@ export class DebugRuntime extends EventEmitter {
 				if(browserRegex.test(line)){
 					logger.debug('matches: browser prompt');
 					this.writeToStdin(this.writeOnBrowserPrompt);
-					if(this.sendContinueOnBrowser){
-						// logger.debug("Continuing on browser!");
-						// this.rSession.runCommand("c", [], true);
-					} else{
-						// R has entered the browser
-						this.debugState = 'function';
-						line = line.replace(browserRegex,'');
-						showLine = false;
-						this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
-						if(!this.expectBrowser){
-							// unexpected breakpoint:
-							// this.hitBreakpoint(false);
-							this.sendShowingPromptRequest("browser");
-						}
-						this.rSession.showsPrompt();
+					// R has entered the browser
+					this.debugState = 'function';
+					line = line.replace(browserRegex,'');
+					showLine = false;
+					this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
+					if(!this.expectBrowser){
+						// unexpected breakpoint:
+						// this.hitBreakpoint(false);
+						this.sendShowingPromptRequest("browser");
 					}
 				} 
 
@@ -334,15 +325,6 @@ export class DebugRuntime extends EventEmitter {
 					showLine = false;
 				}
 
-				// matches echo of calls made by the debugger
-				const echoRegex = new RegExp(escapeForRegex(this.rStrings.append) + '$');
-				if(isFullLine && echoRegex.test(line)){
-					// line = line.replace(echoRegex, '');
-					showLine = false;
-					logger.debug('matches: echo');
-				}
-
-
 				// check for prompt
 				const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
 				if (promptRegex.test(line) && isFullLine) {
@@ -352,7 +334,6 @@ export class DebugRuntime extends EventEmitter {
 					} else{
 						logger.debug("matches: prompt");
 						this.debugState = 'global';
-						this.rSession.showsPrompt();
 						// this.endOutputGroup();
 						this.expectBrowser = false;
 						showLine = false;
@@ -422,7 +403,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	private sendShowingPromptRequest(which: "browser"|"topLevel", text?: string){
-		const request: ShowingPromptRequest = {
+		const request: MDebugProtocol.ShowingPromptRequest = {
 			command: "custom",
 			arguments: {
 				reason: "showingPrompt",
@@ -472,9 +453,7 @@ export class DebugRuntime extends EventEmitter {
 				this.isCrashed = (json.body.reason === 'exception');
 				this.sendEvent('event', json);
 			} else if(json.event === 'custom'){
-				if(json.body.reason === "continueOnBrowserPrompt"){
-					this.sendContinueOnBrowser = json.body.value;
-				} else if(json.body.reason === "writeToStdin"){
+				if(json.body.reason === "writeToStdin"){
 					this.handleWriteToStdinEvent(json.body);
 				}
 			} else{
@@ -486,14 +465,14 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	public handleWriteToStdinEvent(args: WriteToStdinBody){
+	public handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody){
 		if(args.addNewLine && args.text.slice(-1)!=="\n"){
 			args.text = args.text + "\n";
 		}
 		if(args.when==="now"){
 			this.writeToStdin(args.text);
 		}
-		// Don't use else since when==="prompt" is handled twice!
+		// Don't use `else` since when==="prompt" is handled twice!
 		if(args.when==="browserPrompt" || args.when==="prompt"){
 			this.writeOnBrowserPrompt = args.text;
 		}
@@ -508,7 +487,7 @@ export class DebugRuntime extends EventEmitter {
 	public writeToStdin(text: string){
 		if(text){
 			logger.debug("Writing to stdin: ", text);
-			this.rSession.runCommand(text, [], true, "");
+			this.rSession.runCommand(text, [], true);
 		}
 	}
 
@@ -603,11 +582,10 @@ export class DebugRuntime extends EventEmitter {
 	///////////////////////////////////////////////
 
 	// continue script execution:
-	public async continue(request: ContinueRequest) {
+	public async continue(request: MDebugProtocol.ContinueRequest) {
 		if(this.debugState === 'global'){
 			await vscode.window.activeTextEditor.document.save();
 			const filename = vscode.window.activeTextEditor.document.fileName;
-			// this.debugSource(filename);
 			request.arguments = {
 				...request.arguments,
 				callDebugSource: true,
@@ -615,44 +593,11 @@ export class DebugRuntime extends EventEmitter {
 					path: filename
 				}
 			};
-			// request.arguments.callDebugSource = true;
-			// request.arguments.source.path = filename;
 		} else{
 			this.expectBrowser = false;
-			// this.runCommandAndSendEvent('c', '');
 		}
 		this.dispatchRequest(request);
 	}
-
-	// // step:
-	// public async step(reverse = false, event = 'stopOnStep') {
-	// 	this.runCommandAndSendEvent('n');
-	// }
-
-	// // step into function:
-	// public async stepIn(event = 'stopOnStep') {
-	// 	this.runCommandAndSendEvent('s');
-	// }
-
-	// // execute rest of function:
-	// public async stepOut(reverse = false, event = 'stopOnStep') {
-	// 	this.runCommandAndSendEvent('f');
-	// }
-
-	// private async runCommandAndSendEvent(command: string, event: string = 'stopOnStep'){
-	// 	if (this.isCrashed) {
-	// 		this.returnToPrompt();
-	// 	} else {
-	// 		this.rSession.runCommand(command);
-	// 		this.sendEvent(event);
-	// 	}
-	// }
-
-
-
-
-
-
 
 	///////////////////////////////
 	// functions to terminate the debug session
@@ -660,7 +605,6 @@ export class DebugRuntime extends EventEmitter {
 	public killR(): void {
 		if(this.rSession){
 			this.rSession.ignoreOutput = true;
-			this.rSession.clearQueue();
 			this.rSession.killChildProcess();
 			// this.sendEvent('end');
 		}
@@ -668,7 +612,6 @@ export class DebugRuntime extends EventEmitter {
 
 	public terminateFromPrompt(): void {
 		this.rSession.ignoreOutput = true;
-		this.rSession.clearQueue();
 		if(this.debugState === 'function'){
 			this.rSession.runCommand('Q', [], true);
 			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
@@ -687,7 +630,6 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public async returnToPrompt() {
-		this.rSession.clearQueue();
 		if(this.debugState === 'function'){
 			this.rSession.runCommand('Q', [], true);
 		}
@@ -698,12 +640,7 @@ export class DebugRuntime extends EventEmitter {
 
 	public terminate(ignoreOutput: boolean = true): void {
 		this.rSession.ignoreOutput = ignoreOutput;
-		this.rSession.clearQueue();
 		this.rSession.killChildProcess();
 		this.sendEvent('end');
-	}
-
-	public cancel(): void {
-		this.rSession.clearQueue();
 	}
 }

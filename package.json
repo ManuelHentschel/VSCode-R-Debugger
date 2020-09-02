@@ -200,11 +200,6 @@
           "default": "/usr/bin/R",
           "description": "R path for Linux."
         },
-        "rdebugger.waitBetweenRCommands": {
-          "type": "integer",
-          "default": 0,
-          "description": "The time (in ms) to wait between R commands."
-        },
         "rdebugger.startupTimeout": {
           "type": "number",
           "default": 2000,
