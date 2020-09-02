@@ -81,21 +81,8 @@ and use a custom version of `source()`, which makes changes to the R code in ord
 To provide a somewhat 'cleaner' method of running code, this debug mode can be used.
 The specified file is executed using the default `source` command ad breakpoints are set by using R's `trace(..., tracer=browser)` function, which is more robust than the custom breakpoint mechanism.
 
-The remaining config entries are:
-* `"workingDirectory"`: An absolute path to the desired work directory. Defaults to the workspace folder.
-* `"file"`: Required for debug modes `"file"` and `"function"`. The file to be debugged/sourced before calling the main function.
-* `"mainFunction"`: The name of the main function to be debugged. Must be callable without arguments.
-* `"allowGlobalDebugging"`: Whether to keep the R session running after debugging and evaluate expressions from the debug console.
-Essential for debug moge `"workspace"`, recommended for `"file"`, usually not sensible for `"function"`.
-* `"setBreakpointsInPackages"`: Defaults to `false` for performance reasons.
-Set to `true` to debug packages.
-* `"includePackageScopes"`: Set to `true` to view the scopes of packages in the variable view.
-
-There is also a number of settings that are managed within R, using `getOption(...)`.
-These are not documented yet and might change in the future.
-The names of these settings are of the form `vsc.XXXXX` and most are "self-explanatory" booleans.
-To get an idea of the available settings you can search the source code for `getOption('vsc.`/`getOption("vsc.`.
-Alternatively, don't hesitate to open an issue if you are looking for a particular setting/behaviour.
+The is a number of additional launch config entries and settings that are described in detail in
+[configuration.md](./configuration.md) on github.
 
 ## How it works
 The debugger works as follows:
@@ -119,7 +106,12 @@ For this to work, the proper source information must be retained during the inst
 I personally do not know a bulletproof way to achieve this, but the following might help:
 * The package must be installed from source code (not CRAN or `.tar.gz`)
 * The flag `--with-keep.source` should be set
-* Extensions containing C code seem to cause problems sometimes
+* Extensions containing C code seem to cause problems sometimes.
+Sometimes it helps to install the package using
+`devtools::install(quick=FALSE, ...)`
+to compile the binaries and again with
+`devtools::install(quick=TRUE, ...)`
+to retain the source information.
 
 To set breakpoints, the debug config entry `"setBreakpointsInPackages"` needs to be set to `true`.
 If `debugMode=="file"` or `debugMode=="workspace"` it is also necessary to specify the debugged package(s) in the launch config to be loaded before launch, e.g.: 
