@@ -32,7 +32,8 @@
   "activationEvents": [
     "onLanguage:r",
     "onLanguage:rd",
-    "onLanguage:rmd"
+    "onLanguage:rmd",
+    "onCommand:rdebugger.updateRPackage"
   ],
   "keywords": [
     "R",

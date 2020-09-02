@@ -18,7 +18,7 @@ export type VersionCheckLevel = "none"|"required"|"recommended";
 
 
 export async function updateRPackage(packageName:string = 'vscDebugger') {
-    vscode.window.showInformationMessage('I am trying to install stuff now!');
+    vscode.window.showInformationMessage('Installing R Packages...');
     const url = getRDownloadLink(packageName);
     const rPath = (await getRStartupArguments()).path;
     const terminal = vscode.window.createTerminal('InstallRPackage');
