@@ -17,7 +17,7 @@ import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
-import { config } from './utils';
+import { config, getVSCodePackageVersion } from './utils';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugSession");
@@ -110,6 +110,7 @@ export class DebugSession extends ProtocolServer {
                     initializeArguments.useJsonServer = config().get<boolean>('useJsonServer', true);
                     initializeArguments.useSinkServer = config().get<boolean>('useSinkServer', true);
                     initializeArguments.threadId = this.THREAD_ID;
+                    initializeArguments.extensionVersion = getVSCodePackageVersion();
                     const initializeRequest: InitializeRequest = {
                         arguments: initializeArguments,
                         ...request

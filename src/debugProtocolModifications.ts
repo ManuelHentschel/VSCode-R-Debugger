@@ -85,10 +85,20 @@ export interface InitializeRequestArguments extends DebugProtocol.InitializeRequ
     useSinkServer?: boolean;
     sinkPort?: number;
     sinkHost?: string;
+    extensionVersion?: string;
 }
 
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {
     arguments: InitializeRequestArguments;
+}
+
+export interface PackageInfo {
+    Package: string;
+    Version: string;
+};
+
+export interface InitializeResponse extends DebugProtocol.InitializeResponse {
+    packageInfo?: PackageInfo;
 }
 
 export interface ContinueArguments extends DebugProtocol.ContinueArguments {

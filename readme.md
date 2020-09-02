@@ -31,6 +31,11 @@ The latest "stable" version of the VS Code extension and the R package can be fo
 [Releases Site](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases).
 For compatibility reasons make sure to install both from the same release.
 
+You can also try to install the R package automatically by entering the command
+`rdebugger.updateRPackage`
+in the command bar (ctrl+shift+p).
+This function will simply try to load and install the correct binary from the github repo linked above.
+
 If you want to install a development version, the VS Code extension can be installed from the .vsix-files found 
 [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain).
 To download the correct file, filter the commits by branch, select the latest commit,

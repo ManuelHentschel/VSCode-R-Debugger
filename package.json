@@ -8,6 +8,12 @@
   "author": {
     "name": "Manuel Hentschel"
   },
+  "rPackageInfo": {
+    "name": "vscDebugger",
+    "required": "0.2.0",
+    "recommended": "0.2.0",
+    "warnIfNewer": "0.3.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ManuelHentschel/VSCode-R-Debugger"
@@ -35,6 +41,13 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands":[
+      {
+        "command": "rdebugger.updateRPackage",
+        "title": "Update or install the required R Package",
+        "category": "R Debugger"
+      }
+    ],
     "languages": [
       {
         "id": "r",
@@ -196,6 +209,16 @@
           "type": "number",
           "default": 2000,
           "description": "The maximum time in ms that is waited for R to startup"
+        },
+        "rdebugger.checkVersion": {
+          "type": "string",
+          "enum": [
+            "none",
+            "required",
+            "recommended"
+          ],
+          "default": "recommended",
+          "description": "Whether to check the version of the R package before launching the debugger."
         }
       }
     }
@@ -225,6 +248,7 @@
     "await-notify": "^1.0.1",
     "loglevel": "^1.7.0",
     "net": "^1.0.2",
+    "semver": "^7.3.2",
     "vscode-debugadapter": "^1.40.0",
     "winreg": "^1.2.4"
   }

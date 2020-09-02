@@ -69,6 +69,8 @@ export class DebugRuntime extends EventEmitter {
 	// state info about the R session
 	private rSessionReady: boolean = false; // is set to true after executing the first R command successfully
 	private rPackageFound: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
+	private rPackageInfo: MDebugProtocol.PackageInfo = undefined;
+	private rPackageVersionCheck: PackageVersionInfo = {versionOk: false, shortMessage: '', longMessage: ''};
 	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
 	private isCrashed: boolean = false; // is set to true upon encountering an error (in R)
 	private expectBrowser: boolean = false; // is set to true if a known breakpoint is encountered (indicated by "tracing...")
@@ -200,28 +202,33 @@ export class DebugRuntime extends EventEmitter {
 		this.dispatchRequest(request);
 
 		await this.rPackageStartup.wait(this.startupTimeout);
-		if (this.rPackageFound) {
-			// nice
-			// this.endOutputGroup(); // is called after launch request
-			return true;
-		} else {
+
+		if (this.rPackageFound && this.rPackageVersionCheck.versionOk) {
+			logger.info('R Package ok');
+		} else{
+			var packageNeedsUpdate: boolean = false;
+			var shortMessage: string = '';
+			var longMessage: string = '';
+			if(this.rPackageFound){ // but not version ok
+				logger.info('R Package version not ok');
+				packageNeedsUpdate = true;
+				shortMessage = this.rPackageVersionCheck.shortMessage;
+				longMessage = this.rPackageVersionCheck.longMessage;
+			} else{ // package completely missing
+				logger.info('R Package missing');
+				shortMessage = 'Please install the R package "' + this.rStrings.packageName + '"!';
+				longMessage = 'The debugger requries the R package "' + this.rStrings.packageName + '"!';
+			}
 			this.endOutputGroup();
-			let message: string;
 			const tmpWriteOutput = (text: string) => {
 				this.writeOutput(text, true, 'console');
 			};
-			const hasInstalledPackages = await installRPackage(this.rSession, this.rStrings.packageName, tmpWriteOutput);
-			if(hasInstalledPackages){
-				message = 'R package "' + this.rStrings.packageName + '" installed.' + '\nLaunch a new debug request to continue.';
-			} else{
-				message = 'Please install the R package "' + this.rStrings.packageName + '"!';
-			}
-			// if(hasInstalledPackages){
-			// } else{
-			// }
-			await this.abortInitializeRequest(response, message, false);
+			explainRPackage(tmpWriteOutput, longMessage);
+			await this.abortInitializeRequest(response, shortMessage, false);
 			return false;
 		}
+		// everything ok:
+		return true;
 	}
 
 	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
@@ -440,13 +447,24 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public handleJson(json: any){
-		if(!this.rPackageFound){
-			this.rPackageFound = true;
-			this.rPackageStartup.notify();
-		}
-		if(json.type==="response"){
-			this.sendEvent("response", json);
-		} else if(json.type==="event"){
+		if(json.type === "response"){
+			if(json.command === "initialize"){
+				this.rPackageFound = true;
+				this.rPackageInfo = (
+					(<MDebugProtocol.InitializeResponse>json).packageInfo ||
+					//0.1.1 is last version that does not return packageInfo:
+					{Version: '0.1.1', Package: this.rStrings.packageName} 
+				);
+				const versionCheck = checkPackageVersion(this.rPackageInfo.Version);
+				this.rPackageVersionCheck = versionCheck;
+				this.rPackageStartup.notify();
+				if(versionCheck.versionOk){
+					this.sendEvent("response", json);
+				}
+			} else{
+				this.sendEvent("response", json);
+			}
+		} else if(json.type === "event"){
 			if(json.event === 'stopped'){
 				this.stdoutIsBrowserInfo = true;
 				this.expectBrowser = true;

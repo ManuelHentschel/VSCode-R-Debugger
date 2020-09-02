@@ -105,7 +105,24 @@ export function getRDownloadLink(packageName: string): String{
     return url;
 }
 
+export function getVSCodePackageVersion(): string {
+    return packageJson.version;
+}
+
 export function escapeForRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+export function getRequiredRPackageVersion(): {
+    name?: string,
+    required?: string,
+    recommended?: string,
+    warnIfNewer?: string
+}{
+    if(packageJson.rPackageInfo){
+        return packageJson.rPackageInfo;
+    } else{
+        return {};
+    }
 }
 
