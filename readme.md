@@ -1,8 +1,5 @@
 # R Debugger
 
-***Note: v0.1.1 is now available as a preview version on the [VSCode market place](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).***
-***The R package still needs to be installed from [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/)***
-
 This extension adds debugging capabilities for the
 [R](https://www.r-project.org/)
 programming language to Visual Studio Code
