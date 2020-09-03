@@ -1,0 +1,56 @@
+name: main
+
+# runs when a tag v* is pushed
+# creates a release draft with the binaries
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VSIX_FILE: r-debugger.vsix
+    steps:
+      - uses: actions/checkout@v2
+      - run: npm install
+      - uses: lannonbr/vsce-action@master
+        with:
+          args: "package -o $VSIX_FILE"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VSIX_FILE }}
+          path: ${{ env.VSIX_FILE }}
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "13.x"
+      - run: npm install
+      - run: npm run lint
+
+  release:
+    name: Release
+    timeout-minutes: 30
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: "artifacts/"
+      - name: Get version from tag
+        id: get_version
+        run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\/v/}
+      - name: Create release
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          title: Version ${{ steps.get_version.outputs.version }}
+          files: "artifacts/*/*"
+          draft: true # add R binaries and change description before release
+
