@@ -16,8 +16,11 @@ const { net } = require("net");
 import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments } from './debugProtocolModifications';
-import { config } from './utils';
+import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
+import { config, getVSCodePackageVersion } from './utils';
+
+import * as log from 'loglevel';
+const logger = log.getLogger("DebugSession");
 
 export class DebugSession extends ProtocolServer {
 
@@ -29,20 +32,22 @@ export class DebugSession extends ProtocolServer {
 
 
     sendResponse(response: DebugProtocol.Response): void {
-        console.log("response " + response.request_seq + ": " + response.command, response);
+        logger.info("response " + response.request_seq + ": " + response.command, response);
 		super.sendResponse(response);
     }
     
     sendEvent(event: DebugProtocol.Event): void {
-        console.log("event: " + event.event);
+        logger.info("event: " + event.event);
         if(event.body){
-            console.log(event.body);
+            logger.info(event.body);
         }
         super.sendEvent(event);
     }
 
     constructor() {
         super();
+
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'INFO'));
 
 		// construct R runtime
 		this._runtime = new DebugRuntime();
@@ -94,7 +99,7 @@ export class DebugSession extends ProtocolServer {
     }
 
     protected dispatchRequest(request: DebugProtocol.Request) {
-        console.log("request " + request.seq + ": " + request.command, request);
+        logger.info("request " + request.seq + ": " + request.command, request);
         const response: ResponseWithBody = new Response(request);
         var dispatchToR: boolean = false; // the cases handled here are not sent to R
         var sendResponse: boolean = true; // for cases handled here, the response must also be sent from here
@@ -105,6 +110,7 @@ export class DebugSession extends ProtocolServer {
                     initializeArguments.useJsonServer = config().get<boolean>('useJsonServer', true);
                     initializeArguments.useSinkServer = config().get<boolean>('useSinkServer', true);
                     initializeArguments.threadId = this.THREAD_ID;
+                    initializeArguments.extensionVersion = getVSCodePackageVersion();
                     const initializeRequest: InitializeRequest = {
                         arguments: initializeArguments,
                         ...request
@@ -127,7 +133,7 @@ export class DebugSession extends ProtocolServer {
                     const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments.expression);
                     if(matches){
                         const toStdin = matches[1];
-                        console.log('cp.stdin:\n' + toStdin);
+                        logger.debug('user cp.stdin:\n' + toStdin);
                         this._runtime.rSession.cp.stdin.write(
                             toStdin + '\n'
                         );
@@ -142,21 +148,21 @@ export class DebugSession extends ProtocolServer {
                 case 'terminate':
                     this._runtime.terminateFromPrompt();
                     break;
-                case 'restart':
-                    this._runtime.returnToPrompt();
-                    break;
+                // case 'restart':
+                    // this._runtime.returnToPrompt();
+                //     break;
                 case 'continue':
-                    this._runtime.continue(request);
+                    this._runtime.continue(<ContinueRequest>request);
                     break;
-                case 'next':
-                    this._runtime.step();
-                    break;
-                case 'stepIn':
-                    this._runtime.stepIn();
-                    break;
-                case 'stepOut':
-                    this._runtime.stepOut();
-                    break;
+                // case 'next':
+                //     this._runtime.step();
+                //     break;
+                // case 'stepIn':
+                //     this._runtime.stepIn();
+                //     break;
+                // case 'stepOut':
+                //     this._runtime.stepOut();
+                //     break;
                 case 'pause':
                     response.success = false;
                     break;
@@ -179,7 +185,7 @@ export class DebugSession extends ProtocolServer {
             }
         }
         catch (e) {
-			console.error("Error while handling request " + request.seq + ": " + request.command);
+			logger.error("Error while handling request " + request.seq + ": " + request.command);
         }
     }
 }

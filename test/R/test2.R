@@ -17,11 +17,21 @@
 
 # v <- 1:3
 
+options(vsc.showInternalFrames = TRUE)
+
+print(1)
+print(2)
+print(3)
+
+g <- function(){
+    print(1:5)
+}
 
 f <- function(x=9){
     print('ja....')
     print(x)
     print('..woll')
+    return(runif(1))
 }
 
 main <- function(){
@@ -30,10 +40,14 @@ main <- function(){
     print('done.')
 }
 
-# main()
+# if(.vsc.getSession('debugMode', 'none')!='function'){
+#     print('Calling main() from file')
+#     main()
+# }
 
-print(1)
-print(2)
-print(3)
+# print(1)
+# print(2)
+# print(3)
+
 
 

@@ -8,6 +8,7 @@ import {
 	FileDebugConfiguration, WorkspaceDebugConfiguration,
 	StrictDebugConfiguration
 } from './debugProtocolModifications';
+import { updateRPackage } from './installRPackage';
 
 
 // this method is called when the extension is activated
@@ -24,6 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
 	if ('dispose' in factory) {
 		context.subscriptions.push(factory);
 	}
+	context.subscriptions.push(
+		vscode.commands.registerCommand('rdebugger.updateRPackage', updateRPackage)
+	);
 }
 
 // this method is called when the extension is deactivated

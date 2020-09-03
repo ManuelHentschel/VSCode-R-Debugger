@@ -2,11 +2,15 @@
 
 import * as child from 'child_process';
 import { TextDecoder } from 'util';
-import { DebugRuntime } from'./debugRuntime';
-import { RStartupArguments, DataSource } from './debugProtocolModifications';
-import { makeFunctionCall, anyRArgs  } from './rUtils';
+import { LineHandler, JsonHandler, DataSource } from'./debugRuntime';
+import { RStartupArguments } from './debugProtocolModifications';
+import { makeFunctionCall, anyRArgs } from './rUtils';
+import { config, getPortNumber } from './utils';
 import * as net from 'net';
 const { Subject } = require('await-notify');
+
+import * as log from 'loglevel';
+const logger = log.getLogger("RSession");
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -29,60 +33,35 @@ export type RFunctionName = (
 
 export class RSession {
     public cp: child.ChildProcessWithoutNullStreams;
-    public isBusy: boolean = false;
-    public useQueue: boolean = false;
-    public cmdQueue: string[] = [];
-    public logLevel: number = 0;
-    public logLevelCP: number = 0;
     public waitBetweenCommands: number = 0;
     public defaultLibrary: string = '';
-    public defaultAppend: string = '';
-    public successTerminal: boolean = false;
     public ignoreOutput: boolean=false;
-    public debugRuntime: DebugRuntime;
-    private restOfStderr: string='';
-    private restOfStdout: string='';
-    private handleLine: (line: string, from: DataSource, isFullLine: boolean) => string;
-    private handleJsonString: (j: string, from: DataSource, isFullLine: boolean) => string;
+    private handleLine: LineHandler;
+    private handleJsonString: JsonHandler;
+    private restOfLine: {[k in DataSource]?: string} = {};
+
+    public host: string = 'localhost';
     public jsonSocket: net.Socket;
     public sinkSocket: net.Socket;
     public jsonServer: net.Server;
     public sinkServer: net.Server;
-    public host: string = 'localhost';
     public jsonPort: number = -1;
     public sinkPort: number = -1;
 
-    // private restOfLine: Record<DataSource, string>;
-    private restOfLine: {[k in DataSource]?: string} = {};
 
-
-    // constructor(rPath: string, rArgs: string[]=[],
-    //     // handleLine: (line:string,fromStderr:boolean,isFullLine:boolean)=>(Promise<string>),
-    //     debugRuntime: DebugRuntime,
-    //     logLevel=undefined, logLevelCP=undefined)
-    constructor(){};
+    constructor(){
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'silent'));
+    };
     
-    public async startR(args: RStartupArguments, debugRuntime: DebugRuntime)
-    {
-        // spawn new terminal process (necessary for interactive R session)
-
-        this.logLevel = args.logLevel || this.logLevel;
-        this.logLevelCP = args.logLevelCP || this.logLevelCP;
-
+    public async startR(args: RStartupArguments, handleLine: LineHandler, handleJson: JsonHandler): Promise<boolean> {
         this.cp = spawnRProcess(args);
 
         if(this.cp.pid === undefined){
-            this.successTerminal = false;
-            return;
+            return false;
         }
 
-        // store line handler
-        // is only used for debugRuntim.handleLine()
-        this.debugRuntime = debugRuntime;
-        // this.handleLine = debugRuntime.handleLine;
-        this.handleLine = (line, from, isFullLine) => debugRuntime.handleLine(line, from, isFullLine);
-        // this.handleJsonString = debugRuntime.handleJson;
-        this.handleJsonString = (j, from, isFullLine) => debugRuntime.handleJsonString(j, from, isFullLine);
+        this.handleLine = handleLine;
+        this.handleJsonString = handleJson;
 
 		// handle output from the R-process
 		this.cp.stdout.on("data", data => {
@@ -132,71 +111,43 @@ export class RSession {
         await jsonServerReady.wait(1000);
         await sinkServerReady.wait(1000);
 
-
-        this.successTerminal = true;
+        return true;
     }
 
-    public async runCommand(cmd: string, args: (string|number)[]=[], force=false, append: string = ''){
+    public async runCommand(cmd: string, args: (string|number)[]=[], force=false){
         // remove trailing newline
 		while(cmd.length>0 && cmd.slice(-1) === '\n'){
             cmd = cmd.slice(0, -1);
         }
 
 
-        if(append === undefined){
-            append = this.defaultAppend;
-        }
-
         // append arguments (if any given) and newline
         if(args.length > 0){
-            cmd = cmd + ' ' + args.join(' ') + append + '\n';
+            cmd = cmd + ' ' + args.join(' ') + '\n';
         } else {
-            cmd = cmd + append + '\n';
+            cmd = cmd + '\n';
         }
 
         // execute command or add to command queue
-        if(!force && this.useQueue && this.isBusy){
-            this.cmdQueue.push(cmd);
-            if(this.logLevel>=3){
-                console.log('rSession: stored command "' + cmd.trim() + '" to position ' + this.cmdQueue.length);
-            }
-        } else{
-            this.isBusy = true;
-            if(this.logLevel>=3){
-                console.log('cp.stdin:\n' + cmd.trim());
-            }
-            if(this.waitBetweenCommands>0){
-                await timeout(this.waitBetweenCommands);
-            }
-            this.cp.stdin.write(cmd);
+        if(this.waitBetweenCommands>0){
+            await timeout(this.waitBetweenCommands);
         }
+        logger.info('cp.stdin:\n' + cmd.trim());
+        this.cp.stdin.write(cmd);
     }
-
-    public clearQueue(){
-        this.cmdQueue = [];
-    }
-
-    // Call this function to indicate that the previous command is done and the R-Process is idle:
-    public showsPrompt(){
-        if(this.cmdQueue.length>0){
-            this.isBusy = true;
-            const cmd = this.cmdQueue.shift();
-            // console.log('rSession: calling from list: "' + cmd.trim() + '"');
-            this.runCommand(cmd, [], true, '');
-        } else{
-            this.isBusy = false;
-        }
-    }
-
 
     // Call an R-function (constructs and calls the command)
-    public callFunction(fnc: RFunctionName, args: any|anyRArgs=[], args2: anyRArgs=[],
-        escapeStrings: boolean=true, library: string = this.defaultLibrary,
-        force:boolean=false, append: string = this.defaultAppend
+    public callFunction(
+        fnc: RFunctionName,
+        args: any|anyRArgs=[],
+        args2: anyRArgs=[],
+        escapeStrings: boolean=true,
+        library: string = this.defaultLibrary,
+        force:boolean=false
     ){
         // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
         const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library);
-        this.runCommand(cmd, [], force, append);
+        this.runCommand(cmd, [], force);
     }
 
     // Kill the child process
@@ -208,9 +159,7 @@ export class RSession {
         var s = data.toString();
         s = s.replace(/\r/g,''); //keep only \n as linebreak
 
-        // console.log("Handle data from " + from + ":", {data: s});
-
-        s = (this.restOfLine[from] || "") + s;
+        s = (this.restOfLine[from] || "") + s; // append to rest of line from previouse call
 
         const lines = s.split(/\n/);
         
@@ -230,21 +179,10 @@ export class RSession {
             } else{
                 restOfLine = this.handleLine(lines[i], from, !isLastLine);
             }
-            this.restOfLine[from] = restOfLine;
+            this.restOfLine[from] = restOfLine; // save unhandled part for next call
         }
     }
 }
-
-
-function getPortNumber(server: net.Server){
-    const address = server.address();
-    if (typeof address === 'string' || address === undefined) {
-        return -1;
-    } else {
-        return address.port;
-    }
-}
-
 
 /////////////////////////////////
 // Child Process
@@ -264,27 +202,18 @@ function spawnRProcess(args: RStartupArguments){
 
     const cp = child.spawn(rPath, rArgs, options);
 
-    const logLevel = args.logLevelCP || 0;
-    // log output to console.log:
-    if(logLevel>=4){
-        cp.stdout.on("data", data => {
-            console.log('cp.stdout:\n' + data);
-        });
-    }
-    if(logLevel>=3){
-        cp.stderr.on("data", data => {
-            console.warn('cp.stderr:\n' + data);
-        });
-    }
-    if(logLevel>=2){
-        cp.on("close", code => {
-            console.log('Child process exited with code: ' + code);
-        });
-    }
-    if(logLevel>=1){
-        cp.on("error", (error) => {
-            console.log('cp.error:\n' + error.message);
-        });
-    }
+    // log output
+    cp.stdout.on("data", data => {
+        logger.debug('cp.stdout:\n' + data);
+    });
+    cp.stderr.on("data", data => {
+        logger.debug('cp.stderr:\n' + data);
+    });
+    cp.on("close", code => {
+        logger.debug('Child process exited with code: ' + code);
+    });
+    cp.on("error", (error) => {
+        logger.debug('cp.error:\n' + error.message);
+    });
     return cp;
 }

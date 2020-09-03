@@ -10,19 +10,14 @@ export enum DebugMode {
 }
 
 
-export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket";
-export type OutputMode = "all"|"filtered"|"nothing";
-
 export interface RStartupArguments {
     path: string;
     args: string[];
-    logLevel?: number;
-    logLevelCP?: number;
     useJsonServer?: boolean;
     useSinkServer?: boolean;
     jsonPort?: number;
     sinkPort?: number;
-    cwd?: string;
+    cwd: string;
 }
 
 
@@ -75,7 +70,6 @@ export interface RStrings {
     startup?: string;
     libraryNotFound?: string;
     packageName?: string;
-    append?: string;
 }
 
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
@@ -87,15 +81,29 @@ export interface InitializeRequestArguments extends DebugProtocol.InitializeRequ
     useSinkServer?: boolean;
     sinkPort?: number;
     sinkHost?: string;
+    extensionVersion?: string;
 }
 
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {
     arguments: InitializeRequestArguments;
 }
 
+export interface PackageInfo {
+    Package: string;
+    Version: string;
+};
+
+export interface InitializeResponse extends DebugProtocol.InitializeResponse {
+    packageInfo?: PackageInfo;
+}
+
 export interface ContinueArguments extends DebugProtocol.ContinueArguments {
     callDebugSource?: boolean;
     source?: DebugProtocol.Source;
+}
+
+export interface ContinueRequest extends DebugProtocol.ContinueRequest {
+    arguments: ContinueArguments;
 }
 
 export interface Source extends DebugProtocol.Source {
@@ -111,6 +119,7 @@ export interface ResponseWithBody extends DebugProtocol.Response {
     body?: { [key: string]: any; };
 }
 
+// Used to send info to VS Code that is not part of the DAP
 export interface CustomEvent extends DebugProtocol.Event {
     event: "custom";
     body: {
@@ -118,11 +127,34 @@ export interface CustomEvent extends DebugProtocol.Event {
     }
 }
 
-export interface ContinueOnBrowserPromptEvent extends CustomEvent {
-    body: {
-        reason: "continueOnBrowserPrompt";
-        value: boolean;
-        message?: string;
-        repeatMessage?: boolean;
+// Indicate that VS-Code should write a given text to R's stdin
+export interface WriteToStdinEvent extends CustomEvent {
+    body: WriteToStdinBody;
+}
+export interface WriteToStdinBody {
+    reason: "writeToStdin";
+    text: string;
+    when?: "now"|"browserPrompt"|"topLevelPrompt"|"prompt";
+    addNewLine?: boolean; //=false (in vscode), =true (in R)
+    changeExpectBrowser?: boolean;
+    expectBrowser?: boolean;
+}
+
+// Used to send info to R that is not part of the DAP
+export interface CustomRequest extends DebugProtocol.Request {
+    command: "custom"
+    arguments: {
+        reason: string;
     }
 }
+
+// Indicate that R is showing the input prompt in its stdout
+export interface ShowingPromptRequest extends CustomRequest {
+    arguments: {
+        reason: "showingPrompt";
+        which?: "browser"|"topLevel";
+        text?: string;
+    }
+}
+
+
