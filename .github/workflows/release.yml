@@ -1,4 +1,4 @@
-name: main
+name: release
 
 # runs when a tag v* is pushed
 # creates a release draft with the binaries
@@ -22,15 +22,6 @@ jobs:
         with:
           name: ${{ env.VSIX_FILE }}
           path: ${{ env.VSIX_FILE }}
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-        with:
-          node-version: "13.x"
-      - run: npm install
-      - run: npm run lint
 
   release:
     name: Release
