@@ -5,6 +5,6 @@
     // "rdebugger.printStdout": "all",
     // "rdebugger.printSinkSocket": "all",
     // "rdebugger.logLevelRSession": "debug",
-    // "rdebugger.logLevelDebugSession": "none",
+    // "rdebugger.logLevelSession": "debug",
     // "rdebugger.rterm.windows": "\"C:\\Program Files\\R\\R-4.0.2\\bin\\x64\\R.exe\""
 }

@@ -142,12 +142,12 @@ export class DebugSession extends ProtocolServer {
                         sendResponse = false;
                     }
                     break;
-                case 'disconnect':
-                    this._runtime.terminateFromPrompt();
-                    break;
-                case 'terminate':
-                    this._runtime.terminateFromPrompt();
-                    break;
+                // case 'disconnect':
+                //     this._runtime.terminateFromPrompt();
+                //     break;
+                // case 'terminate':
+                //     this._runtime.terminateFromPrompt();
+                //     break;
                 // case 'restart':
                     // this._runtime.returnToPrompt();
                 //     break;
@@ -166,12 +166,12 @@ export class DebugSession extends ProtocolServer {
                 case 'pause':
                     response.success = false;
                     break;
-                case 'source':
-                    const srcbody = request.arguments.source.srcbody;
-                    if(srcbody){
-                        response.body = {content: srcbody};
-                    }
-                    break;
+                // case 'source':
+                //     const srcbody = request.arguments.source.srcbody;
+                //     if(srcbody){
+                //         response.body = {content: srcbody};
+                //     }
+                //     break;
                 default:
                     // request not handled here -> send to R
                     dispatchToR = true;

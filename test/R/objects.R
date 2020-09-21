@@ -32,6 +32,13 @@ df2 <- data.frame(id = 1:5, x = rnorm(5), y = rnorm(5))
 # factor
 fctr <- as.factor(c("a", "b", "c", "c", "d"))
 
+if(TRUE){
+  print(
+    1
+  )
+  print(2)
+}
+
 # matrix
 mat0 <- matrix(numeric())
 mat1 <- matrix(1:10, nrow = 1)
@@ -43,9 +50,12 @@ nmat2 <- matrix(1:10, ncol = 1, dimnames = list(letters[1:10], "x"))
 nmat3 <- matrix(rnorm(20), nrow = 4, dimnames = list(letters[1:4], letters[1:5]))
 
 # array
+print(1)
 arr0 <- array(numeric())
+
 arr1 <- array(1:10, c(10, 1, 1))
 arr2 <- array(1:10, c(1, 10, 1))
+print(2)
 arr3 <- array(1:10, c(1, 1, 10))
 arr4 <- array(1:12, c(2,3,2))
 
@@ -110,8 +120,12 @@ s5 <- TRUE
 s6 <- charToRaw("h")
 
 # ...
-fun <- function(x, y, ...) {
-  browser()
+fun <- function(x, y=x, ...) {
+  print('2')
+  # print('3')
+  base::cat(list(1,2,3)) # error
+  print('4')
+  x*y
 }
 
 # active bindings
@@ -121,7 +135,8 @@ makeActiveBinding("x", function() rnorm(1), env1)
 main <- function() {
   print("testing objects")
   print('asdf')
-  fun(1, 2, 4)
+  v <- 1:10
+  w <- sapply(v, fun)
   print('q  wer')
 }
 

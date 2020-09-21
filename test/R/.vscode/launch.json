@@ -19,7 +19,7 @@
             "debugMode": "file",
             "workingDirectory": "${workspaceFolder}",
             "file": "${file}",
-            "allowGlobalDebugging": true
+            "allowGlobalDebugging": false
         },
         {
             "type": "R-Debugger",
@@ -29,6 +29,15 @@
             "workingDirectory": "${fileDirname}",
             "file": "${file}",
             "mainFunction": "main",
+            "allowGlobalDebugging": true
+        },
+        {
+            "type": "R-Debugger",
+            "request": "launch",
+            "name": "Debug Shiny App",
+            "debugMode": "file",
+            "workingDirectory": "${workspaceFolder}/app",
+            "file": "${workspaceFolder}/app/entrypoint.R",
             "allowGlobalDebugging": false
         }
     ]
