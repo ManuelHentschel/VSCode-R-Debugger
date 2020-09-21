@@ -115,5 +115,6 @@ If no values are set, the defaults listed below are used.
 * `"vsc.showEvaluateName" = TRUE`: Whether to include an evaluate name to copy variables to another R session. Can be disabled for performance reasons when working with large variables/lists/vectors.
 * `"vsc.showInternalFrames" = FALSE`: Whether to show the frames on the bottom of the stack that belong to the R package 
 * `"vsc.supportSetVariable" = TRUE`: Whether to enable support for settings the value of variables from the variables window
+* `"vsc.supportTerminateRequest" = TRUE`: Whether to try and exit only the main function/file when stop (Shift+F5) is used, preserving the R session itself.
 * `"vsc.trySilent" = TRUE`: Whether to hide error messages that are expected and caught by the R package
 * `"vsc.verboseVarInfos" = FALSE`: Whether to print debug info when retrieving info about variables
