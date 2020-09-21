@@ -42,7 +42,7 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands":[
+    "commands": [
       {
         "command": "rdebugger.updateRPackage",
         "title": "Update or install the required R Package",
@@ -193,12 +193,12 @@
         },
         "rdebugger.rterm.mac": {
           "type": "string",
-          "default": "/usr/local/bin/R",
+          "default": "",
           "description": "R path for macOS."
         },
         "rdebugger.rterm.linux": {
           "type": "string",
-          "default": "/usr/bin/R",
+          "default": "",
           "description": "R path for Linux."
         },
         "rdebugger.startupTimeout": {
@@ -245,6 +245,7 @@
     "loglevel": "^1.7.0",
     "net": "^1.0.2",
     "semver": "^7.3.2",
+    "tree-kill": "^1.2.2",
     "vscode-debugadapter": "^1.40.0",
     "winreg": "^1.2.4"
   }

@@ -172,10 +172,11 @@ export class DebugRuntime extends EventEmitter {
 			logger.info("R Session ready");
 		} else {
 			const rPath = rStartupArguments.path;
-			const message = 'R path not working:\n' + rPath;
+			const message = 'R path not working:\n' + rPath + '\n(Can be changed in setting rdebugger.rterm.XXX)';
 			await this.abortInitializeRequest(response, message);
 			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
 			this.writeOutput('R path:\n' + rPath, true, true);
+			this.writeOutput('If R is installed but in a different path, please adjust the setting rdebugger.rterm.windows/mac/linux.');
 			return false;
 		}
 
