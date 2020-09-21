@@ -8,6 +8,7 @@ import { makeFunctionCall, anyRArgs } from './rUtils';
 import { config, getPortNumber } from './utils';
 import * as net from 'net';
 const { Subject } = require('await-notify');
+const kill = require('tree-kill');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("RSession");
@@ -152,7 +153,10 @@ export class RSession {
 
     // Kill the child process
     public killChildProcess(){
-        this.cp.kill('SIGKILL');
+        console.log('sending sigkill...');
+        // this.cp.kill();
+        kill(this.cp.pid, 'SIGKILL');
+        console.log('sent sigkill');
     }
 
     public handleData(data: Buffer, from: DataSource){
