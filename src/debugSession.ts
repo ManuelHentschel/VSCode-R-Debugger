@@ -17,7 +17,7 @@ import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
-import { config, getVSCodePackageVersion } from './utils';
+import { config, getVSCodePackageVersion, timeout } from './utils';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugSession");
@@ -29,6 +29,8 @@ export class DebugSession extends ProtocolServer {
 
 	// a runtime (or debugger)
     private _runtime: DebugRuntime;
+
+    private disconnectTimeout: number = 1000;
 
 
     sendResponse(response: DebugProtocol.Response): void {
@@ -142,9 +144,18 @@ export class DebugSession extends ProtocolServer {
                         sendResponse = false;
                     }
                     break;
-                // case 'disconnect':
-                //     this._runtime.terminateFromPrompt();
-                //     break;
+                case 'disconnect':
+                    setTimeout(()=>{
+                        console.log('killing R...');
+                        this._runtime.killR();
+                    }, this.disconnectTimeout);
+                    // timeout(this.disconnectTimeout).then(
+                    //     () => {
+                    //     }
+                    // );
+                    dispatchToR = true;
+                    sendResponse = false;
+                    break;
                 // case 'terminate':
                 //     this._runtime.terminateFromPrompt();
                 //     break;
