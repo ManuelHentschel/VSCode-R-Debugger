@@ -127,6 +127,13 @@ export class DebugRuntime extends EventEmitter {
 			rStartupArguments.cwd = openFolders[0].uri.fsPath;
 		}
 
+		if(!rStartupArguments.path){
+			const message = 'No R path was found in the settings/path/registry.\n(Can be changed in setting rdebugger.rterm.XXX)';
+			// const message = 'R path not working:\n' + rPath + '\n';
+			await this.abortInitializeRequest(response, message);
+			return false;
+		}
+
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
 		this.startOutputGroup('Starting R session...', true);
