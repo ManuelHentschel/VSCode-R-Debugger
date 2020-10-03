@@ -29,7 +29,7 @@
             "workingDirectory": "${fileDirname}",
             "file": "${file}",
             "mainFunction": "main",
-            "allowGlobalDebugging": true
+            "allowGlobalDebugging": false
         },
         {
             "type": "R-Debugger",

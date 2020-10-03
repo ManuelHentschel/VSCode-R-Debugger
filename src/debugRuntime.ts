@@ -48,7 +48,6 @@ export class DebugRuntime extends EventEmitter {
 		packageName: 'vscDebugger',
 	};
 
-
 	private initArgs: MDebugProtocol.InitializeRequestArguments;
 
 	// The rSession used to run the code
@@ -79,7 +78,6 @@ export class DebugRuntime extends EventEmitter {
 
 	// debugMode
 	public allowGlobalDebugging: boolean = false;
-	private debugState: ('prep'|'function'|'global') = 'global';
 	private outputModes: {[key in DataSource]?: OutputMode} = {};
 
 	public writeOnBrowserPrompt: string = "";
@@ -407,7 +405,6 @@ export class DebugRuntime extends EventEmitter {
 
 	private handlePrompt(which: "browser"|"topLevel", text?: string){
 		logger.debug("matches prompt: " + which);
-		this.debugState = (which==="topLevel" ? "global" : "function");
 	
 		if(this.writeOnPrompt.length > 0){
 			const wop = this.writeOnPrompt.shift();
@@ -444,7 +441,6 @@ export class DebugRuntime extends EventEmitter {
 		this.dispatchRequest(request);
 	}
 
-
 	public handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true){
 		if(!isFullLine){
 			return json;
@@ -478,7 +474,6 @@ export class DebugRuntime extends EventEmitter {
 		} else if(json.type === "event"){
 			if(json.event === 'stopped'){
 				this.stdoutIsBrowserInfo = true;
-				this.debugState = 'function';
 				this.sendEvent('event', json);
 			} else if(json.event === 'custom'){
 				if(json.body.reason === "writeToStdin"){
@@ -550,18 +545,7 @@ export class DebugRuntime extends EventEmitter {
 
 	// REQUESTS
 
-	// // receive requests from the debugSession
-	// public dispatchRequest(request: DebugProtocol.Request) {
-	// 	const json = JSON.stringify(request);
-	// 	this.rSession.callFunction('.vsc.handleJson', {json: json});
-	// }
-
 	// This version dispatches requests to the tcp connection instead of stdin
-	// Is not yet working properly. Current problems/todos:
-	//  - Some requests not handled by R (step, stepIn, stepOut, ...)
-	//  - .vsc.listenOnPort needs to be called everytime the prompt is shown
-	//    Is possible using addTaskCallback, but this does not work e.g. when stepping through code
-
 	public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = true) {
 		const json = JSON.stringify(request);
 		logger.info('request ' + request.seq + ': ' + request.command, request);
@@ -652,45 +636,11 @@ export class DebugRuntime extends EventEmitter {
 	///////////////////////////////
 	// functions to terminate the debug session
 
-	public killR(): void {
+	public killR(signal='SIGKILL'): void {
 		if(this.rSession){
 			this.rSession.ignoreOutput = true;
 			this.rSession.killChildProcess();
 			// this.sendEvent('end');
 		}
 	}
-
-	// public terminateFromPrompt(): void {
-	// 	this.rSession.ignoreOutput = true;
-	// 	if(this.debugState === 'function'){
-	// 		this.rSession.runCommand('Q', [], true);
-	// 		this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
-	// 		if(this.allowGlobalDebugging){
-	// 			const infoString = "You terminated R while debugging a function.\n" +
-	// 				"If you want to keep the R session running and only exit the function, use:\n" + 
-	// 				" - 'Restart' (Ctrl+Shift+F5) when stopped on a normal breakpoint\n" +
-	// 				" - 'Continue' (F5) when stopped on an exception";
-	// 			this.sendEvent('output', infoString, "console");
-	// 		}
-	// 		this.sendEvent('end');
-	// 	} else{
-	// 		this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
-	// 		this.sendEvent('end');
-	// 	}
-	// }
-
-	// public async returnToPrompt() {
-	// 	if(this.debugState === 'function'){
-	// 		this.rSession.runCommand('Q', [], true);
-	// 	}
-	// 	this.debugState = 'global';
-	// 	const filename = vscode.window.activeTextEditor.document.fileName;
-	// 	this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
-	// }
-
-	// public terminate(ignoreOutput: boolean = true): void {
-	// 	this.rSession.ignoreOutput = ignoreOutput;
-	// 	this.rSession.killChildProcess();
-	// 	this.sendEvent('end');
-	// }
 }

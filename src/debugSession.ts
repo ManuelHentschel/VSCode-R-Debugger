@@ -145,42 +145,20 @@ export class DebugSession extends ProtocolServer {
                         console.log('killing R...');
                         this._runtime.killR();
                     }, this.disconnectTimeout);
-                    // timeout(this.disconnectTimeout).then(
-                    //     () => {
-                    //     }
-                    // );
                     dispatchToR = true;
                     sendResponse = false;
                     break;
-                // case 'terminate':
-                //     this._runtime.terminateFromPrompt();
-                //     break;
-                // case 'restart':
-                    // this._runtime.returnToPrompt();
-                //     break;
                 case 'continue':
                     this._runtime.continue(<ContinueRequest>request);
                     dispatchToR = false;
                     sendResponse = false;
                     break;
-                // case 'next':
-                //     this._runtime.step();
-                //     break;
-                // case 'stepIn':
-                //     this._runtime.stepIn();
-                //     break;
-                // case 'stepOut':
-                //     this._runtime.stepOut();
-                //     break;
                 case 'pause':
+                    // this._runtime.killR('SIGSTOP');
+                    // const pid = this._runtime.rSession.cp.pid;
+                    // process.kill(pid, 'SIGKILL');
                     response.success = false;
                     break;
-                // case 'source':
-                //     const srcbody = request.arguments.source.srcbody;
-                //     if(srcbody){
-                //         response.body = {content: srcbody};
-                //     }
-                //     break;
                 default:
                     // request not handled here -> send to R
                     dispatchToR = true;

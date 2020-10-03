@@ -137,14 +137,18 @@ fun <- function(x, y=x, ...) {
 env1 <- new.env()
 makeActiveBinding("x", function() rnorm(1), env1)
 
+wait <- function(n){
+  for(i in 1:(10^n)){
+    i
+  }
+}
+
 main <- function() {
-  print("testing objects")
-  print('asdf')
-  v <- 1:10
-  # w <- sapply(v, fun)
-  print('q  wer')
-  print('asdfasdfasdfa')
-  browser()
+  print("start sleeping...")
+  for(i in 1:8){
+    print(i)
+    wait(8)
+  }
   print('done')
 }
 
