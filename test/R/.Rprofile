@@ -1,4 +1,4 @@
 
 # .libPaths('./lib')
 
-# options(vsc.supportTerminateRequest = FALSE)
+options(vsc.supportTerminateRequest = FALSE)

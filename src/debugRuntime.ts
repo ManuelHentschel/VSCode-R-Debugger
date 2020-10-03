@@ -25,6 +25,13 @@ export type JsonHandler = (json: string, from: DataSource, isFullLine: boolean) 
 export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket";
 export type OutputMode = "all"|"filtered"|"nothing";
 
+interface WriteOnPrompt {
+	text: string;
+	which: "browser"|"topLevel"|"prompt";
+	count: number;
+	addNewLine?: boolean;
+};
+
 
 export class DebugRuntime extends EventEmitter {
 
@@ -62,9 +69,7 @@ export class DebugRuntime extends EventEmitter {
 	private rPackageInfo: MDebugProtocol.PackageInfo = undefined;
 	private rPackageVersionCheck: PackageVersionInfo = {versionOk: false, shortMessage: '', longMessage: ''};
 	// output state (of R process)
-	private stdoutIsBrowserInfo = false; // set to true if rSession.stdout is currently giving browser()-details
-	private isCrashed: boolean = false; // is set to true upon encountering an error (in R)
-	private expectBrowser: boolean = false; // is set to true if a known breakpoint is encountered (indicated by "tracing...")
+	private stdoutIsBrowserInfo: boolean = false; // set to true if rSession.stdout is currently giving browser()-details
 	// output state (of this extension)
 	private outputGroupLevel: number = 0; // counts the nesting level of output to the debug window
 
@@ -79,6 +84,12 @@ export class DebugRuntime extends EventEmitter {
 
 	public writeOnBrowserPrompt: string = "";
 	public writeOnTopLevelPrompt: string = "";
+
+
+	public writeOnPrompt: WriteOnPrompt[] = [];
+	public writeOnPromptText: string = "";
+	public writeOnWhichPrompt: ('browser'|'topLevel'|'prompt');
+	public writeOnPromptCount: number = 0;
 
 
 
@@ -311,18 +322,11 @@ export class DebugRuntime extends EventEmitter {
 				// Check for browser prompt
 				const browserRegex = /Browse\[\d+\]> /;
 				if(browserRegex.test(line)){
-					logger.debug('matches: browser prompt');
-					this.writeToStdin(this.writeOnBrowserPrompt);
+					this.handlePrompt("browser");
 					// R has entered the browser
-					this.debugState = 'function';
 					line = line.replace(browserRegex,'');
 					showLine = false;
 					this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
-					if(!this.expectBrowser){
-						// unexpected breakpoint:
-						// this.hitBreakpoint(false);
-						this.sendShowingPromptRequest("browser");
-					}
 				} 
 
 
@@ -336,16 +340,8 @@ export class DebugRuntime extends EventEmitter {
 				// check for prompt
 				const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
 				if (promptRegex.test(line) && isFullLine) {
-					this.writeToStdin(this.writeOnTopLevelPrompt);
-					if(this.isCrashed && !this.allowGlobalDebugging){
-						this.terminate();
-					} else{
-						logger.debug("matches: prompt");
-						this.debugState = 'global';
-						// this.endOutputGroup();
-						this.expectBrowser = false;
-						showLine = false;
-					}
+					this.handlePrompt("topLevel");
+					showLine = false;
 					line = '';
 				}
 
@@ -358,7 +354,7 @@ export class DebugRuntime extends EventEmitter {
 				}
 			}
 		}
-		
+
 		if(isSink){
 			// contains 'normal' output
 			// Breakpoints set with trace() or vscDebugger::mySetBreakpoint() are preceded by this:
@@ -367,7 +363,6 @@ export class DebugRuntime extends EventEmitter {
 				// showLine = false;
 				line = line.replace(tracingInfoRegex, '');
 				this.stdoutIsBrowserInfo = true;
-				this.expectBrowser = true;
 				// this.hitBreakpoint(true);
 				showLine = false;
 			}
@@ -410,6 +405,31 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
+	private handlePrompt(which: "browser"|"topLevel", text?: string){
+		logger.debug("matches prompt: " + which);
+		this.debugState = (which==="topLevel" ? "global" : "function");
+	
+		if(this.writeOnPrompt.length > 0){
+			const wop = this.writeOnPrompt.shift();
+			const matchesPrompt = (wop.which === "prompt" || wop.which === which);
+			if(matchesPrompt && wop.count > 0){
+				this.writeToStdin(wop.text);
+				wop.count -= 1;
+				if(wop.count > 0){
+					this.writeOnPrompt.unshift(wop);
+				}
+			} else if(matchesPrompt && wop.count < 0){
+				this.writeToStdin(wop.text);
+				this.writeOnPrompt.unshift(wop);
+			} else{
+				console.log('invalid wop');
+			}
+		} else {
+			this.rSession.callFunction('.vsc.listenOnPort', {timeout: -1});
+			this.sendShowingPromptRequest(which, text);
+		}
+	}
+
 	private sendShowingPromptRequest(which: "browser"|"topLevel", text?: string){
 		const request: MDebugProtocol.ShowingPromptRequest = {
 			command: "custom",
@@ -449,6 +469,8 @@ export class DebugRuntime extends EventEmitter {
 				this.rPackageStartup.notify();
 				if(versionCheck.versionOk){
 					this.sendEvent("response", json);
+				} else{
+					logger.info("event: " + json.event, json.body);
 				}
 			} else{
 				this.sendEvent("response", json);
@@ -456,14 +478,17 @@ export class DebugRuntime extends EventEmitter {
 		} else if(json.type === "event"){
 			if(json.event === 'stopped'){
 				this.stdoutIsBrowserInfo = true;
-				this.expectBrowser = true;
 				this.debugState = 'function';
-				this.isCrashed = (json.body.reason === 'exception');
 				this.sendEvent('event', json);
 			} else if(json.event === 'custom'){
 				if(json.body.reason === "writeToStdin"){
 					this.handleWriteToStdinEvent(json.body);
+				} else if(json.body.reason === 'changeExpectPrompt'){
+					// deprecated -> ignore
+				} else if(json.body.reason === 'stopListening'){
+					// deprecated -> ignore
 				}
+				logger.info("event: " + json.event, json.body);
 			} else{
 				this.sendEvent("event", json);
 			}
@@ -474,54 +499,80 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	public handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody){
+		let count: number = 0;
+		if(args.count !== 0){
+			count = args.count || 1;
+		}
+		const when = args.when || "now";
+		let text = args.text;
 		if(args.addNewLine && args.text.slice(-1)!=="\n"){
-			args.text = args.text + "\n";
+			text = text + "\n";
 		}
-		if(args.when==="now"){
-			this.writeToStdin(args.text);
-		}
-		// Don't use `else` since when==="prompt" is handled twice!
-		if(args.when==="browserPrompt" || args.when==="prompt"){
-			this.writeOnBrowserPrompt = args.text;
-		}
-		if(args.when==="topLevelPrompt" || args.when==="prompt"){
-			this.writeOnTopLevelPrompt = args.text;
-		}
-		if(args.changeExpectBrowser){
-			this.expectBrowser = args.expectBrowser;
+		if(when==="now"){
+			for(let i=0; i<count; i++){
+				this.writeToStdin(args.text);
+			}
+		} else{
+			let which: "prompt"|"browser"|"topLevel";
+			if(when === "prompt"){
+				which = "prompt";
+			} else if(when === "browserPrompt"){
+				which = "browser";
+			} else if(when === "topLevelPrompt"){
+				which = "topLevel";
+			}
+			const newWriteOnPrompt: WriteOnPrompt = {
+				text: text,
+				which: which,
+				count: count
+			};
+			if(args.stack && count === 0){
+				// ignore
+			} else if(args.stack){
+				this.writeOnPrompt.push(newWriteOnPrompt);
+			} else if(count === 0){
+				this.writeOnPrompt = [];
+			} else{
+				this.writeOnPrompt = [newWriteOnPrompt];
+			}
 		}
 	}
-
 	public writeToStdin(text: string){
 		if(text){
 			logger.debug("Writing to stdin: ", text);
 			this.rSession.runCommand(text, [], true);
+			return true;
+		} else{
+			return false;
 		}
 	}
 
 
 	// REQUESTS
 
-	// receive requests from the debugSession
-	public dispatchRequest(request: DebugProtocol.Request) {
-		const json = JSON.stringify(request);
-		this.rSession.callFunction('.vsc.handleJson', {json: json});
-	}
-
-	// // This version dispatches requests to the tcp connection instead of stdin
-	// // Is not yet working properly. Current problems/todos:
-	// //  - Some requests not handled by R (step, stepIn, stepOut, ...)
-	// //  - .vsc.listenOnPort needs to be called everytime the prompt is shown
-	// //    Is possible using addTaskCallback, but this does not work e.g. when stepping through code
-	//
-	// public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = false) {
-	// 	if(this.jsonServer.jsonSocket && usePort){
-	// 		this.jsonServer.jsonSocket.write(json + '\n');
-	// 	} else{
-	// 		this.rSession.callFunction('.vsc.handleJson', {json: json});
-	// 		this.rSession.callFunction('.vsc.listenOnPort', {timeout: 3});
-	// 	}
+	// // receive requests from the debugSession
+	// public dispatchRequest(request: DebugProtocol.Request) {
+	// 	const json = JSON.stringify(request);
+	// 	this.rSession.callFunction('.vsc.handleJson', {json: json});
 	// }
+
+	// This version dispatches requests to the tcp connection instead of stdin
+	// Is not yet working properly. Current problems/todos:
+	//  - Some requests not handled by R (step, stepIn, stepOut, ...)
+	//  - .vsc.listenOnPort needs to be called everytime the prompt is shown
+	//    Is possible using addTaskCallback, but this does not work e.g. when stepping through code
+
+	public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = true) {
+		const json = JSON.stringify(request);
+		logger.info('request ' + request.seq + ': ' + request.command, request);
+		if(!this.rSession.jsonSocket){
+			logger.debug('not using socket!');
+			this.rSession.callFunction('.vsc.handleJson', {json: json});
+		} else {
+			logger.debug('using socket!');
+			this.rSession.jsonSocket.write(json + '\n');
+		}
+	}
 
 	// send event to the debugSession
 	private sendEvent(event: string, ... args: any[]) {
@@ -591,19 +642,10 @@ export class DebugRuntime extends EventEmitter {
 
 	// continue script execution:
 	public async continue(request: MDebugProtocol.ContinueRequest) {
-		if(this.debugState === 'global'){
-			await vscode.window.activeTextEditor.document.save();
-			const filename = vscode.window.activeTextEditor.document.fileName;
-			request.arguments = {
-				...request.arguments,
-				callDebugSource: true,
-				source: {
-					path: filename
-				}
-			};
-		} else{
-			this.expectBrowser = false;
-		}
+		const doc = vscode.window.activeTextEditor.document;
+		await doc.save();
+		const filename = doc.fileName;
+		request.arguments.source = {path: filename};
 		this.dispatchRequest(request);
 	}
 
@@ -618,37 +660,37 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	public terminateFromPrompt(): void {
-		this.rSession.ignoreOutput = true;
-		if(this.debugState === 'function'){
-			this.rSession.runCommand('Q', [], true);
-			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
-			if(this.allowGlobalDebugging){
-				const infoString = "You terminated R while debugging a function.\n" +
-					"If you want to keep the R session running and only exit the function, use:\n" + 
-					" - 'Restart' (Ctrl+Shift+F5) when stopped on a normal breakpoint\n" +
-					" - 'Continue' (F5) when stopped on an exception";
-				this.sendEvent('output', infoString, "console");
-			}
-			this.sendEvent('end');
-		} else{
-			this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
-			this.sendEvent('end');
-		}
-	}
+	// public terminateFromPrompt(): void {
+	// 	this.rSession.ignoreOutput = true;
+	// 	if(this.debugState === 'function'){
+	// 		this.rSession.runCommand('Q', [], true);
+	// 		this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
+	// 		if(this.allowGlobalDebugging){
+	// 			const infoString = "You terminated R while debugging a function.\n" +
+	// 				"If you want to keep the R session running and only exit the function, use:\n" + 
+	// 				" - 'Restart' (Ctrl+Shift+F5) when stopped on a normal breakpoint\n" +
+	// 				" - 'Continue' (F5) when stopped on an exception";
+	// 			this.sendEvent('output', infoString, "console");
+	// 		}
+	// 		this.sendEvent('end');
+	// 	} else{
+	// 		this.rSession.callFunction('quit', {save: 'no'}, [], true, 'base',true);
+	// 		this.sendEvent('end');
+	// 	}
+	// }
 
-	public async returnToPrompt() {
-		if(this.debugState === 'function'){
-			this.rSession.runCommand('Q', [], true);
-		}
-		this.debugState = 'global';
-		const filename = vscode.window.activeTextEditor.document.fileName;
-		this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
-	}
+	// public async returnToPrompt() {
+	// 	if(this.debugState === 'function'){
+	// 		this.rSession.runCommand('Q', [], true);
+	// 	}
+	// 	this.debugState = 'global';
+	// 	const filename = vscode.window.activeTextEditor.document.fileName;
+	// 	this.sendEvent('stopOnStep'); // Alternative might be: 'stopOnStepPreserveFocus';
+	// }
 
-	public terminate(ignoreOutput: boolean = true): void {
-		this.rSession.ignoreOutput = ignoreOutput;
-		this.rSession.killChildProcess();
-		this.sendEvent('end');
-	}
+	// public terminate(ignoreOutput: boolean = true): void {
+	// 	this.rSession.ignoreOutput = ignoreOutput;
+	// 	this.rSession.killChildProcess();
+	// 	this.sendEvent('end');
+	// }
 }

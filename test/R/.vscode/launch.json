@@ -19,7 +19,7 @@
             "debugMode": "file",
             "workingDirectory": "${workspaceFolder}",
             "file": "${file}",
-            "allowGlobalDebugging": false
+            "allowGlobalDebugging": true
         },
         {
             "type": "R-Debugger",

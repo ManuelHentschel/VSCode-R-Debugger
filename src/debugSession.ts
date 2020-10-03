@@ -39,10 +39,7 @@ export class DebugSession extends ProtocolServer {
     }
     
     sendEvent(event: DebugProtocol.Event): void {
-        logger.info("event: " + event.event);
-        if(event.body){
-            logger.info(event.body);
-        }
+        logger.info("event: " + event.event, event.body);
         super.sendEvent(event);
     }
 
@@ -101,7 +98,6 @@ export class DebugSession extends ProtocolServer {
     }
 
     protected dispatchRequest(request: DebugProtocol.Request) {
-        logger.info("request " + request.seq + ": " + request.command, request);
         const response: ResponseWithBody = new Response(request);
         var dispatchToR: boolean = false; // the cases handled here are not sent to R
         var sendResponse: boolean = true; // for cases handled here, the response must also be sent from here
@@ -164,6 +160,8 @@ export class DebugSession extends ProtocolServer {
                 //     break;
                 case 'continue':
                     this._runtime.continue(<ContinueRequest>request);
+                    dispatchToR = false;
+                    sendResponse = false;
                     break;
                 // case 'next':
                 //     this._runtime.step();
@@ -190,6 +188,8 @@ export class DebugSession extends ProtocolServer {
             }
             if(dispatchToR){
                 this._runtime.dispatchRequest(request);
+            } else{
+                logger.info("request " + request.seq + " (handled in VS Code): " + request.command, request);
             }
             if(sendResponse){
                 this.sendResponse(response);

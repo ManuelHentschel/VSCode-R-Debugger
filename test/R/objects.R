@@ -7,8 +7,12 @@ options(vsc.dataFramesByRow = TRUE)
 
 options(vsc.includeFrameColumn = FALSE)
 
+# options(vsc.showInternalFrames = TRUE)
+
 # options(vsc.showCustomAttributes = FALSE)
 # options(vsc.showAttributes = FALSE)
+
+options(vsc.groupAttributes = TRUE)
 
 # trace(.vsc.setVariable, tracer=browser)
 
@@ -121,6 +125,7 @@ s6 <- charToRaw("h")
 
 # ...
 fun <- function(x, y=x, ...) {
+  a <- 9
   print('2')
   # print('3')
   base::cat(list(1,2,3)) # error
@@ -136,7 +141,14 @@ main <- function() {
   print("testing objects")
   print('asdf')
   v <- 1:10
-  w <- sapply(v, fun)
+  # w <- sapply(v, fun)
   print('q  wer')
+  print('asdfasdfasdfa')
+  browser()
+  print('done')
 }
 
+main2 <- function(){
+  x <- 1
+  base::cat(list(1,2,3))
+}

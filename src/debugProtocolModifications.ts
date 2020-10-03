@@ -2,6 +2,7 @@
 
 import { DebugProtocol } from 'vscode-debugprotocol';
 import * as VsCode from 'vscode';
+// import { DebugProtocol } from './debugProtocol';
 
 export enum DebugMode {
     Function = "function",
@@ -18,6 +19,10 @@ export interface RStartupArguments {
     jsonPort?: number;
     sinkPort?: number;
     cwd: string;
+}
+
+export interface Source extends DebugProtocol.Source {
+    content?: string;
 }
 
 
@@ -106,10 +111,6 @@ export interface ContinueRequest extends DebugProtocol.ContinueRequest {
     arguments: ContinueArguments;
 }
 
-export interface Source extends DebugProtocol.Source {
-    srcbody?: string;
-}
-
 export interface SourceArguments extends DebugProtocol.SourceArguments {
     source?: Source;
 }
@@ -136,8 +137,8 @@ export interface WriteToStdinBody {
     text: string;
     when?: "now"|"browserPrompt"|"topLevelPrompt"|"prompt";
     addNewLine?: boolean; //=false (in vscode), =true (in R)
-    changeExpectBrowser?: boolean;
-    expectBrowser?: boolean;
+    count?: number; // =1
+    stack?: boolean;
 }
 
 // Used to send info to R that is not part of the DAP

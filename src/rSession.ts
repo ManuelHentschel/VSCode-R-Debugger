@@ -83,6 +83,7 @@ export class RSession {
 
         if(useJsonServer && jsonPort>=0){
             const server = net.createServer((socket) => {
+                console.log('created server!');
                 socket.on('data', (data) => {
                     this.handleData(data, 'jsonSocket');
                 });
