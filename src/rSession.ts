@@ -154,9 +154,13 @@ export class RSession {
 
     // Kill the child process
     public killChildProcess(signal = 'SIGKILL'){
-        console.log('sending signal...');
-        kill(this.cp.pid, signal);
-        console.log('sent signal');
+        if(this.cp.exitCode === null){
+            logger.info('sending signal' + signal + '...');
+            kill(this.cp.pid, signal);
+            logger.info('sent signal');
+        } else{
+            logger.info('process already exited with code ' + this.cp.exitCode);
+        }
     }
 
     public handleData(data: Buffer, from: DataSource){

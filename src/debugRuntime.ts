@@ -55,9 +55,6 @@ export class DebugRuntime extends EventEmitter {
 	// Time in ms to wait before sending an R command (makes debugging slower but 'safer'?)
 	private waitBetweenRCommands: number = 0;
 
-	public host = 'localhost';
-	public port: number = 0;
-
 	// // state info about the R session
 	// R session
 	private rSessionStartup = new Subject(); // used to wait for R session to start
@@ -77,7 +74,6 @@ export class DebugRuntime extends EventEmitter {
 	private terminateTimeout = 50; // time to wait before terminating to give time for messages to appear
 
 	// debugMode
-	public allowGlobalDebugging: boolean = false;
 	private outputModes: {[key in DataSource]?: OutputMode} = {};
 
 	public writeOnBrowserPrompt: string = "";
@@ -221,12 +217,10 @@ export class DebugRuntime extends EventEmitter {
 		if (this.rPackageFound && this.rPackageVersionCheck.versionOk) {
 			logger.info('R Package ok');
 		} else{
-			var packageNeedsUpdate: boolean = false;
 			var shortMessage: string = '';
 			var longMessage: string = '';
 			if(this.rPackageFound){ // but not version ok
 				logger.info('R Package version not ok');
-				packageNeedsUpdate = true;
 				shortMessage = this.rPackageVersionCheck.shortMessage;
 				longMessage = this.rPackageVersionCheck.longMessage;
 			} else{ // package completely missing
@@ -472,16 +466,9 @@ export class DebugRuntime extends EventEmitter {
 				this.sendEvent("response", json);
 			}
 		} else if(json.type === "event"){
-			if(json.event === 'stopped'){
-				this.stdoutIsBrowserInfo = true;
-				this.sendEvent('event', json);
-			} else if(json.event === 'custom'){
+			if(json.event === 'custom'){
 				if(json.body.reason === "writeToStdin"){
 					this.handleWriteToStdinEvent(json.body);
-				} else if(json.body.reason === 'changeExpectPrompt'){
-					// deprecated -> ignore
-				} else if(json.body.reason === 'stopListening'){
-					// deprecated -> ignore
 				}
 				logger.info("event: " + json.event, json.body);
 			} else{

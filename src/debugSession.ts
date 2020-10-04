@@ -117,11 +117,6 @@ export class DebugSession extends ProtocolServer {
                     sendResponse = false;
                     break;
                 case 'launch':
-                    if(request.arguments){
-                        if(request.arguments.allowGlobalDebugging){
-                            this._runtime.allowGlobalDebugging = true;
-                        }
-                    }
                     dispatchToR = true;
                     sendResponse = false;
                     this._runtime.writeOutput('Launch Arguments:\n' + JSON.stringify(request.arguments, undefined, 2));

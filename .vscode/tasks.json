@@ -17,7 +17,7 @@
 			"label": "Package Extension",
 			"type": "shell",
 			"problemMatcher": [],
-			"command": "vsce package",
+			"command": "vsce package -o rdebugger.vsix && code --install-extension rdebugger.vsix --force",
 			"group": {
 				"kind": "build",
 				"isDefault": true
