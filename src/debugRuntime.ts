@@ -383,6 +383,7 @@ export class DebugRuntime extends EventEmitter {
 			lineOut = line;
 		} else{
 			lineOut = "";
+			showLine = false;
 		}
 
 		// output line
