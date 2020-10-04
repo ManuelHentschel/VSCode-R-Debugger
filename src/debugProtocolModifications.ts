@@ -39,10 +39,11 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     // specify how to debug (optional)
     includePackageScopes?: boolean;
     setBreakpointsInPackages?: boolean;
-    packagesBeforeLaunch?: string[];
+    debuggedPackages?: string[];
     assignToAns?: boolean;
     overwritePrint?: boolean;
     overwriteCat?: boolean;
+    overwriteMessage?: boolean;
     overwriteSource?: boolean;
 }
 
