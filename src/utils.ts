@@ -1,5 +1,5 @@
 
-import { window, workspace } from "vscode";
+import { DebugProtocolMessage, window, workspace } from "vscode";
 import { platform } from "os";
 import { RStartupArguments } from './debugProtocolModifications';
 import * as net from 'net';

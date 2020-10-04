@@ -83,6 +83,7 @@ export class RSession {
 
         if(useJsonServer && jsonPort>=0){
             const server = net.createServer((socket) => {
+                console.log('created server!');
                 socket.on('data', (data) => {
                     this.handleData(data, 'jsonSocket');
                 });
@@ -152,11 +153,14 @@ export class RSession {
     }
 
     // Kill the child process
-    public killChildProcess(){
-        console.log('sending sigkill...');
-        // this.cp.kill();
-        kill(this.cp.pid, 'SIGKILL');
-        console.log('sent sigkill');
+    public killChildProcess(signal = 'SIGKILL'){
+        if(this.cp.exitCode === null){
+            logger.info('sending signal' + signal + '...');
+            kill(this.cp.pid, signal);
+            logger.info('sent signal');
+        } else{
+            logger.info('process already exited with code ' + this.cp.exitCode);
+        }
     }
 
     public handleData(data: Buffer, from: DataSource){

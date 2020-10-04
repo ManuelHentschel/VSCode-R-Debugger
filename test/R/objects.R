@@ -7,8 +7,12 @@ options(vsc.dataFramesByRow = TRUE)
 
 options(vsc.includeFrameColumn = FALSE)
 
+# options(vsc.showInternalFrames = TRUE)
+
 # options(vsc.showCustomAttributes = FALSE)
 # options(vsc.showAttributes = FALSE)
+
+options(vsc.groupAttributes = TRUE)
 
 # trace(.vsc.setVariable, tracer=browser)
 
@@ -121,6 +125,7 @@ s6 <- charToRaw("h")
 
 # ...
 fun <- function(x, y=x, ...) {
+  a <- 9
   print('2')
   # print('3')
   base::cat(list(1,2,3)) # error
@@ -132,11 +137,22 @@ fun <- function(x, y=x, ...) {
 env1 <- new.env()
 makeActiveBinding("x", function() rnorm(1), env1)
 
-main <- function() {
-  print("testing objects")
-  print('asdf')
-  v <- 1:10
-  w <- sapply(v, fun)
-  print('q  wer')
+wait <- function(n){
+  for(i in 1:(10^n)){
+    i
+  }
 }
 
+main <- function() {
+  print("start sleeping...")
+  for(i in 1:8){
+    print(i)
+    wait(8)
+  }
+  print('done')
+}
+
+main2 <- function(){
+  x <- 1
+  base::cat(list(1,2,3))
+}

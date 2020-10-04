@@ -2,9 +2,10 @@
     // "rdebugger.useJsonServer": false,
     // "rdebugger.useSinkServer": false,
     "rdebugger.checkVersion": "none",
-    // "rdebugger.printStdout": "all",
-    // "rdebugger.printSinkSocket": "all",
-    // "rdebugger.logLevelRSession": "debug",
+    "rdebugger.printStdout": "all",
+    "rdebugger.printSinkSocket": "all",
+    "rdebugger.logLevelRSession": "debug",
     // "rdebugger.logLevelSession": "debug",
+    "rdebugger.logLevelRuntime": "debug",
     // "rdebugger.rterm.windows": "\"C:\\Program Files\\R\\R-4.0.2\\bin\\x64\\R.exe\""
 }
