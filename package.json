@@ -2,7 +2,7 @@
   "name": "r-debugger",
   "displayName": "R Debugger",
   "description": "R Debugger for VS Code",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "RDebugger",
   "license": "MIT",
   "author": {
@@ -10,9 +10,9 @@
   },
   "rPackageInfo": {
     "name": "vscDebugger",
-    "required": "0.2.0",
-    "recommended": "0.2.0",
-    "warnIfNewer": "0.3.0"
+    "required": "0.3.0",
+    "recommended": "0.3.0",
+    "warnIfNewer": "0.4.0"
   },
   "repository": {
     "type": "git",
