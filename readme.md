@@ -24,18 +24,15 @@ For many variables it is also possible to assign a new value to the variable or 
 
 
 ## Installation
-The latest "stable" version of the VS Code extension and the R package can be found on the
-[Releases Site](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases).
-For compatibility reasons make sure to install both from the same release.
-
-
-You can also try to install the R package automatically by entering the command
-`rdebugger.updateRPackage`
-in the command bar (ctrl+shift+p).
-This function will simply try to load and install the correct binary from the github repo linked above.
+The latest "stable" version of the VS Code extension can be installed from the
+[marketplace](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).
+After installing the extension, the R package can be installed using the command 
+`rdebugger.updateRPackage`.
+If this does not work, you can find the source code and compiled binaries on the
+[releases site](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases).
 
 The provided binaries were compiled using R 4.0.2 and might be incompatible with older R versions.
-In these cases it is necessary to compile the package from code (see below).
+In these cases it is necessary to compile the package from code.
 
 If you want to install a development version, the VS Code extension can be installed from the .vsix-files found 
 [here](https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain).
@@ -45,11 +42,6 @@ To install the latest development version of the required R-package from GitHub,
 `devtools::install_github("ManuelHentschel/vscDebugger")`
 or install from the artifacts found 
 [here](https://github.com/ManuelHentschel/vscDebugger/actions).
-
-Installing/running from code is a little more involved, but the files `.vscode/tasks.json` and `tsconfig.json` from this repo
-as well as `build.R` and `.vscode/tasks.json` from [vscDebugger](https://github.com/ManuelHentschel/vscDebugger)
-might be helpful.
-
 
 ## Using the Debugger
 * Install this extension in VS Code.
@@ -61,9 +53,6 @@ might be helpful.
 expressions entered into the debug console are evaluated in the currently active frame
 * During debugging in the global workspace it is often necessary to click the dummy frame
 in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv`.
-
-<!-- *For Windows users: If your R installation is from [CRAN](http://cran.r-project.org/mirrors.html) with default installation settings, especially **Save version number in registry** is enabled, then there's no need to specify `rdebugger.rterm.windows`.* -->
-
 
 ## Launch config
 The behaviour of the debugger can be configured with the entry `"debugMode"`,
