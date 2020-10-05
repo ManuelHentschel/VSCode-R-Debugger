@@ -147,8 +147,8 @@ main <- function() {
   print("start sleeping...")
   for(i in 1:8){
     print(i)
-    wait(8)
   }
+  main2()
   print('done')
 }
 

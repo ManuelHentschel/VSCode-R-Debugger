@@ -145,3 +145,23 @@ export function getRequiredRPackageVersion(): {
     }
 }
 
+
+export function escapeStringForR(s: string, quote: string='"') {
+    if (s === undefined) {
+        return "NULL";
+    } else {
+        return(
+            quote
+            + s.replace(/\\/g, "\\\\")
+                .replace(RegExp(quote, "g"), `\\${quote}`)
+                .replace(/\n/g, "\\n")
+                // .replace(/\r/g, "\\r")
+                .replace(/\r/g, "")
+                .replace(/\t/g, "\\t")
+                .replace(/\f/g, "\\f")
+                .replace(/\v/g, "\\v")
+            + quote);
+    }
+}
+
+

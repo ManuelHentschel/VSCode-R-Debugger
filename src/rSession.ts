@@ -1,45 +1,25 @@
 
 
 import * as child from 'child_process';
-import { TextDecoder } from 'util';
 import { LineHandler, JsonHandler, DataSource } from'./debugRuntime';
 import { RStartupArguments } from './debugProtocolModifications';
-import { makeFunctionCall, anyRArgs } from './rUtils';
 import { config, getPortNumber } from './utils';
 import * as net from 'net';
+
 const { Subject } = require('await-notify');
 const kill = require('tree-kill');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("RSession");
 
-function timeout(ms: number) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-
-// this is only typed to avoid typos in the function names
-export type RFunctionName = (
-    ".vsc.dispatchRequest" |
-    "cat" |
-    "print" |
-    ".vsc.handleJson" |
-    "tryCatch" |
-    ".vsc.debugSource" |
-    "quit" |
-    ".vsc.listenOnPort" |
-    "install.packages"
-);
-
 
 export class RSession {
-    public cp: child.ChildProcessWithoutNullStreams;
-    public waitBetweenCommands: number = 0;
-    public defaultLibrary: string = '';
-    public ignoreOutput: boolean=false;
+    private cp: child.ChildProcessWithoutNullStreams;
     private handleLine: LineHandler;
     private handleJsonString: JsonHandler;
     private restOfLine: {[k in DataSource]?: string} = {};
+
+    public ignoreOutput: boolean = false;
 
     public host: string = 'localhost';
     public jsonSocket: net.Socket;
@@ -61,6 +41,7 @@ export class RSession {
             return false;
         }
 
+        // store line/json handlers (are called by this.handleData)
         this.handleLine = handleLine;
         this.handleJsonString = handleJson;
 
@@ -72,84 +53,58 @@ export class RSession {
 			this.handleData(data, "stderr");
         });
 
-        const useJsonServer: boolean = args.useJsonServer || false;
-        const useSinkServer: boolean = args.useSinkServer || false;
-
+        // set up json port
+        // used for protocol messages, formatted as json
         const jsonPort = args.jsonPort || 0;
-        const sinkPort = args.sinkPort || 0;
-
         const jsonServerReady = new Subject();
+
+        this.jsonServer = net.createServer((socket) => {
+            socket.on('data', (data) => {
+                this.handleData(data, 'jsonSocket');
+            });
+            this.jsonSocket = socket;
+        });
+        this.jsonServer.listen(jsonPort, this.host, () => {
+            this.jsonPort = getPortNumber(this.jsonServer);
+            jsonServerReady.notify();
+        });
+
+        // set up sink port
+        // is used to capture output printed to stdout by 'normal' R commands
+        // only some low level stuff (prompt/input echo) is still printed to the actual stdout
+        const sinkPort = args.sinkPort || 0;
         const sinkServerReady = new Subject();
 
-        if(useJsonServer && jsonPort>=0){
-            const server = net.createServer((socket) => {
-                console.log('created server!');
-                socket.on('data', (data) => {
-                    this.handleData(data, 'jsonSocket');
-                });
-                this.jsonSocket = socket;
+        this.sinkServer = net.createServer((socket) => {
+            socket.on('data', (data) => {
+                this.handleData(data, 'sinkSocket');
             });
-            server.listen(jsonPort, this.host, () => {
-                this.jsonPort = getPortNumber(server);
-                jsonServerReady.notify();
-            });
-            this.jsonServer = server;
-        }
+            this.sinkSocket = socket;
+        });
+        this.sinkServer.listen(sinkPort, this.host, () => {
+            this.sinkPort = getPortNumber(this.sinkServer);
+            sinkServerReady.notify();
+        });
 
-        if(useSinkServer && sinkPort>=0){
-            const server = net.createServer((socket) => {
-                socket.on('data', (data) => {
-                    this.handleData(data, 'sinkSocket');
-                });
-                this.sinkSocket = socket;
-            });
-            server.listen(jsonPort, this.host, () => {
-                this.sinkPort = getPortNumber(server);
-                sinkServerReady.notify();
-            });
-            this.sinkServer = server;
-        }
-
+        // wait for servers to connect to port
         await jsonServerReady.wait(1000);
         await sinkServerReady.wait(1000);
 
         return true;
     }
 
-    public async runCommand(cmd: string, args: (string|number)[]=[], force=false){
-        // remove trailing newline
-		while(cmd.length>0 && cmd.slice(-1) === '\n'){
-            cmd = cmd.slice(0, -1);
+    public writeToStdin(text: string, checkNewLine: boolean = true){
+        // make sure text ends in exactly one newline
+        if(checkNewLine){
+            while(text.length>0 && text.slice(-1) === '\n'){
+                text = text.slice(0, -1);
+            }
+            text = text + '\n';
         }
 
-
-        // append arguments (if any given) and newline
-        if(args.length > 0){
-            cmd = cmd + ' ' + args.join(' ') + '\n';
-        } else {
-            cmd = cmd + '\n';
-        }
-
-        // execute command or add to command queue
-        if(this.waitBetweenCommands>0){
-            await timeout(this.waitBetweenCommands);
-        }
-        logger.info('cp.stdin:\n' + cmd.trim());
-        this.cp.stdin.write(cmd);
-    }
-
-    // Call an R-function (constructs and calls the command)
-    public callFunction(
-        fnc: RFunctionName,
-        args: any|anyRArgs=[],
-        args2: anyRArgs=[],
-        escapeStrings: boolean=true,
-        library: string = this.defaultLibrary,
-        force:boolean=false
-    ){
-        // two sets of arguments (args and args2) to allow mixing named and unnamed arguments
-        const cmd = makeFunctionCall(fnc, args, args2, escapeStrings, library);
-        this.runCommand(cmd, [], force);
+        // log and write text
+        logger.info('cp.stdin:\n' + text.trim());
+        this.cp.stdin.write(text);
     }
 
     // Kill the child process
@@ -164,14 +119,13 @@ export class RSession {
     }
 
     public handleData(data: Buffer, from: DataSource){
-        var s = data.toString();
-        s = s.replace(/\r/g,''); //keep only \n as linebreak
 
-        s = (this.restOfLine[from] || "") + s; // append to rest of line from previouse call
-
-        const lines = s.split(/\n/);
+        let text: string = data.toString();
+        text = text.replace(/\r/g,''); //keep only \n as linebreak
+        text = (this.restOfLine[from] || "") + text; // append to rest of line from previouse call
+        const lines = text.split(/\n/); // split into lines
         
-        for(var i = 0; i<lines.length; i++){
+        for(let i = 0; i<lines.length; i++){
 			// abort output handling if ignoreOutput has been set to true
 			// used to avoid handling remaining output after debugging has been stopped
             if(this.ignoreOutput){
@@ -179,7 +133,7 @@ export class RSession {
             }
             const isLastLine = i === lines.length-1;
             const line = lines[i];
-            var restOfLine: string = "";
+            let restOfLine: string = "";
             if(isLastLine && line===""){
                 restOfLine = "";
             } else if(from === "jsonSocket"){

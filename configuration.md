@@ -32,8 +32,6 @@ Log level of the debugger itself
 * `rdebugger.waitBetweenRCommands (boolean)`:
 Time in ms that is waited before sending commands to the R process.
 Can be useful when debugging async issues.
-* `rdebugger.useJsonServer`, `rdebugger.useSinkServer` `(boolean, default=true)`:
-Whether to use tcp connections to communicate with the R process.
 * `rdebugger.packageURL`: Overwrite for the URL used to download the R package when installing it automatically.
 * `rdebugger.printStdout`, `rdebugger.printStderr`, `rdebugger.printSinkSocket` (`"nothing"|"all"|"filtered"`):
 To what extent output by the R process is printed to the debug console.

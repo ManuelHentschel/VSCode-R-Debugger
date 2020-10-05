@@ -1,23 +1,13 @@
 
 "use strict";
 
-import { TerminatedEvent, StoppedEvent, OutputEvent} from 'vscode-debugadapter';
-
-
 import { basename } from 'path';
 import { DebugRuntime } from './debugRuntime';
-const { Subject } = require('await-notify');
-
-const { net } = require("net");
-
-
-
-
 import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { SourceArguments, InitializeRequest, ContinueArguments, StrictDebugConfiguration, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
-import { config, getVSCodePackageVersion, timeout } from './utils';
+import { InitializeRequest, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
+import { config, getVSCodePackageVersion } from './utils';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugSession");
@@ -31,7 +21,6 @@ export class DebugSession extends ProtocolServer {
     private _runtime: DebugRuntime;
 
     private disconnectTimeout: number = 1000;
-
 
     sendResponse(response: DebugProtocol.Response): void {
         logger.info("response " + response.request_seq + ": " + response.command, response);
@@ -58,24 +47,19 @@ export class DebugSession extends ProtocolServer {
 		this._runtime.on('event', (event: DebugProtocol.Event) => {
 			this.sendEvent(event);
 		});
-		this._runtime.on('stopOnEntry', () => {
-			this.sendEvent(new StoppedEvent('entry', this.THREAD_ID));
-		});
-		this._runtime.on('stopOnStep', () => {
-			this.sendEvent(new StoppedEvent('step', this.THREAD_ID));
-		});
-		this._runtime.on('stopOnBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('breakpoint', this.THREAD_ID));
-		});
 		this._runtime.on('output', (text, category: "stdout"|"stderr"|"console" = "stdout", filePath="", line?: number, column?: number, group?: ("start"|"startCollapsed"|"end"), data?: object) => {
-			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-			e.body = {
-				category: category,
-				output: text,
-				group: group,
-				line: line,
-				column: column
-			};
+            const e: DebugProtocol.OutputEvent = {
+                event: 'output',
+                seq: 0,
+                type: 'event',
+                body: {
+                    category: category,
+                    output: text,
+                    group: group,
+                    line: line,
+                    column: column
+                }
+            };
 			if(filePath !== ''){
                 const source = {
                     name: basename(filePath),
@@ -87,9 +71,6 @@ export class DebugSession extends ProtocolServer {
                 e.body.data = data;
             }
 			this.sendEvent(e);
-		});
-		this._runtime.on('end', () => {
-			this.sendEvent(new TerminatedEvent());
 		});
     }
     static run(debugSession: typeof DebugSession): void {
@@ -105,8 +86,6 @@ export class DebugSession extends ProtocolServer {
             switch(request.command){
                 case 'initialize':
                     const initializeArguments: InitializeRequestArguments = request.arguments || {};
-                    initializeArguments.useJsonServer = config().get<boolean>('useJsonServer', true);
-                    initializeArguments.useSinkServer = config().get<boolean>('useSinkServer', true);
                     initializeArguments.threadId = this.THREAD_ID;
                     initializeArguments.extensionVersion = getVSCodePackageVersion();
                     const initializeRequest: InitializeRequest = {
@@ -126,10 +105,8 @@ export class DebugSession extends ProtocolServer {
                     const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments.expression);
                     if(matches){
                         const toStdin = matches[1];
-                        logger.debug('user cp.stdin:\n' + toStdin);
-                        this._runtime.rSession.cp.stdin.write(
-                            toStdin + '\n'
-                        );
+                        logger.debug('user to stdin:\n' + toStdin);
+                        this._runtime.rSession.writeToStdin(toStdin);
                     } else{
                         dispatchToR = true;
                         sendResponse = false;
@@ -149,9 +126,7 @@ export class DebugSession extends ProtocolServer {
                     sendResponse = false;
                     break;
                 case 'pause':
-                    // this._runtime.killR('SIGSTOP');
-                    // const pid = this._runtime.rSession.cp.pid;
-                    // process.kill(pid, 'SIGKILL');
+                    // this._runtime.killR('SIGSTOP'); // doesn't work
                     response.success = false;
                     break;
                 default:
