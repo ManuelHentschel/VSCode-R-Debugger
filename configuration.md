@@ -74,6 +74,7 @@ Breakpoints and the modified `print`/`cat`/`message` functions are applied in th
 that also prints a link to the file and line number in the debug console.
 This overwrite does not affect print statements in packages.
 * `"overwriteCat"`: Same as above for `cat()`
+* `"overwriteMessage"`: Same as above for `message()`
 * `"overwriteSource"`: Whether to overwrite the `source` function with a custom version
 that is affected by breakpoints set in VS Code.
 

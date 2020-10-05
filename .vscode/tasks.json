@@ -14,7 +14,7 @@
 			}
 		},
 		{
-			"label": "Package Extension",
+			"label": "Package and install Extension",
 			"type": "shell",
 			"problemMatcher": [],
 			"command": "vsce package -o rdebugger.vsix && code --install-extension rdebugger.vsix --force",
