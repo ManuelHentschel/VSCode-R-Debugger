@@ -64,7 +64,7 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 		if(!config.file){
 			config.file = '${file}';
 		}
-		if(!config.function){
+		if(!config.mainFunction){
 			config.mainFunction = 'main';
 		}
 

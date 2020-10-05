@@ -28,8 +28,11 @@
             "debugMode": "function",
             "workingDirectory": "${fileDirname}",
             "file": "${file}",
-            "mainFunction": "main",
-            "allowGlobalDebugging": false
+            // "file": "asdfasdf",
+            // "mainFunction": "main",
+            "allowGlobalDebugging": false,
+            "setBreakpointsInPackages": false,
+            // "packagesBeforeLaunch": ["asdf"]
         },
         {
             "type": "R-Debugger",

@@ -118,22 +118,27 @@
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to write a new print() function to .GlobalEnv (direct calls to base::print are not affected)."
+                "description": "Whether to attach a modified print() function (direct calls to base::print are not affected)."
+              },
+              "overwriteMessage": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified message() function (direct calls to base::message are not affected)."
               },
               "overwriteCat": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to write a new cat() function to .GlobalEnv (direct calls to base::cat are not affected)."
+                "description": "Whether to attach a modified cat() function (direct calls to base::cat are not affected)."
               },
               "overwriteSource": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to write a new source() function to .GlobalEnv (direct calls to base::source are not affected)."
+                "description": "Whether to attach a modified source() function (direct calls to base::source are not affected)."
               },
               "setBreakpointsInPackages": {
                 "type": "boolean",
                 "default": false,
-                "description": "Whether to enable breakpoints in packages. Can impact performance if set to true."
+                "description": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
               },
               "includePackageScopes": {
                 "type": "boolean",
@@ -141,12 +146,17 @@
                 "description": "Set to true to show package scopes in the variable window."
               },
               "packagesBeforeLaunch": {
+                "type": "DEPRECATED ENTRY! Use `debuggedPackages` instead.",
+                "default": "DEPRECATED ENTRY! Use `debuggedPackages` instead.",
+                "description": "DEPRECATED ENTRY! Use `debuggedPackages` instead."
+              },
+              "debuggedPackages": {
                 "type": "array",
                 "items": {
                   "type": "string"
                 },
                 "default": [],
-                "description": "Packages to be loaded before launching the R script."
+                "description": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
               }
             }
           }
