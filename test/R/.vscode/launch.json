@@ -32,7 +32,6 @@
             // "mainFunction": "main",
             "allowGlobalDebugging": false,
             "setBreakpointsInPackages": false,
-            // "packagesBeforeLaunch": ["asdf"]
         },
         {
             "type": "R-Debugger",

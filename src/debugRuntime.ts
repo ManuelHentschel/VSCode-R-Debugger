@@ -4,11 +4,10 @@
 
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
-import { config, escapeForRegex, getRStartupArguments, timeout } from "./utils";
+import { config, escapeForRegex, getRStartupArguments, timeout, escapeStringForR } from "./utils";
 import { checkPackageVersion } from './installRPackage';
 
 import { RSession } from './rSession';
-import { makeFunctionCall, anyRArgs } from './rUtils';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import * as MDebugProtocol from './debugProtocolModifications';
 import { explainRPackage, PackageVersionInfo } from './installRPackage';
@@ -35,12 +34,10 @@ interface WriteOnPrompt {
 
 export class DebugRuntime extends EventEmitter {
 
-	// delimiters used when printing info from R which is meant for the debugger
+	// DEPRECATED: delimiters used when printing info from R which is meant for the debugger
 	// need to occurr on the same line!
 	// need to match those used in the R-package
 	private rStrings = {
-		delimiter0: '<v\\s\\c>',
-		delimiter1: '</v\\s\\c>',
 		prompt: '<#v\\s\\c>', //actual prompt is followed by a newline to make easier to identify
 		continue: '<##v\\s\\c>', //actual prompt is followed by a newline to make easier to identify
 		startup: '<v\\s\\c\\R\\STARTUP>',
@@ -76,16 +73,7 @@ export class DebugRuntime extends EventEmitter {
 	// debugMode
 	private outputModes: {[key in DataSource]?: OutputMode} = {};
 
-	public writeOnBrowserPrompt: string = "";
-	public writeOnTopLevelPrompt: string = "";
-
-
-	public writeOnPrompt: WriteOnPrompt[] = [];
-	public writeOnPromptText: string = "";
-	public writeOnWhichPrompt: ('browser'|'topLevel'|'prompt');
-	public writeOnPromptCount: number = 0;
-
-
+	private writeOnPrompt: WriteOnPrompt[] = [];
 
 	// constructor
 	constructor() {
@@ -106,8 +94,6 @@ export class DebugRuntime extends EventEmitter {
 		if(args.rStrings){
 			const rs1 = args.rStrings;
 			const rs0 = this.rStrings;
-			this.rStrings.delimiter0 = rs1.delimiter0 || rs0.delimiter0;
-			this.rStrings.delimiter1 = rs1.delimiter1 || rs0.delimiter1;
 			this.rStrings.prompt = rs1.prompt || rs0.prompt;
 			this.rStrings.continue = rs1.continue || rs0.continue;
 			this.rStrings.startup = rs1.startup || rs0.startup;
@@ -125,8 +111,6 @@ export class DebugRuntime extends EventEmitter {
 
 		// start R in child process
 		const rStartupArguments: MDebugProtocol.RStartupArguments = await getRStartupArguments();
-		rStartupArguments.useJsonServer = args.useJsonServer;
-		rStartupArguments.useSinkServer = args.useSinkServer;
 		const openFolders = vscode.workspace.workspaceFolders;
 		if(openFolders){
 			rStartupArguments.cwd = openFolders[0].uri.fsPath;
@@ -153,7 +137,6 @@ export class DebugRuntime extends EventEmitter {
 			return this.handleJsonString(json, from, isFullLine);
 		};
 		this.rSession = new RSession();
-		this.rSession.waitBetweenCommands = this.waitBetweenRCommands;
 		// check that the child process launched properly
 		const successTerminal = await this.rSession.startR(rStartupArguments, tmpHandleLine, tmpHandleJsonString);
 		if (!successTerminal) {
@@ -161,23 +144,25 @@ export class DebugRuntime extends EventEmitter {
 			await this.abortInitializeRequest(response, message);
 			return false;
 		}
+
 		// read ports that were assigned to the child process and add to initialize args
-		args.useJsonServer = this.rSession.jsonPort > 0;
-		if(args.useJsonServer){
+		if(this.rSession.jsonPort <= 0 || this.rSession.sinkPort <= 0){
+			const message = 'Failed to connect to R process using ports!';
+			await this.abortInitializeRequest(response, message);
+			return false;
+		} else{
 			args.jsonHost = this.rSession.host;
 			args.jsonPort = this.rSession.jsonPort;
-		}
-
-		args.useSinkServer = this.rSession.sinkPort > 0;
-		if(args.useSinkServer){
 			args.sinkHost = this.rSession.host;
 			args.sinkPort = this.rSession.sinkPort;
 		}
-		this.initArgs = args;
 
 		//// (3) CHECK IF R HAS STARTED
 		// cat message from R
-		this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
+		const escapedStartupString = escapeStringForR(this.rStrings.startup + '\n');
+		const startupCmd = `base::cat(${escapedStartupString})`;
+		this.rSession.writeToStdin(startupCmd);
+		// this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
 		// `this.rSessionStartup` is notified when the output of the above `cat()` call is received
 		await this.rSessionStartup.wait(this.startupTimeout);
 		if (this.rSessionReady) {
@@ -195,15 +180,10 @@ export class DebugRuntime extends EventEmitter {
 		//// (4) Load R package
 		// load R package, wrapped in a try-catch-function
 		// missing R package will be handled by this.handleLine()
-		const tryCatchArgs: anyRArgs = {
-			expr: makeFunctionCall('library', this.rStrings.packageName, [], false, 'base'),
-			error: 'function(e)' + makeFunctionCall('cat', this.rStrings.libraryNotFound, '\n', true, 'base'),
-			silent: true
-		};
-		this.rSession.callFunction('tryCatch', tryCatchArgs, [], false, 'base');
+		const escapedLibraryNotFoundString = escapeStringForR(this.rStrings.libraryNotFound + '\n');
+		const libraryCmd = `base::tryCatch(expr=base::library(${this.rStrings.packageName}), error=function(e) base::cat(${escapedLibraryNotFoundString}))`;
+		this.rSession.writeToStdin(libraryCmd);
 
-		// all R function calls from here on are (by default) meant for functions from the vsc-extension:
-		this.rSession.defaultLibrary = this.rStrings.packageName;
 		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
 
 		// actually dispatch the (modified) initialize request to the R package
@@ -270,29 +250,11 @@ export class DebugRuntime extends EventEmitter {
 		const isStderr = (from === "stderr");
 		const outputMode = this.outputModes[from] || "all";
 
-		var isSink: boolean;
-		var isStdout: boolean;
-		if(this.initArgs.useSinkServer){
-			isSink = from === "sinkSocket";
-			isStdout = from === "stdout";
-		} else{
-			isSink = (from === "sinkSocket") || (from === "stdout");
-			isStdout = isSink;
-		}
+		const isSink = from === "sinkSocket";
+		const isStdout = from === "stdout";
 
 		// only show the line to the user if it is complete & relevant
 		var showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
-
-		// filter out info meant for vsc:
-		const jsonRegex = new RegExp(escapeForRegex(this.rStrings.delimiter0) + '(.*)' + escapeForRegex(this.rStrings.delimiter1) + '$');
-		const jsonMatch = jsonRegex.exec(line);
-		if(jsonMatch && isFullLine){
-			// is meant for the debugger, not the user
-			this.rPackageFound = true;
-			this.rPackageStartup.notify();
-			this.handleJsonString(jsonMatch[1]);
-			line = line.replace(jsonRegex, '');
-		}
 
 		// differentiate data source. Is non exclusive, in case sinkServer is not used
 		if(isStdout){
@@ -302,7 +264,6 @@ export class DebugRuntime extends EventEmitter {
 				if(RegExp(escapeForRegex(this.rStrings.startup)).test(line)){
 					this.rSessionReady = true;
 					this.rSessionStartup.notify();
-					this.rSessionReady = true;
 				}
 				// This message is sent only if loading the R package throws an error
 				// Check for Library-Not-Found-Message
@@ -417,7 +378,9 @@ export class DebugRuntime extends EventEmitter {
 				console.log('invalid wop');
 			}
 		} else {
-			this.rSession.callFunction('.vsc.listenOnPort', {timeout: -1});
+			const cmdListen = `.vsc.listenOnPort(timeout = -1)`;
+			this.rSession.writeToStdin(cmdListen);
+			// this.rSession.callFunction('.vsc.listenOnPort', {timeout: -1});
 			this.sendShowingPromptRequest(which, text);
 		}
 	}
@@ -523,7 +486,8 @@ export class DebugRuntime extends EventEmitter {
 	public writeToStdin(text: string){
 		if(text){
 			logger.debug("Writing to stdin: ", text);
-			this.rSession.runCommand(text, [], true);
+			// this.rSession.runCommand(text, [], true);
+			this.rSession.writeToStdin(text);
 			return true;
 		} else{
 			return false;
@@ -539,7 +503,11 @@ export class DebugRuntime extends EventEmitter {
 		logger.info('request ' + request.seq + ': ' + request.command, request);
 		if(!this.rSession.jsonSocket){
 			logger.debug('not using socket!');
-			this.rSession.callFunction('.vsc.handleJson', {json: json});
+			const escapedJson = escapeStringForR(json);
+			const cmdJson = `${this.rStrings.packageName}::.vsc.handleJson(json=${escapedJson})`;
+			this.rSession.writeToStdin(cmdJson);
+			// console.log(cmdJson);
+			// this.rSession.callFunction('.vsc.handleJson', {json: json});
 		} else {
 			logger.debug('using socket!');
 			this.rSession.jsonSocket.write(json + '\n');
@@ -552,7 +520,6 @@ export class DebugRuntime extends EventEmitter {
 			this.emit(event, ...args);
 		});
 	}
-
 
 
 	//////////////////////////////////////////////
@@ -595,7 +562,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 	private startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, filePath = '', line = 1){
-		var group: ("start"|"startCollapsed");
+		let group: ("start"|"startCollapsed");
 		if(collapsed){
 			group = "startCollapsed";
 		} else{
@@ -628,7 +595,6 @@ export class DebugRuntime extends EventEmitter {
 		if(this.rSession){
 			this.rSession.ignoreOutput = true;
 			this.rSession.killChildProcess();
-			// this.sendEvent('end');
 		}
 	}
 }
