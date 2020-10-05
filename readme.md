@@ -62,7 +62,7 @@ expressions entered into the debug console are evaluated in the currently active
 * During debugging in the global workspace it is often necessary to click the dummy frame
 in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv`.
 
-*For Windows users: If your R installation is from [CRAN](http://cran.r-project.org/mirrors.html) with default installation settings, especially **Save version number in registry** is enabled, then there's no need to specify `rdebugger.rterm.windows`.*
+<!-- *For Windows users: If your R installation is from [CRAN](http://cran.r-project.org/mirrors.html) with default installation settings, especially **Save version number in registry** is enabled, then there's no need to specify `rdebugger.rterm.windows`.* -->
 
 
 ## Launch config
@@ -103,8 +103,7 @@ These lines are also hidden from the user.
 ## Debugging R Packages
 In general, R packages can also be debugged using this extension.
 For this to work, the proper source information must be retained during the installation of the package
-(check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')` for some function from the package).
-I personally do not know a bulletproof way to achieve this, but the following might help:
+(check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')` for some function from the package):
 * The package must be installed from source code (not CRAN or `.tar.gz`)
 * The flag `--with-keep.source` should be set
 * Extensions containing C code seem to cause problems sometimes.
@@ -114,42 +113,32 @@ to compile the binaries and again with
 `devtools::install(quick=TRUE, ...)`
 to retain the source information.
 
-To set breakpoints, the debug config entry `"setBreakpointsInPackages"` needs to be set to `true`.
-If `debugMode=="file"` or `debugMode=="workspace"` it is also necessary to specify the debugged package(s) in the launch config to be loaded before launch, e.g.: 
+The package(s) that you are debugging needs to be specified in the launch config as follows.
 ```json
-"debugMode": "file",
-"setBreakpointsInPackages": true,
-"packagesBeforeLaunch": ["MyPackage"],
+"debuggedPackages": ["MyPackage"],
 ...
 ```
 
-The modified `print` and `cat` functions also work if source information is retained during the installation,
-but some modifications to the package are necessary.
-To use `.vsc.print` and `.vsc.cat` without breaking the package when not using the debugger,
-add the following code to the package:
-```r
+To overwrite the `print`/`cat`/`message` functions for an individual package,
+they need to be explicitly assigned somewhere in the package:
+``` r
 print <- print
 cat <- cat
-
-.onLoad <- function(){
-    try(print <<- vscDebugger::.vsc.print, silent=TRUE)
-    try(cat <<- vscDebugger::.vsc.cat, silent=TRUE)
-}
+message <- message
 ```
+This assignment can be overwritten by the debugger with
+`.vsc.print`/`.vsc.cat`/`.vsc.message`, but has no effect when not using the debugger.
 
 ## Warning
 In the following cases the debugger might not work correctly/as expected:
 * Calls to `trace()`, `tracingstate()`:
 These are used to implement breakpoints, so usage might interfere with the debugger's breakpoints
-* Calls to `browser()` without `.doTrace()`:
-Usually, these will be recognized as breakpoints, but they might cause problems in some circumstances (e.g. watch expressions)
 * Custom `options(error=...)`: the debugger uses its own `options(error=...)` to show stack trace etc. on error
 * Any form of (interactive) user input in the terminal during runtime (e.g. `readline(stdin())`), since
 the debugger passes all user input through `eval(...)`.
 * Code that contains calls to `sys.calls()`, `sys.frames()`, `attr(..., 'srcref')` etc.:
-Since pretty much all code is evaluated through calls to `eval(...)` these results might be wrong.
-If required, input in the debug console can be sent directly to R's `stdin` by prepending `###stdin`.
-* Any use of graphical output/input, stdio-redirecting, `sink()`
+Since pretty much all code is evaluated through calls to `eval(...)` these results might be wrong. <!-- If required, input in the debug console can be sent directly to R's `stdin` by prepending `###stdin`. -->
+* Extensive use of graphical output/input, stdio-redirecting, `sink()`
 * Extensive use of lazy evaluation, promises, side-effects:
 In the general case, the debugger recognizes unevaluated promises and preserves them.
 It might be possible, however, that the gathering of information about the stack/variables leads to unexpected side-effects.

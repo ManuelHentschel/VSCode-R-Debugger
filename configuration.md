@@ -65,11 +65,13 @@ The name of the main function to be debugged. Must be callable without arguments
 * `"allowGlobalDebugging"`: Whether to keep the R session running after debugging and evaluate expressions from the debug console.
 Essential for debug moge `"workspace"`, optional for `"file"`, usually not sensible for `"function"`.
 * `"setBreakpointsInPackages"`:
-Whether to try and set breakpoints in functions from packages.
-Defaults to `false` for performance reasons.
-Set to `true` to debug packages.
-* `"includePackageScopes"`: Set to `true` to view the namespaces of packages in the variable view.
-* `"packagesBeforeLaunch"`: List of package names that are loaded before launching the debug session.
+Whether to try and set breakpoints in exported functions from ALL packages.
+Very slow!
+Usually, specifying individual packages in `debuggedPackages` is preferred.
+* `"includePackageScopes"`: Set to `true` to view the exported functions/variables of packages in the variable view.
+* `"debuggedPackages"`: List of package names to be debugged.
+These packages are loaded before running the specified file/function.
+Breakpoints and the modified `print`/`cat`/`message` functions are applied in these packages.
 * `"overwritePrint"`: Whether to overwrite the `print` function with a custom version
 that also prints a link to the file and line number in the debug console.
 This overwrite does not affect print statements in packages.
@@ -101,6 +103,7 @@ If no values are set, the defaults listed below are used.
 * `"vsc.defaultDebugMode" = "workspace"`: Default value for the launch config entry `debugMode`
 * `"vsc.defaultIncludePackageScopes" = FALSE`: Default value for the launch config entry `includePackageScopes`
 * `"vsc.defaultOverwriteCat" = TRUE` Default value for the launch config entry `overwriteCat`
+* `"vsc.defaultOverwriteMessage" = TRUE` Default value for the launch config entry `overwriteMessage`
 * `"vsc.defaultOverwritePrint" = TRUE` Default value for the launch config entry `overwritePrint`
 * `"vsc.defaultOverwriteSource" = TRUE` Default value for the launch config entry `overwriteSource`
 * `"vsc.defaultSetBreakpointsInPackages" = FALSE` Default value for the launch config entry `setBreakpointsInPackages`
