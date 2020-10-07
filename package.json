@@ -120,6 +120,11 @@
                 "default": true,
                 "description": "Whether to attach a modified print() function (direct calls to base::print are not affected)."
               },
+              "overwriteStr": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified str() function (direct calls to base::str are not affected)."
+              },
               "overwriteMessage": {
                 "type": "boolean",
                 "default": true,
