@@ -45,7 +45,7 @@ The intended usecases for these modes are:
 R Files can be run by focussing a file and pressing `F5`.
 The stack view contains a single dummy frame.
 To view the variables in the global environment it is often necessary to click this frame and expand the variables view!
-This method is 'abusing' the debug adapter protocol to some extent, since the protocol is apparently not designed for ongoing interactive programming in a global workspace.
+This method is 'abusing' the debug adapter protocol to some extent, since the protocol is not designed for ongoing interactive programming in a global workspace.
 * `"file"`: Is pretty much equivalent to launching the debugger with `"workspace"` and immediately calling `.vsc.debugSource()` on a file.
 Is hopefully the behaviour expected by users coming from R Studio etc.
 * `"function"`: The above debug modes introduce significant overhead by passing all input through `eval()` etc.
@@ -69,14 +69,12 @@ Usually, specifying individual packages in `debuggedPackages` is preferred.
 * `"includePackageScopes"`: Set to `true` to view the exported functions/variables of packages in the variable view.
 * `"debuggedPackages"`: List of package names to be debugged.
 These packages are loaded before running the specified file/function.
-Breakpoints and the modified `print`/`cat`/`message` functions are applied in these packages.
-* `"overwritePrint"`: Whether to overwrite the `print` function with a custom version
-that also prints a link to the file and line number in the debug console.
-This overwrite does not affect print statements in packages.
+Breakpoints and the modified `print`/`cat`/`message`/`str` functions are applied in these packages.
+* `"overwritePrint"`: Whether to attach a custom `print` function that also prints a link to the file and line number in the debug console.
 * `"overwriteCat"`: Same as above for `cat()`
+* `"overwriteStr"`: Same as above for `str()`.
 * `"overwriteMessage"`: Same as above for `message()`
-* `"overwriteSource"`: Whether to overwrite the `source` function with a custom version
-that is affected by breakpoints set in VS Code.
+* `"overwriteSource"`: Whether to overwrite the `source` function with a custom version that is affected by breakpoints set in VS Code.
 
 
 ## 4. R Options
@@ -105,6 +103,7 @@ If no values are set, the defaults listed below are used.
 * `"vsc.defaultOverwriteMessage" = TRUE` Default value for the launch config entry `overwriteMessage`
 * `"vsc.defaultOverwritePrint" = TRUE` Default value for the launch config entry `overwritePrint`
 * `"vsc.defaultOverwriteSource" = TRUE` Default value for the launch config entry `overwriteSource`
+* `"vsc.defaultOverwriteStr" = TRUE` Default value for the launch config entry `overwriteStr`
 * `"vsc.defaultSetBreakpointsInPackages" = FALSE` Default value for the launch config entry `setBreakpointsInPackages`
 * `"vsc.dropArrays" = TRUE`: Whether to skip dimensions of size one when showing arrays in the variables window
 * `"vsc.evaluateActiveBindings" = FALSE`: Whether to evaluate active bindings and show the value in the variables view
