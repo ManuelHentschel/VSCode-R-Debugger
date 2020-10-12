@@ -25,6 +25,9 @@ export interface Source extends DebugProtocol.Source {
 
 
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
+    type: "R-Debugger";
+    request: "launch";
+
     // specify what to debug (required)
     debugMode: DebugMode;
     allowGlobalDebugging: boolean;
@@ -39,9 +42,11 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     setBreakpointsInPackages?: boolean;
     debuggedPackages?: string[];
     assignToAns?: boolean;
+
     overwritePrint?: boolean;
     overwriteCat?: boolean;
     overwriteMessage?: boolean;
+    overwriteStr?: boolean;
     overwriteSource?: boolean;
 }
 
@@ -61,7 +66,13 @@ export interface WorkspaceDebugConfiguration extends DebugConfiguration {
     workingDirectory: string;
 }
 
-export type StrictDebugConfiguration = FunctionDebugConfiguration | FileDebugConfiguration | WorkspaceDebugConfiguration;
+export interface AttachConfiguration extends VsCode.DebugConfiguration {
+    type: "R-Debugger"; //R2-Debugger?
+    request: "attach";
+    port?: number; //default = 18721
+}
+
+export type StrictDebugConfiguration = FunctionDebugConfiguration | FileDebugConfiguration | WorkspaceDebugConfiguration | AttachConfiguration;
 
 export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments, DebugConfiguration {
 }

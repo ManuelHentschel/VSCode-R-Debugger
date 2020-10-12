@@ -24,7 +24,7 @@
   },
   "icon": "images/Rlogo.png",
   "engines": {
-    "vscode": "^1.44.0"
+    "vscode": "^1.50.0"
   },
   "categories": [
     "Debuggers"
@@ -68,6 +68,23 @@
       }
     ],
     "debuggers": [
+      {
+        "type": "R2-Debugger",
+        "label": "R Debugger 2",
+        "program": "./out/debugAdapter.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "attach": {
+            "properties": {
+              "testPort": {
+                "type": "number",
+                "description": "port number",
+                "default": 123
+              }
+            }
+          }
+        }
+      },
       {
         "type": "R-Debugger",
         "label": "R Debugger",
@@ -243,17 +260,17 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/glob": "^7.1.1",
+    "@types/glob": "^7.1.3",
     "@types/mocha": "^7.0.2",
-    "@types/node": "^13.13.6",
-    "@types/vscode": "^1.44.0",
-    "@typescript-eslint/eslint-plugin": "^2.26.0",
-    "@typescript-eslint/parser": "^2.26.0",
+    "@types/node": "^13.13.25",
+    "@types/vscode": "^1.50.0",
+    "@typescript-eslint/eslint-plugin": "^2.34.0",
+    "@typescript-eslint/parser": "^2.34.0",
     "eslint": "^6.8.0",
     "glob": "^7.1.6",
-    "mocha": "^7.1.1",
-    "typescript": "^3.8.3",
-    "vscode-test": "^1.3.0"
+    "mocha": "^7.2.0",
+    "typescript": "^3.9.7",
+    "vscode-test": "^1.4.0"
   },
   "dependencies": {
     "await-notify": "^1.0.1",
@@ -261,7 +278,7 @@
     "net": "^1.0.2",
     "semver": "^7.3.2",
     "tree-kill": "^1.2.2",
-    "vscode-debugadapter": "^1.40.0",
+    "vscode-debugadapter": "^1.42.1",
     "winreg": "^1.2.4"
   }
 }

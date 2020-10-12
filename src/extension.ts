@@ -25,6 +25,10 @@ export function activate(context: vscode.ExtensionContext) {
 	if ('dispose' in factory) {
 		context.subscriptions.push(factory);
 	}
+
+	const factory2 = new ServerDebugAdapterFactory();
+	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R2-Debugger', factory2));
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('rdebugger.updateRPackage', updateRPackage)
 	);
@@ -79,6 +83,20 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 			strictConfig = <WorkspaceDebugConfiguration>config;
 		}
 		return strictConfig;
+	}
+}
+
+class ServerDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+	createDebugAdapterDescriptor(session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
+		const config = session.configuration;
+		let port: number = config.testPort;
+		if(port === undefined){
+			port = 80801;
+		}
+		console.log(port);
+		console.log('creating debugadapterdescriptor');
+		let ret = new vscode.DebugAdapterServer(port, 'localhost');
+		return ret;
 	}
 }
 

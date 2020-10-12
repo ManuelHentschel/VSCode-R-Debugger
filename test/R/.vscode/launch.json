@@ -13,6 +13,12 @@
             "allowGlobalDebugging": true
         },
         {
+            "type": "R2-Debugger",
+            "request": "attach",
+            "testPort": 18721,
+            "name": "Attach to R process"
+        },
+        {
             "type": "R-Debugger",
             "request": "launch",
             "name": "Debug R-File",
