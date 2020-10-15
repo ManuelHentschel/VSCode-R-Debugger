@@ -81,7 +81,7 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 		if(config.request === 'launch'){
 			// fill in capabilities that are always true for this extension
-			config.supportsStdinReading = true;
+			config.supportsStdoutReading = true;
 			config.supportsWriteToStdinEvent = true;
 			config.supportsShowingPromptRequest = true;
 		} else if (config.request === 'attach'){
