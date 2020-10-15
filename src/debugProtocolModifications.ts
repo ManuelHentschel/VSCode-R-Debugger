@@ -28,10 +28,6 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     type: "R-Debugger";
     request: "launch"|"attach";
 
-    // specify what to debug (required)
-    debugMode: DebugMode;
-    allowGlobalDebugging: boolean;
-
     // specify where to debug (some required, depends on debugMode)
     workingDirectory?: string;
     file?: string;
@@ -50,9 +46,11 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     overwriteSource?: boolean;
     splitOverwrittenOutput?: boolean;
 
-    // custom events/requests:
+    // custom events/requests/capabilities:
     supportsWriteToStdinEvent?: boolean;
     supportsShowingPromptRequest?: boolean;
+    supportsStdoutReading?: boolean;
+    ignoreFlowControl?: boolean;
 
     useCustomSocket?: boolean;
     customPort?: number;

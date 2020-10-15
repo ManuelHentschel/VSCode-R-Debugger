@@ -18,17 +18,14 @@ let terminalHandler: TerminalHandler;
 export async function activate(context: vscode.ExtensionContext) {
 
 	terminalHandler = new TerminalHandler();
-
 	const port = await terminalHandler.portPromise;
-	console.log('port = ' + port);
 
-	// register a configuration provider for 'R' debug type
+	// register a configuration provider
 	const provider = new DebugConfigurationProvider(port);
 	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', provider));
 
-    // run the debug adapter inside the extension and directly talk to it
+	// register the debug adapter descriptor provider
     const factory = new DebugAdapterDescriptorFactory();
-
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
 	if ('dispose' in factory) {
 		context.subscriptions.push(factory);
@@ -45,7 +42,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 // this method is called when the extension is deactivated
 export function deactivate() {
-	// dummy?
+	// close connections opened by terminalHandler
 	if(terminalHandler){
 		terminalHandler.close();
 	}
@@ -66,54 +63,55 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 		let strictConfig: StrictDebugConfiguration|null = null;
 
-		// todo: sensible defaults, if no file/folder is open
-
 		// if launch.json is missing or empty
 		if (!config.type && !config.request && !config.name) {
-			const editor = vscode.window.activeTextEditor;
-			if (editor && editor.document.languageId === 'r') {
-				let wd: string = '${fileDirname}';
-				if(folder){
-					wd = '{$workspaceFolder}';
-				}
-				strictConfig = {
-					type: 'R-Debugger',
-					name: 'Launch',
-					request: 'launch',
-					debugMode: DebugMode[DebugMode.File],
-					file: '${file}',
-					workingDirectory: wd,
-					allowGlobalDebugging: true
-				};
-			}
+			const doc = vscode.window.activeTextEditor;
+			const wd = (folder ? '{$workspaceFolder}' : (doc ? '${fileDirname}' : '~'));
+			config = {
+				type: 'R-Debugger',
+				name: 'Launch',
+				// request: 'launch',
+				request: 'attach',
+				// debugMode: DebugMode[DebugMode.File],
+				// file: '${file}',
+				workingDirectory: wd,
+				allowGlobalDebugging: true
+			};
+		}
+
+		if(config.request === 'launch'){
+			// fill in capabilities that are always true for this extension
+			config.supportsStdinReading = true;
+			config.supportsWriteToStdinEvent = true;
+			config.supportsShowingPromptRequest = true;
+		} else if (config.request === 'attach'){
+			// fill in communication info with TerminalHandler()
+			config.customPort = config.customPort || this.customPort;
+			config.customHost = config.customHost || this.customHost;
+			config.useCustomSocket = config.useCustomSocket ?? true;
+			config.supportsWriteToStdinEvent = config.supportsWriteToStdinEvent ?? true;
 		}
 
 		const debugMode = config.debugMode;
-		
-		if(!config.workingDirectory){
-			config.workingDirectory = '${workspaceFolder}';
-		}
-		if(debugMode === DebugMode.File || debugMode === DebugMode.Function){
+		if(debugMode === DebugMode.Function){
+			// make sure that all required fields (workingDirectory, file, function) are filled:
+			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
 			config.file = config.file || '${file}';
-		}
-		if(!config.mainFunction){
-			config.mainFunction = 'main';
-		}
-
-		if(config.debugMode === DebugMode.Function){
-			// make sure that all required fields (workingDirectory, file, function) are filled above!
+			config.mainFunction = config.mainFunction || 'main';
 			strictConfig = <FunctionDebugConfiguration>config;
-		} else if(config.debugMode === DebugMode.File){
-			// make sure that all required fields (workingDirectory, file) are filled above!
+		} else if(debugMode === DebugMode.File){
+			// make sure that all required fields (workingDirectory, file) are filled:
+			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.file = config.file || '${file}';
 			strictConfig = <FileDebugConfiguration>config;
-		} else if(config.debugMode === DebugMode.Workspace){
-			// make sure that all required fields (workingDirectory) are filled above!
+		} else if(debugMode === DebugMode.Workspace){
+			// make sure that all required fields (workingDirectory) are filled:
+			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
 			strictConfig = <WorkspaceDebugConfiguration>config;
 		} else if(config.request === 'attach'){
-			config.customPort = this.customPort;
-			config.customHost = this.customHost;
-			config.useCustomSocket = true;
 			strictConfig = <AttachConfiguration>config;
+		} else{
+			strictConfig = null;
 		}
 		return strictConfig;
 	}
@@ -127,8 +125,7 @@ class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFact
 		} else if(config.request === 'attach'){
 			const port: number = config.port || 18721;
 			const host: string = config.host || 'localhost';
-			const ret = new vscode.DebugAdapterServer(port, host);
-			return ret;
+			return new vscode.DebugAdapterServer(port, host);
 		} else{
 			throw new Error('Invalid entry "request" in debug config. Valid entries are "launch" and "attach"');
 		}

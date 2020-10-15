@@ -9,4 +9,13 @@ f <- function(){
 
 listen <- vscDebugger::.vsc.listenForDAP
 
+l <- list(
+    a=1,
+    b=2,
+    c=3
+)
+
+x <- 99
+
+s <- 'asdf'
 

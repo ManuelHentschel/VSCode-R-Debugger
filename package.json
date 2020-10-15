@@ -77,19 +77,35 @@
         "configurationAttributes": {
           "attach": {
             "properties": {
-              "useCustomSocket": {},
-              "customPort": {},
-              "customHost": {},
-
+              "supportsWriteToStdinEvent": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to use custom events to request text written to R's stdin. Is used to implement next/step/continue requests."
+              },
+              "useCustomSocket": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to use a separate socket for custom events. Usually necessary."
+              },
+              "customPort": {
+                "type": "number",
+                "default": 0,
+                "description": "Port number of custom socket. Leave emtpy/0 to assign automatically."
+              },
+              "customHost": {
+                "type": "string",
+                "default": "localhost",
+                "description": "Host name of custom socket. Leave empty to use localhost."
+              },
               "port": {
                 "type": "number",
                 "default": 18721,
-                "description": "Port number"
+                "description": "Port number where vscDebugger is listening for DAP messages."
               },
               "host": {
                 "type": "string",
                 "default": "localhost",
-                "description": "Host"
+                "description": "Host name where vscDebugger is listening for DAP messages."
               },
               "splitOverwrittenOutput": {
                 "type": "boolean",
