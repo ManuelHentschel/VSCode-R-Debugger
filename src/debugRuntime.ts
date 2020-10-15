@@ -151,8 +151,10 @@ export class DebugRuntime extends EventEmitter {
 			await this.abortInitializeRequest(response, message);
 			return false;
 		} else{
+			args.useJsonSocket = true;
 			args.jsonHost = this.rSession.host;
 			args.jsonPort = this.rSession.jsonPort;
+			args.useSinkSocket = true;
 			args.sinkHost = this.rSession.host;
 			args.sinkPort = this.rSession.sinkPort;
 		}
@@ -584,6 +586,7 @@ export class DebugRuntime extends EventEmitter {
 		const doc = vscode.window.activeTextEditor.document;
 		await doc.save();
 		const filename = doc.fileName;
+		request.arguments.callDebugSource = true;
 		request.arguments.source = {path: filename};
 		this.dispatchRequest(request);
 	}
@@ -594,7 +597,7 @@ export class DebugRuntime extends EventEmitter {
 	public killR(signal='SIGKILL'): void {
 		if(this.rSession){
 			this.rSession.ignoreOutput = true;
-			this.rSession.killChildProcess();
+			this.rSession.killChildProcess(signal);
 		}
 	}
 }

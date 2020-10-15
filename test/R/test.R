@@ -1,6 +1,12 @@
 
+library(vscDebugger)
 
-session <- .vsc.getSession()
+f <- function(){
+    print(1)
+    print(2)
+    print('done')
+}
 
-env <- parent.env(session)
+listen <- vscDebugger::.vsc.listenForDAP
+
 

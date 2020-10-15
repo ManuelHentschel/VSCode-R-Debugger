@@ -4,19 +4,28 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        // {
+        //     "type": "R-Debugger",
+        //     "request": "launch",
+        //     "name": "Launch Workspace",
+        //     "debugMode": "workspace",
+        //     "workingDirectory": "${workspaceFolder}",
+        //     "allowGlobalDebugging": true
+        // },
         {
             "type": "R-Debugger",
-            "request": "launch",
-            "name": "Launch Workspace",
-            "debugMode": "workspace",
-            "workingDirectory": "${workspaceFolder}",
-            "allowGlobalDebugging": true
+            "request": "attach",
+            "name": "Attach to R process",
+            "splitOverwrittenOutput": true,
+            "useCustomSocket": true,
+            "customPort": 18720
         },
         {
-            "type": "R2-Debugger",
+            "type": "R-Debugger",
             "request": "attach",
-            "testPort": 18721,
-            "name": "Attach to R process"
+            "name": "Attach to R process 2",
+            // "port": 18723,
+            "useCustomSocket": true
         },
         {
             "type": "R-Debugger",

@@ -33,7 +33,8 @@
     "onLanguage:r",
     "onLanguage:rd",
     "onLanguage:rmd",
-    "onCommand:rdebugger.updateRPackage"
+    "onCommand:rdebugger.updateRPackage",
+    "onDebug"
   ],
   "keywords": [
     "R",
@@ -69,28 +70,77 @@
     ],
     "debuggers": [
       {
-        "type": "R2-Debugger",
-        "label": "R Debugger 2",
-        "program": "./out/debugAdapter.js",
-        "runtime": "node",
-        "configurationAttributes": {
-          "attach": {
-            "properties": {
-              "testPort": {
-                "type": "number",
-                "description": "port number",
-                "default": 123
-              }
-            }
-          }
-        }
-      },
-      {
         "type": "R-Debugger",
         "label": "R Debugger",
         "program": "./out/debugAdapter.js",
         "runtime": "node",
         "configurationAttributes": {
+          "attach": {
+            "properties": {
+              "useCustomSocket": {},
+              "customPort": {},
+              "customHost": {},
+
+              "port": {
+                "type": "number",
+                "default": 18721,
+                "description": "Port number"
+              },
+              "host": {
+                "type": "string",
+                "default": "localhost",
+                "description": "Host"
+              },
+              "splitOverwrittenOutput": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to show the overwritten output in the normal stdout/stderr as well."
+              },
+              "overwritePrint": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified print() function (direct calls to base::print are not affected)."
+              },
+              "overwriteStr": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified str() function (direct calls to base::str are not affected)."
+              },
+              "overwriteMessage": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified message() function (direct calls to base::message are not affected)."
+              },
+              "overwriteCat": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified cat() function (direct calls to base::cat are not affected)."
+              },
+              "overwriteSource": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified source() function (direct calls to base::source are not affected)."
+              },
+              "setBreakpointsInPackages": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
+              },
+              "includePackageScopes": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set to true to show package scopes in the variable window."
+              },
+              "debuggedPackages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
+              }
+            }
+          },
           "launch": {
             "required": [
               "debugMode",
@@ -166,11 +216,6 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Set to true to show package scopes in the variable window."
-              },
-              "packagesBeforeLaunch": {
-                "type": "DEPRECATED ENTRY! Use `debuggedPackages` instead.",
-                "default": "DEPRECATED ENTRY! Use `debuggedPackages` instead.",
-                "description": "DEPRECATED ENTRY! Use `debuggedPackages` instead."
               },
               "debuggedPackages": {
                 "type": "array",
@@ -280,5 +325,12 @@
     "tree-kill": "^1.2.2",
     "vscode-debugadapter": "^1.42.1",
     "winreg": "^1.2.4"
+  },
+  "definitions": {
+    "testDefinition": {
+      "type": "string",
+      "default": "testDefault",
+      "description": "testDescription"
+    }
   }
 }

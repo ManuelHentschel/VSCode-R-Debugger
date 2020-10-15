@@ -26,7 +26,7 @@ export interface Source extends DebugProtocol.Source {
 
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
     type: "R-Debugger";
-    request: "launch";
+    request: "launch"|"attach";
 
     // specify what to debug (required)
     debugMode: DebugMode;
@@ -48,28 +48,40 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     overwriteMessage?: boolean;
     overwriteStr?: boolean;
     overwriteSource?: boolean;
+    splitOverwrittenOutput?: boolean;
+
+    // custom events/requests:
+    supportsWriteToStdinEvent?: boolean;
+    supportsShowingPromptRequest?: boolean;
+
+    useCustomSocket?: boolean;
+    customPort?: number;
+    customHost?: string;
 }
 
 export interface FunctionDebugConfiguration extends DebugConfiguration {
+    request: "launch";
     debugMode: DebugMode.Function;
     workingDirectory: string;
     file: string;
     mainFunction: string;
 }
 export interface FileDebugConfiguration extends DebugConfiguration {
+    request: "launch";
     debugMode: DebugMode.File;
     workingDirectory: string;
     file: string;
 }
 export interface WorkspaceDebugConfiguration extends DebugConfiguration {
+    request: "launch";
     debugMode: DebugMode.Workspace;
     workingDirectory: string;
 }
 
-export interface AttachConfiguration extends VsCode.DebugConfiguration {
-    type: "R-Debugger"; //R2-Debugger?
+export interface AttachConfiguration extends DebugConfiguration {
     request: "attach";
     port?: number; //default = 18721
+    host?: string;
 }
 
 export type StrictDebugConfiguration = FunctionDebugConfiguration | FileDebugConfiguration | WorkspaceDebugConfiguration | AttachConfiguration;
@@ -88,8 +100,10 @@ export interface RStrings {
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
+    useJsonSocket?: boolean;
     jsonPort?: number;
     jsonHost?: string;
+    useSinkSocket?: boolean;
     sinkPort?: number;
     sinkHost?: string;
     extensionVersion?: string;
@@ -142,9 +156,15 @@ export interface WriteToStdinBody {
     reason: "writeToStdin";
     text: string;
     when?: "now"|"browserPrompt"|"topLevelPrompt"|"prompt";
+    fallBackToNow?: boolean;
     addNewLine?: boolean; //=false (in vscode), =true (in R)
     count?: number; // =1
     stack?: boolean;
+    // info used to identify the correct terminal:
+    terminalId?: string;
+    useActiveTerminal?: boolean;
+    pid?: number;
+    ppid?: number;
 }
 
 // Used to send info to R that is not part of the DAP
