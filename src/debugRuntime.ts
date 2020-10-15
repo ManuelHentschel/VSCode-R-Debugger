@@ -45,12 +45,8 @@ export class DebugRuntime extends EventEmitter {
 		packageName: 'vscDebugger',
 	};
 
-	private initArgs: MDebugProtocol.InitializeRequestArguments;
-
 	// The rSession used to run the code
 	public rSession: RSession;
-	// Time in ms to wait before sending an R command (makes debugging slower but 'safer'?)
-	private waitBetweenRCommands: number = 0;
 
 	// // state info about the R session
 	// R session
@@ -103,8 +99,8 @@ export class DebugRuntime extends EventEmitter {
 		args.rStrings = this.rStrings;
 
 		// read settings from vsc-settings
-		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
-		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
+		this.startupTimeout = config().get<number>('timeouts.startup', this.startupTimeout);
+		this.terminateTimeout = config().get<number>('timeouts.terminate', this.terminateTimeout);
 		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
 		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
@@ -361,8 +357,15 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
-	private handlePrompt(which: "browser"|"topLevel", text?: string){
+	private async handlePrompt(which: "browser"|"topLevel", text?: string){
 		logger.debug("matches prompt: " + which);
+
+		// wait for timeout to give json socket time to catch up
+		// might be useful to avoid async issues
+		const timeout = config().get<number>('timeouts.prompt', 0);
+		if(timeout>0){
+			await new Promise(resolve => setTimeout(resolve, timeout));
+		}
 	
 		if(this.writeOnPrompt.length > 0){
 			const wop = this.writeOnPrompt.shift();

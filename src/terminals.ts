@@ -4,7 +4,7 @@ import * as net from 'net';
 
 import { WriteToStdinEvent, WriteToStdinBody } from './debugProtocolModifications';
 import * as vscode from 'vscode';
-import { getPortNumber } from './utils';
+import { config, getPortNumber } from './utils';
 
 let doTrackTerminals: boolean = false;
 
@@ -73,6 +73,7 @@ export class TerminalHandler {
     private lineCache = new Map<net.Socket, string>();
 
     public constructor(port: number = 0, host: string = 'localhost'){
+        const timeout = config().get<number>('timeouts.startup', 1000);
         this.server = net.createServer((socket) => {
             socket.on('data', (data) => {
                 this.handleData(data, socket);
@@ -86,7 +87,7 @@ export class TerminalHandler {
             });
             setTimeout(() => {
                 reject(new Error('Server not listening...'));
-            }, 1000);
+            }, timeout);
         });
 
         this.portPromise = portPromise;

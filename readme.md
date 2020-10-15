@@ -11,7 +11,7 @@ For further R support in VS Code see e.g. [vscode-R](https://github.com/Ikuyadeu
 ![features.png](images/features.png)
 
 The debugger includes the following features:
-1. Run and debug R Code, using one of three debug modes (for details see below).
+1. Run and debug R Code by launching a new R process or attaching to a running one.
 2. View scopes and variables of the currently selected stack frame.
 For many variables it is also possible to assign a new value to the variable or individual entries/attributes in this view.
 3. Add watch expressions that are evaluated in the selected stack frame on each breakpoint/step.
@@ -61,24 +61,8 @@ expressions entered into the debug console are evaluated in the currently active
 * During debugging in the global workspace it is often necessary to click the dummy frame
 in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv`.
 
-## Launch config
-The behaviour of the debugger can be configured with the entry `"debugMode"`,
-which can be one of the values `"function"`, `"file"`, and `"workspace"`.
-The intended usecases for these modes are:
-
-* `"workspace"`: Starts an R process in the background and sends all input into the debug console to the R process (but indirectly, through `eval()` nested in some helper functions).
-R Files can be run by focussing a file and pressing `F5`.
-The stack view contains a single dummy frame.
-To view the variables in the global environment it is often necessary to click this frame and expand the variables view!
-This method is 'abusing' the debug adapter protocol to some extent, since the protocol is apparently not designed for ongoing interactive programming in a global workspace.
-* `"file"`: Is pretty much equivalent to launching the debugger with `"workspace"` and immediately calling `.vsc.debugSource()` on a file.
-Is hopefully the behaviour expected by users coming from R Studio etc.
-* `"function"`: The above debug modes introduce significant overhead by passing all input through `eval()` etc.
-and use a custom version of `source()`, which makes changes to the R code in order to set breakpoints.
-To provide a somewhat 'cleaner' method of running code, this debug mode can be used.
-The specified file is executed using the default `source` command ad breakpoints are set by using R's `trace(..., tracer=browser)` function, which is more robust than the custom breakpoint mechanism.
-
-The is a number of additional launch config entries and settings that are described in detail in
+## Configuration
+For a detailed explanation of possible launch config entries and other settings, see
 [configuration.md](./configuration.md) on github.
 
 ## How it works
@@ -109,7 +93,7 @@ to compile the binaries and again with
 `devtools::install(quick=TRUE, ...)`
 to retain the source information.
 
-The package(s) that you are debugging needs to be specified in the launch config as follows.
+The packages that are being debugged need to be specified in the launch config as follows:
 ```json
 "debuggedPackages": ["MyPackage"],
 ...
@@ -141,24 +125,8 @@ It might be possible, however, that the gathering of information about the stack
 Especially watch-expressions must be safe to be evaluated in any frame,
 since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
 
-## Work in Progress
-This package is still under development.
-The following topics are on the todo list:
-
-* Auto adjustment of breakpoint position to next valid position
-* Conditional breakponts, data breakpoints
-* Setting of breakpoints during runtime (currently most of these are silently ignored)
-* Improve error handling/argument checks
-* Handling graphical output etc.?
-* Attach to currently open R process instead of spawning a new one?
-* Use (visible) integrated terminal instead of background process,
-use `sink(..., split=TRUE)` to simultaneously show stdout to user and the debugger
-* Pipe a copy of stdout to a pseudo-terminal as info for the user
-* Handling parallel computing (currently not looking very promising...)
-* Cleaner adoption of the Debug Adapter Protocol in R
-* Smoother installation/troubleshooting process
-
 ## Contributing
+This package is still under development.
 If you have problems, suggestions, bug fixes etc. feel free to open an
 [issue](https://github.com/ManuelHentschel/VSCode-R-Debugger/issues)
 or submit a pull request.

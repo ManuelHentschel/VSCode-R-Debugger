@@ -20,7 +20,7 @@ export class DebugSession extends ProtocolServer {
 	// a runtime (or debugger)
     private _runtime: DebugRuntime;
 
-    private disconnectTimeout: number = 1000;
+    private disconnectTimeout: number = config().get<number>('timeouts.startup', 1000);
 
     sendResponse(response: DebugProtocol.Response): void {
         logger.info("response " + response.request_seq + ": " + response.command, response);

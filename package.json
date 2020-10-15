@@ -85,7 +85,7 @@
               "useCustomSocket": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to use a separate socket for custom events. Usually necessary."
+                "description": "Whether to use a separate socket for custom events. Usually necessary in attach mode."
               },
               "customPort": {
                 "type": "number",
@@ -112,6 +112,7 @@
                 "default": false,
                 "description": "Whether to show the overwritten output in the normal stdout/stderr as well."
               },
+
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
@@ -198,6 +199,7 @@
                 "default": "main",
                 "description": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
               },
+
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
@@ -294,10 +296,20 @@
           "default": "",
           "description": "R path for Linux. If empty, the PATH is searched for an R executable."
         },
-        "rdebugger.startupTimeout": {
+        "rdebugger.timeouts.startup": {
           "type": "number",
           "default": 2000,
-          "description": "The maximum time in ms that is waited for R to startup"
+          "description": "The maximum time in ms that is waited for R to startup. Is also used for some other timeouts."
+        },
+        "rdebugger.timeouts.terminate": {
+          "type": "number",
+          "default": 50,
+          "description": "Time in ms that is waited when terminating R to allow messages etc. to appear."
+        },
+        "rdebugger.timeouts.prompt": {
+          "type": "number",
+          "default": 0,
+          "description": "Time in ms that is waited before handling input prompts on stdout (to avoid async issues)."
         },
         "rdebugger.checkVersion": {
           "type": "string",

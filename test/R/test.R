@@ -1,6 +1,8 @@
 
 # library(vscDebugger)
 
+options(vsc.showInternalFrames = TRUE)
+
 f <- function(){
     print(1)
     print(2)
@@ -18,4 +20,8 @@ l <- list(
 x <- 99
 
 s <- 'asdf'
+
+g <- function(){
+    f()
+}
 
