@@ -4,12 +4,7 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import * as VsCode from 'vscode';
 // import { DebugProtocol } from './debugProtocol';
 
-export enum DebugMode {
-    Function = "function",
-    File = "file",
-    Workspace = "workspace"
-}
-
+export type DebugMode = "function"|"file"|"workspace";
 
 export interface RStartupArguments {
     path: string;
@@ -28,7 +23,8 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     type: "R-Debugger";
     request: "launch"|"attach";
 
-    // specify where to debug (some required, depends on debugMode)
+    // specify how/where to debug (some required, depends on request/debugMode)
+    debugMode?: DebugMode;
     workingDirectory?: string;
     file?: string;
     mainFunction?: string;
@@ -59,20 +55,20 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
 
 export interface FunctionDebugConfiguration extends DebugConfiguration {
     request: "launch";
-    debugMode: DebugMode.Function;
+    debugMode: "function";
     workingDirectory: string;
     file: string;
     mainFunction: string;
 }
 export interface FileDebugConfiguration extends DebugConfiguration {
     request: "launch";
-    debugMode: DebugMode.File;
+    debugMode: "file";
     workingDirectory: string;
     file: string;
 }
 export interface WorkspaceDebugConfiguration extends DebugConfiguration {
     request: "launch";
-    debugMode: DebugMode.Workspace;
+    debugMode: "workspace";
     workingDirectory: string;
 }
 

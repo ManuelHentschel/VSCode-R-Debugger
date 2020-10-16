@@ -67,49 +67,69 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 		if (!config.type && !config.request && !config.name) {
 			const doc = vscode.window.activeTextEditor;
 			const wd = (folder ? '{$workspaceFolder}' : (doc ? '${fileDirname}' : '~'));
-			config = {
-				type: 'R-Debugger',
-				name: 'Launch',
-				// request: 'launch',
-				request: 'attach',
-				// debugMode: DebugMode[DebugMode.File],
-				// file: '${file}',
-				workingDirectory: wd,
-				allowGlobalDebugging: true
-			};
+			if(doc){
+				// if file is open, debug file
+				config = {
+					type: "R-Debugger",
+					name: "Launch R Debugger",
+					request: "launch",
+					debugMode: "file",
+					file: "${file}",
+					workingDirectory: wd
+				};
+			} else if(wd){
+				// if folder but no file is open, launch workspace
+				config = {
+					type: "R-Debugger",
+					name: "Launch R Debugger",
+					request: "launch",
+					debugMode: "file",
+					workingDirectory: wd
+				};
+			} else{
+				// if no file/folder open, attach
+				config = {
+					type: 'R-Debugger',
+					name: 'Launch',
+					request: 'attach'
+				};
+			}
 		}
 
+		// fill custom capabilities/socket info
 		if(config.request === 'launch'){
-			// fill in capabilities that are always true for this extension
+			// capabilities that are always true for this extension:
 			config.supportsStdoutReading = true;
 			config.supportsWriteToStdinEvent = true;
 			config.supportsShowingPromptRequest = true;
 		} else if (config.request === 'attach'){
-			// fill in communication info with TerminalHandler()
-			config.customPort = config.customPort || this.customPort;
+			// communication info with TerminalHandler():
+			config.customPort = config.customPort ?? this.customPort;
 			config.customHost = config.customHost || this.customHost;
 			config.useCustomSocket = config.useCustomSocket ?? true;
 			config.supportsWriteToStdinEvent = config.supportsWriteToStdinEvent ?? true;
 		}
 
-		const debugMode = config.debugMode;
-		if(debugMode === DebugMode.Function){
+		// make sure the config matches the requirements of one of the debug modes
+		const debugMode: DebugMode|undefined = config.debugMode;
+		if(config.request === 'attach'){
+			// no fields mandatory
+			strictConfig = <AttachConfiguration>config;
+		} else if(debugMode === "function"){
 			// make sure that all required fields (workingDirectory, file, function) are filled:
 			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
 			config.file = config.file || '${file}';
 			config.mainFunction = config.mainFunction || 'main';
 			strictConfig = <FunctionDebugConfiguration>config;
-		} else if(debugMode === DebugMode.File){
+		} else if(debugMode === "file"){
 			// make sure that all required fields (workingDirectory, file) are filled:
 			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
 			config.file = config.file || '${file}';
 			strictConfig = <FileDebugConfiguration>config;
-		} else if(debugMode === DebugMode.Workspace){
+		} else if(debugMode === "workspace"){
 			// make sure that all required fields (workingDirectory) are filled:
 			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
 			strictConfig = <WorkspaceDebugConfiguration>config;
-		} else if(config.request === 'attach'){
-			strictConfig = <AttachConfiguration>config;
 		} else{
 			strictConfig = null;
 		}
