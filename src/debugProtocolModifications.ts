@@ -4,6 +4,11 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import * as VsCode from 'vscode';
 // import { DebugProtocol } from './debugProtocol';
 
+
+//
+// Regular extension of the DAP:
+//
+
 export type DebugMode = "function"|"file"|"workspace";
 
 export interface RStartupArguments {
@@ -13,11 +18,6 @@ export interface RStartupArguments {
     sinkPort?: number;
     cwd: string;
 }
-
-export interface Source extends DebugProtocol.Source {
-    content?: string;
-}
-
 
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
     type: "R-Debugger";
@@ -91,6 +91,16 @@ export interface RStrings {
     packageName?: string;
 }
 
+
+
+
+//
+// Non standard extension/modification of the DAP:
+// 
+
+export interface InitializeRequest extends DebugProtocol.InitializeRequest {
+    arguments: InitializeRequestArguments;
+}
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
@@ -103,30 +113,20 @@ export interface InitializeRequestArguments extends DebugProtocol.InitializeRequ
     extensionVersion?: string;
 }
 
-export interface InitializeRequest extends DebugProtocol.InitializeRequest {
-    arguments: InitializeRequestArguments;
+export interface InitializeResponse extends DebugProtocol.InitializeResponse {
+    packageInfo?: PackageInfo;
 }
-
 export interface PackageInfo {
     Package: string;
     Version: string;
 };
 
-export interface InitializeResponse extends DebugProtocol.InitializeResponse {
-    packageInfo?: PackageInfo;
-}
-
-export interface ContinueArguments extends DebugProtocol.ContinueArguments {
-    callDebugSource?: boolean;
-    source?: DebugProtocol.Source;
-}
-
 export interface ContinueRequest extends DebugProtocol.ContinueRequest {
     arguments: ContinueArguments;
 }
-
-export interface SourceArguments extends DebugProtocol.SourceArguments {
-    source?: Source;
+export interface ContinueArguments extends DebugProtocol.ContinueArguments {
+    callDebugSource?: boolean;
+    source?: DebugProtocol.Source;
 }
 
 

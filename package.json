@@ -2,7 +2,7 @@
   "name": "r-debugger",
   "displayName": "R Debugger",
   "description": "R Debugger for VS Code",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "publisher": "RDebugger",
   "license": "MIT",
   "author": {
@@ -10,9 +10,9 @@
   },
   "rPackageInfo": {
     "name": "vscDebugger",
-    "required": "0.3.0",
-    "recommended": "0.3.1",
-    "warnIfNewer": "0.4.0"
+    "required": "0.4.0",
+    "recommended": "0.4.0",
+    "warnIfNewer": "0.5.0"
   },
   "repository": {
     "type": "git",
@@ -113,7 +113,6 @@
                 "default": false,
                 "description": "Whether to show the overwritten output in the normal stdout/stderr as well."
               },
-
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
@@ -200,7 +199,6 @@
                 "default": "main",
                 "description": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
               },
-
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
@@ -274,6 +272,12 @@
             "file": "${file}",
             "mainFunction": "main",
             "allowGlobalDebugging": false
+          },
+          {
+            "type": "R-Debugger",
+            "request": "attach",
+            "name": "Attach to R process",
+            "splitOverwrittenOutput": true
           }
         ]
       }
@@ -321,6 +325,11 @@
           ],
           "default": "recommended",
           "description": "Whether to check the version of the R package before launching the debugger."
+        },
+        "rdebugger.trackTerminals": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
         }
       }
     }

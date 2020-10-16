@@ -3,7 +3,6 @@
 
 import { basename } from 'path';
 import { DebugRuntime } from './debugRuntime';
-import { Response } from 'vscode-debugadapter/lib/messages';
 import { ProtocolServer } from 'vscode-debugadapter/lib/protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { InitializeRequest, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
@@ -11,6 +10,7 @@ import { config, getVSCodePackageVersion } from './utils';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugSession");
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'INFO'));
 
 export class DebugSession extends ProtocolServer {
 
@@ -34,8 +34,6 @@ export class DebugSession extends ProtocolServer {
 
     constructor() {
         super();
-
-		logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'INFO'));
 
 		// construct R runtime
 		this._runtime = new DebugRuntime();
@@ -79,7 +77,13 @@ export class DebugSession extends ProtocolServer {
     }
 
     protected dispatchRequest(request: DebugProtocol.Request) {
-        const response: ResponseWithBody = new Response(request);
+        const response: DebugProtocol.Response = {
+            command: request.command,
+            request_seq: request.seq,
+            seq: 0,
+            success: true,
+            type: 'response'
+        };
         var dispatchToR: boolean = false; // the cases handled here are not sent to R
         var sendResponse: boolean = true; // for cases handled here, the response must also be sent from here
         try {

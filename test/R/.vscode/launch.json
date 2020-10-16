@@ -8,7 +8,7 @@
             "type": "R-Debugger",
             "request": "attach",
             "name": "Attach to R process",
-            "supportsWriteToStdinEvent": false,
+            "supportsWriteToStdinEvent": true,
             "splitOverwrittenOutput": false,
             "useCustomSocket": true
         },

@@ -6,6 +6,10 @@ import { WriteToStdinEvent, WriteToStdinBody } from './debugProtocolModification
 import * as vscode from 'vscode';
 import { config, getPortNumber } from './utils';
 
+import * as log from 'loglevel';
+const logger = log.getLogger("DebugRuntime");
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelTerminals', 'INFO'));
+
 let doTrackTerminals: boolean = false;
 
 export function trackTerminals(){
@@ -75,6 +79,7 @@ export class TerminalHandler {
     public constructor(port: number = 0, host: string = 'localhost'){
         const timeout = config().get<number>('timeouts.startup', 1000);
         this.server = net.createServer((socket) => {
+            logger.debug('Cusotm server: connection!');
             socket.on('data', (data) => {
                 this.handleData(data, socket);
             });
@@ -82,7 +87,7 @@ export class TerminalHandler {
         const portPromise = new Promise<number>((resolve, reject) => {
             this.server.listen(port, host, () => {
                 const port = getPortNumber(this.server);
-                console.log(`Server listening on ${host}:${port}`);
+                logger.info(`Custom server listening on ${host}:${port}`);
                 resolve(port);
             });
             setTimeout(() => {
@@ -94,7 +99,7 @@ export class TerminalHandler {
     }
 
     public close(){
-        console.log('closing terminal handler connections');
+        console.log('Closing custom server connections');
         this.lineCache.forEach((_, socket) => {
             socket.destroy();
         });
@@ -146,6 +151,7 @@ async function writeToStdin(args: WriteToStdinArgs){
         terminal.sendText(args.text, args.addNewLine);
         return true;
     } else{
+        logger.debug('No terminal found.')
         return false;
     }
 }
@@ -161,6 +167,7 @@ async function findTerminal(args: WriteToStdinArgs): Promise<vscode.Terminal|und
         for(term of vscode.window.terminals){
             const pid: number = await term.processId;
             if(pid === args.pid || pid === args.ppid){
+                logger.debug('identified terminal by pid');
                 return term;
             }
         }
@@ -169,12 +176,14 @@ async function findTerminal(args: WriteToStdinArgs): Promise<vscode.Terminal|und
     if(args.terminalId && doTrackTerminals){
         for(term of vscode.window.terminals){
             if('vscodeRDebuggerTerminalId' in term && args.terminalId === term.vscodeRDebuggerTerminalId){
+                logger.debug('identified terminal by terminalId');
                 return term;
             }
         }
     }
     // resort to active terminal
     if(args.useActiveTerminal){
+        logger.debug('resort to active terminal');
         return vscode.window.activeTerminal;
     }
     // give up...

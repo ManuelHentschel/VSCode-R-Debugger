@@ -16,6 +16,7 @@ const { Subject } = require('await-notify');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
@@ -74,7 +75,6 @@ export class DebugRuntime extends EventEmitter {
 	// constructor
 	constructor() {
 		super();
-		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 	}
 
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: MDebugProtocol.InitializeRequestArguments, request: MDebugProtocol.InitializeRequest) {
@@ -383,9 +383,8 @@ export class DebugRuntime extends EventEmitter {
 				console.log('invalid wop');
 			}
 		} else {
-			const cmdListen = `.vsc.listenOnPort(timeout = -1)`;
+			const cmdListen = this.rStrings.packageName + `::.vsc.listenForJSON(timeout = -1)`;
 			this.rSession.writeToStdin(cmdListen);
-			// this.rSession.callFunction('.vsc.listenOnPort', {timeout: -1});
 			this.sendShowingPromptRequest(which, text);
 		}
 	}

@@ -1,0 +1,2 @@
+
+options(vsc.supportSetVariable = FALSE)

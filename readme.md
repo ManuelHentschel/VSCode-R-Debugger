@@ -43,6 +43,8 @@ To install the latest development version of the required R-package from GitHub,
 or install from the artifacts found 
 [here](https://github.com/ManuelHentschel/vscDebugger/actions).
 
+If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `rdebugger.rterm.*`.
+
 **Note on the package version:**
 Since the debugger is still under initial development, both this extension and the accompanying R package are major version 0.y.z.
 The minor version (x.Y.z) is incremented when backward incompatible changes to the interface/communication between the VS Code extension and the R package are introduced.
@@ -51,15 +53,26 @@ The patch version (x.y.Z) is incremented independently for all other changes tha
 
 
 ## Using the Debugger
-* Install this extension in VS Code.
-* Install the package [**vscDebugger**](https://github.com/ManuelHentschel/vscDebugger) in R.
-* If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `rdebugger.rterm.*`.
+### Launch Mode
 * Press F5 and select `R Debugger` as debugger. With the default launch configuration, the debugger will start a new R session.
 * To run a file, focus the file in the editor and press F5 (or the continue button in the debug controls)
 * Output will be printed to the debug console,
 expressions entered into the debug console are evaluated in the currently active frame
 * During debugging in the global workspace it is often necessary to click the dummy frame
 in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv`.
+
+### Attach Mode
+* Start R in a terminal
+* Load `library(vscDebugger)`
+* Call `.vsc.listen()`
+* Start the debugger with launch configuration including `"request":"attach"`, e.g.:
+``` json
+{
+    "type": "R-Debugger",
+    "request": "attach",
+    "name": "Attach to R process"
+}
+```
 
 ## Configuration
 For a detailed explanation of possible launch config entries and other settings, see
