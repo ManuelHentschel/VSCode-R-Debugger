@@ -1,7 +1,12 @@
 
 # library(vscDebugger)
 
+options(vsc.groupAttributes = TRUE)
+
 options(vsc.showInternalFrames = TRUE)
+
+
+options(vsc.convertFactorEntries = TRUE)
 
 f <- function(){
     print(1)

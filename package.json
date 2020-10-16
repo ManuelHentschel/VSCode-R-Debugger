@@ -34,6 +34,7 @@
     "onLanguage:rd",
     "onLanguage:rmd",
     "onCommand:rdebugger.updateRPackage",
+    "workspaceContains:*.{rproj,Rproj,r,R,rd,Rd,rmd,Rmd}",
     "onDebug"
   ],
   "keywords": [
