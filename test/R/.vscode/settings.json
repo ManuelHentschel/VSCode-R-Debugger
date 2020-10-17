@@ -2,8 +2,12 @@
     "rdebugger.checkVersion": "none",
     // "rdebugger.printStdout": "all",
     // "rdebugger.printSinkSocket": "all",
-    "rdebugger.logLevelRSession": "debug",
+    // "rdebugger.logLevelRSession": "debug",
     // "rdebugger.logLevelSession": "debug",
-    "rdebugger.logLevelRuntime": "debug",
+    // "rdebugger.logLevelRuntime": "debug",
+    "terminal.integrated.env.windows": {
+        "VSCODE_R_DEBUGGER_TERMINAL_ID": "81"
+    },
+    "rdebugger.trackTerminals": true
     // "rdebugger.rterm.windows": "\"C:\\Program Files\\R\\R-4.0.2\\bin\\x64\\R.exe\""
 }

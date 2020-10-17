@@ -6,11 +6,26 @@
     "configurations": [
         {
             "type": "R-Debugger",
+            "request": "attach",
+            "name": "Attach to R process",
+            "supportsWriteToStdinEvent": true,
+            "splitOverwrittenOutput": false,
+            "useCustomSocket": true
+        },
+        {
+            "type": "R-Debugger",
             "request": "launch",
             "name": "Launch Workspace",
             "debugMode": "workspace",
             "workingDirectory": "${workspaceFolder}",
             "allowGlobalDebugging": true
+        },
+        {
+            "type": "R-Debugger",
+            "request": "attach",
+            "name": "Attach to R process 2",
+            // "port": 18723,
+            "useCustomSocket": true
         },
         {
             "type": "R-Debugger",

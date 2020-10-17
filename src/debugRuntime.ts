@@ -16,6 +16,7 @@ const { Subject } = require('await-notify');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
@@ -45,12 +46,8 @@ export class DebugRuntime extends EventEmitter {
 		packageName: 'vscDebugger',
 	};
 
-	private initArgs: MDebugProtocol.InitializeRequestArguments;
-
 	// The rSession used to run the code
 	public rSession: RSession;
-	// Time in ms to wait before sending an R command (makes debugging slower but 'safer'?)
-	private waitBetweenRCommands: number = 0;
 
 	// // state info about the R session
 	// R session
@@ -78,7 +75,6 @@ export class DebugRuntime extends EventEmitter {
 	// constructor
 	constructor() {
 		super();
-		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 	}
 
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: MDebugProtocol.InitializeRequestArguments, request: MDebugProtocol.InitializeRequest) {
@@ -103,8 +99,8 @@ export class DebugRuntime extends EventEmitter {
 		args.rStrings = this.rStrings;
 
 		// read settings from vsc-settings
-		this.waitBetweenRCommands = config().get<number>('waitBetweenRCommands', 0);
-		this.startupTimeout = config().get<number>('startupTimeout', this.startupTimeout);
+		this.startupTimeout = config().get<number>('timeouts.startup', this.startupTimeout);
+		this.terminateTimeout = config().get<number>('timeouts.terminate', this.terminateTimeout);
 		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
 		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
@@ -151,8 +147,10 @@ export class DebugRuntime extends EventEmitter {
 			await this.abortInitializeRequest(response, message);
 			return false;
 		} else{
+			args.useJsonSocket = true;
 			args.jsonHost = this.rSession.host;
 			args.jsonPort = this.rSession.jsonPort;
+			args.useSinkSocket = true;
 			args.sinkHost = this.rSession.host;
 			args.sinkPort = this.rSession.sinkPort;
 		}
@@ -359,8 +357,15 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
-	private handlePrompt(which: "browser"|"topLevel", text?: string){
+	private async handlePrompt(which: "browser"|"topLevel", text?: string){
 		logger.debug("matches prompt: " + which);
+
+		// wait for timeout to give json socket time to catch up
+		// might be useful to avoid async issues
+		const timeout = config().get<number>('timeouts.prompt', 0);
+		if(timeout>0){
+			await new Promise(resolve => setTimeout(resolve, timeout));
+		}
 	
 		if(this.writeOnPrompt.length > 0){
 			const wop = this.writeOnPrompt.shift();
@@ -378,9 +383,8 @@ export class DebugRuntime extends EventEmitter {
 				console.log('invalid wop');
 			}
 		} else {
-			const cmdListen = `.vsc.listenOnPort(timeout = -1)`;
+			const cmdListen = this.rStrings.packageName + `::.vsc.listenForJSON(timeout = -1)`;
 			this.rSession.writeToStdin(cmdListen);
-			// this.rSession.callFunction('.vsc.listenOnPort', {timeout: -1});
 			this.sendShowingPromptRequest(which, text);
 		}
 	}
@@ -584,6 +588,7 @@ export class DebugRuntime extends EventEmitter {
 		const doc = vscode.window.activeTextEditor.document;
 		await doc.save();
 		const filename = doc.fileName;
+		request.arguments.callDebugSource = true;
 		request.arguments.source = {path: filename};
 		this.dispatchRequest(request);
 	}
@@ -594,7 +599,7 @@ export class DebugRuntime extends EventEmitter {
 	public killR(signal='SIGKILL'): void {
 		if(this.rSession){
 			this.rSession.ignoreOutput = true;
-			this.rSession.killChildProcess();
+			this.rSession.killChildProcess(signal);
 		}
 	}
 }

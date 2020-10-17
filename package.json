@@ -2,7 +2,7 @@
   "name": "r-debugger",
   "displayName": "R Debugger",
   "description": "R Debugger for VS Code",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "publisher": "RDebugger",
   "license": "MIT",
   "author": {
@@ -10,9 +10,9 @@
   },
   "rPackageInfo": {
     "name": "vscDebugger",
-    "required": "0.3.0",
-    "recommended": "0.3.1",
-    "warnIfNewer": "0.4.0"
+    "required": "0.4.0",
+    "recommended": "0.4.0",
+    "warnIfNewer": "0.5.0"
   },
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
   },
   "icon": "images/Rlogo.png",
   "engines": {
-    "vscode": "^1.44.0"
+    "vscode": "^1.50.0"
   },
   "categories": [
     "Debuggers"
@@ -33,7 +33,9 @@
     "onLanguage:r",
     "onLanguage:rd",
     "onLanguage:rmd",
-    "onCommand:rdebugger.updateRPackage"
+    "onCommand:rdebugger.updateRPackage",
+    "workspaceContains:*.{rproj,Rproj,r,R,rd,Rd,rmd,Rmd}",
+    "onDebug"
   ],
   "keywords": [
     "R",
@@ -74,6 +76,88 @@
         "program": "./out/debugAdapter.js",
         "runtime": "node",
         "configurationAttributes": {
+          "attach": {
+            "properties": {
+              "supportsWriteToStdinEvent": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to use custom events to request text written to R's stdin. Is used to implement next/step/continue requests."
+              },
+              "useCustomSocket": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to use a separate socket for custom events. Usually necessary in attach mode."
+              },
+              "customPort": {
+                "type": "number",
+                "default": 0,
+                "description": "Port number of custom socket. Leave emtpy/0 to assign automatically."
+              },
+              "customHost": {
+                "type": "string",
+                "default": "localhost",
+                "description": "Host name of custom socket. Leave empty to use localhost."
+              },
+              "port": {
+                "type": "number",
+                "default": 18721,
+                "description": "Port number where vscDebugger is listening for DAP messages."
+              },
+              "host": {
+                "type": "string",
+                "default": "localhost",
+                "description": "Host name where vscDebugger is listening for DAP messages."
+              },
+              "splitOverwrittenOutput": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to show the overwritten output in the normal stdout/stderr as well."
+              },
+              "overwritePrint": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified print() function (direct calls to base::print are not affected)."
+              },
+              "overwriteStr": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified str() function (direct calls to base::str are not affected)."
+              },
+              "overwriteMessage": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified message() function (direct calls to base::message are not affected)."
+              },
+              "overwriteCat": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified cat() function (direct calls to base::cat are not affected)."
+              },
+              "overwriteSource": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified source() function (direct calls to base::source are not affected)."
+              },
+              "setBreakpointsInPackages": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
+              },
+              "includePackageScopes": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set to true to show package scopes in the variable window."
+              },
+              "debuggedPackages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
+              }
+            }
+          },
           "launch": {
             "required": [
               "debugMode",
@@ -150,11 +234,6 @@
                 "default": false,
                 "description": "Set to true to show package scopes in the variable window."
               },
-              "packagesBeforeLaunch": {
-                "type": "DEPRECATED ENTRY! Use `debuggedPackages` instead.",
-                "default": "DEPRECATED ENTRY! Use `debuggedPackages` instead.",
-                "description": "DEPRECATED ENTRY! Use `debuggedPackages` instead."
-              },
               "debuggedPackages": {
                 "type": "array",
                 "items": {
@@ -193,6 +272,12 @@
             "file": "${file}",
             "mainFunction": "main",
             "allowGlobalDebugging": false
+          },
+          {
+            "type": "R-Debugger",
+            "request": "attach",
+            "name": "Attach to R process",
+            "splitOverwrittenOutput": true
           }
         ]
       }
@@ -216,10 +301,20 @@
           "default": "",
           "description": "R path for Linux. If empty, the PATH is searched for an R executable."
         },
-        "rdebugger.startupTimeout": {
+        "rdebugger.timeouts.startup": {
           "type": "number",
           "default": 2000,
-          "description": "The maximum time in ms that is waited for R to startup"
+          "description": "The maximum time in ms that is waited for R to startup. Is also used for some other timeouts."
+        },
+        "rdebugger.timeouts.terminate": {
+          "type": "number",
+          "default": 50,
+          "description": "Time in ms that is waited when terminating R to allow messages etc. to appear."
+        },
+        "rdebugger.timeouts.prompt": {
+          "type": "number",
+          "default": 0,
+          "description": "Time in ms that is waited before handling input prompts on stdout (to avoid async issues)."
         },
         "rdebugger.checkVersion": {
           "type": "string",
@@ -230,6 +325,11 @@
           ],
           "default": "recommended",
           "description": "Whether to check the version of the R package before launching the debugger."
+        },
+        "rdebugger.trackTerminals": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
         }
       }
     }
@@ -243,17 +343,17 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/glob": "^7.1.1",
+    "@types/glob": "^7.1.3",
     "@types/mocha": "^7.0.2",
-    "@types/node": "^13.13.6",
-    "@types/vscode": "^1.44.0",
-    "@typescript-eslint/eslint-plugin": "^2.26.0",
-    "@typescript-eslint/parser": "^2.26.0",
+    "@types/node": "^13.13.25",
+    "@types/vscode": "^1.50.0",
+    "@typescript-eslint/eslint-plugin": "^2.34.0",
+    "@typescript-eslint/parser": "^2.34.0",
     "eslint": "^6.8.0",
     "glob": "^7.1.6",
-    "mocha": "^7.1.1",
-    "typescript": "^3.8.3",
-    "vscode-test": "^1.3.0"
+    "mocha": "^7.2.0",
+    "typescript": "^3.9.7",
+    "vscode-test": "^1.4.0"
   },
   "dependencies": {
     "await-notify": "^1.0.1",
@@ -261,7 +361,14 @@
     "net": "^1.0.2",
     "semver": "^7.3.2",
     "tree-kill": "^1.2.2",
-    "vscode-debugadapter": "^1.40.0",
+    "vscode-debugadapter": "^1.42.1",
     "winreg": "^1.2.4"
+  },
+  "definitions": {
+    "testDefinition": {
+      "type": "string",
+      "default": "testDefault",
+      "description": "testDescription"
+    }
   }
 }

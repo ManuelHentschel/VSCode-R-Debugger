@@ -14,9 +14,13 @@ in the Extensions-window and selecting `Extension Settings`.
 Current settings are:
 * `rdebugger.rterm.XXX (string)`: The path to the R executable itself (not just the directory!).
 Can usually be left empty on a windows installation with the default settings.
-* `rdebugger.startupTimeout (number)`: The maximum time in ms that is waited for R to startup.
+* `rdebugger.timeouts.startup (number)`: The maximum time in ms that is waited for R to startup.
 Can be set to a larger value if launching the debugger fails with a notification 
 "R path not valid".
+* `rdebugger.timeouts.terminate (number)`: The time in ms that is waited when terminating.
+Is used to allow messages etc. to appear before terminating the debugger.
+* `rdebugger.timeouts.prompt (number)`: The time in ms that is waited before handling input prompts on stdout.
+Might be helpful to avoid async issues between stdout/stderr/sockets.
 * `rdebugger.checkVersion ("none"|"required"|"recommended")`:
 Whether to check the version of the R package vscDebugger before launching the debugger.
 The debugger always checks if the package is present at all.
@@ -28,15 +32,17 @@ They are useful mostly for debugging the debugger itself and their behaviour mig
 * `rdebugger.logLevelRuntime`, `rdebugger.logLevelSession`, `rdebugger.logLevelRSession`
 (`"silent"|"info"|"debug"`):
 Log level of the debugger itself
-(visible e.g. in the 'parent session' when running the debugger from code)
-* `rdebugger.waitBetweenRCommands (boolean)`:
-Time in ms that is waited before sending commands to the R process.
-Can be useful when debugging async issues.
+(visible e.g. in the 'parent session' when running the debugger from code).
 * `rdebugger.packageURL`: Overwrite for the URL used to download the R package when installing it automatically.
 * `rdebugger.printStdout`, `rdebugger.printStderr`, `rdebugger.printSinkSocket` (`"nothing"|"all"|"filtered"`):
 To what extent output by the R process is printed to the debug console.
 
 ## 3. Launch Config
+### 3.1 Launch Requests
+These configurations are specified by the entry `"request": "launch"`.
+In this mode, a new R process is started in the background for each debug session and its stdin/stdout/stderr are handled by the VS Code extension.
+This is ideal to make the debugger as powerful and robust as possible.
+
 The main behaviour of a debug session can be configured with the entry `"debugMode"`,
 which can be one of the values `"function"`, `"file"`, and `"workspace"`.
 The intended usecases for these modes are:
@@ -62,6 +68,28 @@ The R process is always launched in the workspace folder (reading the `.Rprofile
 The name of the main function to be debugged. Must be callable without arguments.
 * `"allowGlobalDebugging"`: Whether to keep the R session running after debugging and evaluate expressions from the debug console.
 Essential for debug moge `"workspace"`, optional for `"file"`, usually not sensible for `"function"`.
+
+### 3.2 Attach Requests
+These configurations are specified by the entry `"request": "attach"`.
+In this mode, the debugger is attached to an already running R process.
+To answer the requests sent by VS Code, the function `.vsc.listenForDAP()` must be called manually.
+This mode is ideal to give the user a more direct access to the R process.
+
+This mode should work fine with the defaults, but can be finetuned with the following config entries:
+
+* `"port"`: Port number where vscDebugger is listening for DAP messages. Defaults to 18721.
+* `"host"`: Host name where vscDebugger is listening for DAP messages. Defaults to "localhost".
+* `"useCustomSocket"`:
+Whether to use a separate socket for custom events.
+Is necessary to allow flow control (stepping through code).
+* `"customPort"`: Port number of custom socket. Leave emtpy/0 to assign automatically.
+* `"customHost"`: Host name of custom socket. Leave empty to use localhost.
+* `"splitOverwrittenOutput"`:
+Whether to show the overwritten output in the normal stdout/stderr as well.
+
+
+### 3.3 Shared config entries
+These configuration entries are used in both modes.
 * `"setBreakpointsInPackages"`:
 Whether to try and set breakpoints in exported functions from ALL packages.
 Very slow!
@@ -116,6 +144,6 @@ If no values are set, the defaults listed below are used.
 * `"vsc.showEvaluateName" = TRUE`: Whether to include an evaluate name to copy variables to another R session. Can be disabled for performance reasons when working with large variables/lists/vectors.
 * `"vsc.showInternalFrames" = FALSE`: Whether to show the frames on the bottom of the stack that belong to the R package 
 * `"vsc.supportSetVariable" = TRUE`: Whether to enable support for settings the value of variables from the variables window
-* `"vsc.supportTerminateRequest" = TRUE`: Whether to try and exit only the main function/file when stop (Shift+F5) is used, preserving the R session itself.
+* `"vsc.supportTerminateRequest" = FALSE`: Whether to try and exit only the main function/file when stop (Shift+F5) is used, preserving the R session itself.
 * `"vsc.trySilent" = TRUE`: Whether to hide error messages that are expected and caught by the R package
 * `"vsc.verboseVarInfos" = FALSE`: Whether to print debug info when retrieving info about variables

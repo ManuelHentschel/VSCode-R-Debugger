@@ -87,8 +87,9 @@ export class RSession {
         });
 
         // wait for servers to connect to port
-        await jsonServerReady.wait(1000);
-        await sinkServerReady.wait(1000);
+        const timeout = config().get<number>('timeouts.startup', 1000);
+        await jsonServerReady.wait(timeout);
+        await sinkServerReady.wait(timeout);
 
         return true;
     }
