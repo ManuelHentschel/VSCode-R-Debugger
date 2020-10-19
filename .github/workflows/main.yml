@@ -3,18 +3,19 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      VSIX_FILE: r-debugger.vsix
     steps:
       - uses: actions/checkout@v2
       - run: npm install
       - uses: lannonbr/vsce-action@master
         with:
-          args: "package -o $VSIX_FILE"
+          args: "package"
+      - name: Identify output file # can be retrieved as steps.filenames.outputs.file_out
+        id: filenames
+        run: echo "::set-output name=file_out::$(ls | grep "^r-debugger-.*\.vsix$" | head -1)"
       - uses: actions/upload-artifact@v1
         with:
-          name: ${{ env.VSIX_FILE }}
-          path: ${{ env.VSIX_FILE }}
+          name: ${{ steps.filenames.outputs.file_out }}
+          path: ${{ steps.filenames.outputs.file_out }}
   lint:
     runs-on: ubuntu-latest
     steps:
