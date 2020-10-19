@@ -16,6 +16,8 @@ options(vsc.groupAttributes = TRUE)
 
 # trace(.vsc.setVariable, tracer=browser)
 
+options(vsc.showUnclass = TRUE)
+
 # NULL
 nul <- NULL
 

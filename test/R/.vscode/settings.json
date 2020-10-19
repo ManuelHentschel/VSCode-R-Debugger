@@ -6,7 +6,7 @@
     // "rdebugger.logLevelSession": "debug",
     // "rdebugger.logLevelRuntime": "debug",
     "terminal.integrated.env.windows": {
-        "VSCODE_R_DEBUGGER_TERMINAL_ID": "81"
+        "VSCODE_R_DEBUGGER_TERMINAL_ID": "88"
     },
     "rdebugger.trackTerminals": true
     // "rdebugger.rterm.windows": "\"C:\\Program Files\\R\\R-4.0.2\\bin\\x64\\R.exe\""

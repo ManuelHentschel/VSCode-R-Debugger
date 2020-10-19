@@ -5,6 +5,10 @@ testR
 R/test*
 *.vsix
 
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+
 *.temp
 *.tmp
 tmp.*
