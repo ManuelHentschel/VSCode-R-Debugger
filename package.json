@@ -302,17 +302,17 @@
         "rdebugger.rterm.windows": {
           "type": "string",
           "default": "",
-          "description": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable."
+          "description": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable. Enclose in quotes if it contains spaces!"
         },
         "rdebugger.rterm.mac": {
           "type": "string",
           "default": "",
-          "description": "R path for macOS. If empty, the PATH is searched for an R executable."
+          "description": "R path for macOS. If empty, the PATH is searched for an R executable. Enclose in quotes if it contains spaces!"
         },
         "rdebugger.rterm.linux": {
           "type": "string",
           "default": "",
-          "description": "R path for Linux. If empty, the PATH is searched for an R executable."
+          "description": "R path for Linux. If empty, the PATH is searched for an R executable. Enclose in quotes if it contains spaces!"
         },
         "rdebugger.timeouts.startup": {
           "type": "number",
