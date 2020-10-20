@@ -99,13 +99,12 @@ class InitialDebugConfigurationProvider implements vscode.DebugConfigurationProv
 }
 
 class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
-	provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<StrictDebugConfiguration[]>{
 
-		console.log('providing debug configs!!!');
+	provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<StrictDebugConfiguration[]>{
 
 		const doc = vscode.window.activeTextEditor;
 		const docValid = doc && doc.document.uri.scheme === 'file';
-		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '~'));
+		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
 
 		let configs: StrictDebugConfiguration[] = [];
 
@@ -166,7 +165,7 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 
 		let strictConfig: StrictDebugConfiguration|null = null;
 
-		// if launch.json is missing or empty
+		// if the debugger was launched without config
 		if (!config.type && !config.request && !config.name) {
 
 			const doc = vscode.window.activeTextEditor;
