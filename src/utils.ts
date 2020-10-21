@@ -82,20 +82,31 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
 
     if (rpath === "") {
         rpath = getRfromEnvPath(platform);
-        rArgs = ['--ess', '--quiet', '--interactive', '--no-save'];
     }
+
+    // enclose path in quotes if it contains spaces (and isn't quoted yet)
+    if(rpath.match(/^[^"'].* .*[^"']$/)){
+        rpath = `"${rpath}"`;
+    }
+    // replace single quotes with double quotes on windows
+    if(platform === "win32" && rpath.match(/^'.* .*'$/)){
+        rpath = rpath.replace(/^'(.*)'$/, '"$1"');
+    }
+
+    // add user specified args
+    const customArgs = config().get<Array<string>>("rterm.args");
+    rArgs = rArgs.concat(customArgs);
+
     const ret: RStartupArguments = {
         path: rpath,
         args: rArgs,
         cwd: undefined
     };
 
-    if (rpath !== "") {
-        return ret;
-    } else{
+    if(rpath === ""){
         window.showErrorMessage(`${process.platform} can't find R`);
-        return ret;
     }
+    return ret;
 }
 
 

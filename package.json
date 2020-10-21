@@ -302,17 +302,25 @@
         "rdebugger.rterm.windows": {
           "type": "string",
           "default": "",
-          "description": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable. Enclose in quotes if it contains spaces!"
+          "description": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable."
         },
         "rdebugger.rterm.mac": {
           "type": "string",
           "default": "",
-          "description": "R path for macOS. If empty, the PATH is searched for an R executable. Enclose in quotes if it contains spaces!"
+          "description": "R path for macOS. If empty, the PATH is searched for an R executable."
         },
         "rdebugger.rterm.linux": {
           "type": "string",
           "default": "",
-          "description": "R path for Linux. If empty, the PATH is searched for an R executable. Enclose in quotes if it contains spaces!"
+          "description": "R path for Linux. If empty, the PATH is searched for an R executable."
+        },
+        "rdebugger.rterm.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional command line arguments used when launching R."
         },
         "rdebugger.timeouts.startup": {
           "type": "number",

@@ -25,7 +25,8 @@ export async function updateRPackage(packageName:string = 'vscDebugger') {
     terminal.show();
     terminal.sendText(
         rPath +
-        " --no-save" +
+        " --vanilla" +
+        " --silent" +
         " -e \"install.packages('" + url + "', repos=NULL)\"" +
         " -e \"install.packages('jsonlite', repos='http://cran.r-project.org')\"" +
         " -e \"install.packages('R6', repos='http://cran.r-project.org')\""

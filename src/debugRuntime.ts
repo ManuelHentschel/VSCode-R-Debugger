@@ -167,15 +167,11 @@ export class DebugRuntime extends EventEmitter {
 			logger.info("R Session ready");
 		} else {
 			const rPath = rStartupArguments.path;
-			let message = 'R path not working:\n' + rPath + '\n(Can be changed in setting rdebugger.rterm.XXX)';
-			if(rPath.match('^[^"].* .*[^"]$')){
-				message += "\nIf the path contains spaces, it must be enclosed in quotes!";
-			}
+			const message = 'R path not working:\n' + rPath + '\n(Can be changed in setting rdebugger.rterm.XXX)';
 			const abortPromise = this.abortInitializeRequest(response, message);
 			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
 			this.writeOutput('R path:\n' + rPath, true, true);
 			this.writeOutput('If R is installed but in a different path, please adjust the setting rdebugger.rterm.windows/mac/linux.\n');
-			this.writeOutput('If the R path contains spaces (usually the case on windows), it must be enclosed in quotes!');
 			await abortPromise;
 			return false;
 		}
