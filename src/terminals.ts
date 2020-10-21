@@ -151,7 +151,7 @@ async function writeToStdin(args: WriteToStdinArgs){
         terminal.sendText(args.text, args.addNewLine);
         return true;
     } else{
-        logger.debug('No terminal found.')
+        logger.debug('No terminal found.');
         return false;
     }
 }

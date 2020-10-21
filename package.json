@@ -35,6 +35,7 @@
     "onLanguage:rmd",
     "onCommand:rdebugger.updateRPackage",
     "workspaceContains:*.{rproj,Rproj,r,R,rd,Rd,rmd,Rmd}",
+    "onDebugDynamicConfigurations:R-Debugger",
     "onDebug"
   ],
   "keywords": [
@@ -72,6 +73,7 @@
     "debuggers": [
       {
         "type": "R-Debugger",
+        "languages": ["r"],
         "label": "R Debugger",
         "program": "./out/debugAdapter.js",
         "runtime": "node",
@@ -245,39 +247,51 @@
             }
           }
         },
-        "initialConfigurations": [
+        "configurationSnippets": [
           {
-            "type": "R-Debugger",
-            "request": "launch",
-            "name": "Launch Workspace",
-            "debugMode": "workspace",
-            "workingDirectory": "${workspaceFolder}",
-            "allowGlobalDebugging": true
+            "label": "R: Launch Workspace",
+            "body": {
+              "type": "R-Debugger",
+              "request": "launch",
+              "name": "Launch Workspace",
+              "debugMode": "workspace",
+              "workingDirectory": "${workspaceFolder}",
+              "allowGlobalDebugging": true
+            }
           },
           {
-            "type": "R-Debugger",
-            "request": "launch",
-            "name": "Debug R-File",
-            "debugMode": "file",
-            "workingDirectory": "${workspaceFolder}",
-            "file": "${file}",
-            "allowGlobalDebugging": true
+            "label": "R: Debug File",
+            "body": {
+              "type": "R-Debugger",
+              "request": "launch",
+              "name": "Debug R-File",
+              "debugMode": "file",
+              "workingDirectory": "${workspaceFolder}",
+              "file": "${file}",
+              "allowGlobalDebugging": true
+            }
           },
           {
-            "type": "R-Debugger",
-            "request": "launch",
-            "name": "Debug R-Function",
-            "debugMode": "function",
-            "workingDirectory": "${fileDirname}",
-            "file": "${file}",
-            "mainFunction": "main",
-            "allowGlobalDebugging": false
+            "label": "R: Debug Function",
+            "body": {
+              "type": "R-Debugger",
+              "request": "launch",
+              "name": "Debug R-Function",
+              "debugMode": "function",
+              "workingDirectory": "${workspaceFolder}",
+              "file": "${file}",
+              "mainFunction": "main",
+              "allowGlobalDebugging": false
+            }
           },
           {
-            "type": "R-Debugger",
-            "request": "attach",
-            "name": "Attach to R process",
-            "splitOverwrittenOutput": true
+            "label": "R: Attach to process",
+            "body": {
+              "type": "R-Debugger",
+              "request": "attach",
+              "name": "Attach to R process",
+              "splitOverwrittenOutput": true
+            }
           }
         ]
       }
@@ -300,6 +314,14 @@
           "type": "string",
           "default": "",
           "description": "R path for Linux. If empty, the PATH is searched for an R executable."
+        },
+        "rdebugger.rterm.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional command line arguments used when launching R."
         },
         "rdebugger.timeouts.startup": {
           "type": "number",
@@ -328,7 +350,7 @@
         },
         "rdebugger.trackTerminals": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
         }
       }

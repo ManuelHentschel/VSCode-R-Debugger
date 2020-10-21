@@ -9,6 +9,10 @@ R/test*
 !.vscode/tasks.json
 !.vscode/launch.json
 
+test/R/*
+!test/R/.vscode/launch.json
+!test/R/objects.R
+
 *.temp
 *.tmp
 tmp.*

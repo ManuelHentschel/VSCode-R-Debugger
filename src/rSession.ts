@@ -125,6 +125,8 @@ export class RSession {
         text = text.replace(/\r/g,''); //keep only \n as linebreak
         text = (this.restOfLine[from] || "") + text; // append to rest of line from previouse call
         const lines = text.split(/\n/); // split into lines
+
+        logger.debug(`data from ${from}: ${text}`);
         
         for(let i = 0; i<lines.length; i++){
 			// abort output handling if ignoreOutput has been set to true

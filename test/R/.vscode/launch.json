@@ -6,26 +6,11 @@
     "configurations": [
         {
             "type": "R-Debugger",
-            "request": "attach",
-            "name": "Attach to R process",
-            "supportsWriteToStdinEvent": true,
-            "splitOverwrittenOutput": false,
-            "useCustomSocket": true
-        },
-        {
-            "type": "R-Debugger",
             "request": "launch",
             "name": "Launch Workspace",
             "debugMode": "workspace",
             "workingDirectory": "${workspaceFolder}",
             "allowGlobalDebugging": true
-        },
-        {
-            "type": "R-Debugger",
-            "request": "attach",
-            "name": "Attach to R process 2",
-            // "port": 18723,
-            "useCustomSocket": true
         },
         {
             "type": "R-Debugger",
@@ -41,21 +26,16 @@
             "request": "launch",
             "name": "Debug R-Function",
             "debugMode": "function",
-            "workingDirectory": "${fileDirname}",
+            "workingDirectory": "${workspaceFolder}",
             "file": "${file}",
-            // "file": "asdfasdf",
-            // "mainFunction": "main",
-            "allowGlobalDebugging": false,
-            "setBreakpointsInPackages": false,
+            "mainFunction": "main",
+            "allowGlobalDebugging": false
         },
         {
             "type": "R-Debugger",
-            "request": "launch",
-            "name": "Debug Shiny App",
-            "debugMode": "file",
-            "workingDirectory": "${workspaceFolder}/app",
-            "file": "${workspaceFolder}/app/entrypoint.R",
-            "allowGlobalDebugging": false
+            "request": "attach",
+            "name": "Attach to R process",
+            "splitOverwrittenOutput": true
         }
     ]
 }

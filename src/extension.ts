@@ -1,10 +1,10 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { WorkspaceFolder, ProviderResult, CancellationToken } from 'vscode';
+import { WorkspaceFolder, ProviderResult, CancellationToken, DebugConfigurationProviderTriggerKind } from 'vscode';
 import { DebugSession } from './debugSession';
 import {
-	DebugConfiguration, DebugMode, FunctionDebugConfiguration,
+	DebugMode, FunctionDebugConfiguration,
 	FileDebugConfiguration, WorkspaceDebugConfiguration,
 	StrictDebugConfiguration,
 	AttachConfiguration
@@ -20,9 +20,19 @@ export async function activate(context: vscode.ExtensionContext) {
 	terminalHandler = new TerminalHandler();
 	const port = await terminalHandler.portPromise;
 
-	// register a configuration provider
-	const provider = new DebugConfigurationProvider(port);
-	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', provider));
+	console.log('activate');
+
+	// register configuration resolver
+	const resolver = new DebugConfigurationResolver(port);
+	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', resolver));
+
+	// register dynamic configuration provider
+	const dynamicProvider = new DynamicDebugConfigurationProvider();
+	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', dynamicProvider, DebugConfigurationProviderTriggerKind.Dynamic));
+
+	// register initial configuration provider
+	const initialProvider = new InitialDebugConfigurationProvider();
+	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', initialProvider, DebugConfigurationProviderTriggerKind.Initial));
 
 	// register the debug adapter descriptor provider
     const factory = new DebugAdapterDescriptorFactory();
@@ -48,8 +58,100 @@ export function deactivate() {
 	}
 }
 
+class InitialDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
+	provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<StrictDebugConfiguration[]>{
+		return [
+			{
+				type: "R-Debugger",
+				request: "launch",
+				name: "Launch Workspace",
+				debugMode: "workspace",
+				workingDirectory: "${workspaceFolder}",
+				allowGlobalDebugging: true
+			},
+			{
+				type: "R-Debugger",
+				request: "launch",
+				name: "Debug R-File",
+				debugMode: "file",
+				workingDirectory: "${workspaceFolder}",
+				file: "${file}",
+				allowGlobalDebugging: true
+			},
+			{
+				type: "R-Debugger",
+				request: "launch",
+				name: "Debug R-Function",
+				debugMode: "function",
+				workingDirectory: "${workspaceFolder}",
+				file: "${file}",
+				mainFunction: "main",
+				allowGlobalDebugging: false
+			},
+			{
+				type: "R-Debugger",
+				request: "attach",
+				name: "Attach to R process",
+				splitOverwrittenOutput: true
+			}
+		];
+	}
+}
 
-class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
+class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
+
+	provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<StrictDebugConfiguration[]>{
+
+		const doc = vscode.window.activeTextEditor;
+		const docValid = doc && doc.document.uri.scheme === 'file';
+		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
+
+		let configs: StrictDebugConfiguration[] = [];
+
+		configs.push({
+            type: "R-Debugger",
+            request: "launch",
+            name: "Launch Workspace",
+            debugMode: "workspace",
+            workingDirectory: wd,
+            allowGlobalDebugging: true
+		});
+
+		if(docValid){
+			configs.push({
+				type: "R-Debugger",
+				request: "launch",
+				name: "Debug R-File",
+				debugMode: "file",
+				workingDirectory: wd,
+				file: "${file}",
+				allowGlobalDebugging: true
+			});
+
+			configs.push({
+				type: "R-Debugger",
+				request: "launch",
+				name: "Debug R-Function",
+				debugMode: "function",
+				workingDirectory: wd,
+				file: "${file}",
+				mainFunction: "main",
+				allowGlobalDebugging: false
+			});
+		};
+
+		configs.push({
+            type: "R-Debugger",
+            request: "attach",
+            name: "Attach to R process",
+            splitOverwrittenOutput: true
+		});
+
+		return configs;
+	}
+}
+
+class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 
 	readonly customPort: number;
 	readonly customHost: string;
@@ -63,11 +165,13 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 
 		let strictConfig: StrictDebugConfiguration|null = null;
 
-		// if launch.json is missing or empty
+		// if the debugger was launched without config
 		if (!config.type && !config.request && !config.name) {
+
 			const doc = vscode.window.activeTextEditor;
-			const wd = (folder ? '{$workspaceFolder}' : (doc ? '${fileDirname}' : '~'));
-			if(doc){
+			const docValid = doc && doc.document.uri.scheme === 'file';
+			const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
+			if(docValid){
 				// if file is open, debug file
 				config = {
 					type: "R-Debugger",
@@ -77,21 +181,14 @@ class DebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 					file: "${file}",
 					workingDirectory: wd
 				};
-			} else if(wd){
+			} else{
 				// if folder but no file is open, launch workspace
 				config = {
 					type: "R-Debugger",
 					name: "Launch R Debugger",
 					request: "launch",
-					debugMode: "file",
+					debugMode: "workspace",
 					workingDirectory: wd
-				};
-			} else{
-				// if no file/folder open, attach
-				config = {
-					type: 'R-Debugger',
-					name: 'Launch',
-					request: 'attach'
 				};
 			}
 		}
