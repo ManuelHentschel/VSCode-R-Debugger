@@ -73,6 +73,7 @@
     "debuggers": [
       {
         "type": "R-Debugger",
+        "languages": ["r"],
         "label": "R Debugger",
         "program": "./out/debugAdapter.js",
         "runtime": "node",
