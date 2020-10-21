@@ -350,7 +350,7 @@
         },
         "rdebugger.trackTerminals": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
         }
       }
