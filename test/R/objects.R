@@ -38,13 +38,6 @@ df2 <- data.frame(id = 1:5, x = rnorm(5), y = rnorm(5))
 # factor
 fctr <- as.factor(c("a", "b", "c", "c", "d"))
 
-if(TRUE){
-  print(
-    1
-  )
-  print(2)
-}
-
 # matrix
 mat0 <- matrix(numeric())
 mat1 <- matrix(1:10, nrow = 1)
@@ -146,15 +139,9 @@ wait <- function(n){
 }
 
 main <- function() {
-  print("start sleeping...")
   for(i in 1:8){
     print(i)
   }
-  main2()
   print('done')
 }
 
-main2 <- function(){
-  x <- 1
-  base::cat(list(1,2,3))
-}
