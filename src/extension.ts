@@ -1,5 +1,4 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+
 import * as vscode from 'vscode';
 import { WorkspaceFolder, ProviderResult, CancellationToken, DebugConfigurationProviderTriggerKind } from 'vscode';
 import { DebugSession } from './debugSession';
