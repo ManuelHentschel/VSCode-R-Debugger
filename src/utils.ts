@@ -94,7 +94,7 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
     }
 
     // add user specified args
-    const customArgs = config().get<Array<string>>("rterm.args");
+    const customArgs = config().get<Array<string>>("rterm.args", []);
     rArgs = rArgs.concat(customArgs);
 
     const ret: RStartupArguments = {
