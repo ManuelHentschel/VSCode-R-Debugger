@@ -1,8 +1,7 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+
 import * as vscode from 'vscode';
 import { WorkspaceFolder, ProviderResult, CancellationToken, DebugConfigurationProviderTriggerKind } from 'vscode';
-import { DebugSession } from './debugSession';
+import { DebugAdapter } from './debugAdapter';
 import {
 	DebugMode, FunctionDebugConfiguration,
 	FileDebugConfiguration, WorkspaceDebugConfiguration,
@@ -19,8 +18,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	terminalHandler = new TerminalHandler();
 	const port = await terminalHandler.portPromise;
-
-	console.log('activate');
 
 	// register configuration resolver
 	const resolver = new DebugConfigurationResolver(port);
@@ -57,6 +54,22 @@ export function deactivate() {
 		terminalHandler.close();
 	}
 }
+
+class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
+	createDebugAdapterDescriptor(session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
+		const config = session.configuration;
+		if(config.request === 'launch'){
+			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter());
+		} else if(config.request === 'attach'){
+			const port: number = config.port || 18721;
+			const host: string = config.host || 'localhost';
+			return new vscode.DebugAdapterServer(port, host);
+		} else{
+			throw new Error('Invalid entry "request" in debug config. Valid entries are "launch" and "attach"');
+		}
+	}
+}
+
 
 class InitialDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
 	provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<StrictDebugConfiguration[]>{
@@ -233,19 +246,3 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 		return strictConfig;
 	}
 }
-
-class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
-	createDebugAdapterDescriptor(session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
-		const config = session.configuration;
-		if(config.request === 'launch'){
-			return new vscode.DebugAdapterInlineImplementation(new DebugSession());
-		} else if(config.request === 'attach'){
-			const port: number = config.port || 18721;
-			const host: string = config.host || 'localhost';
-			return new vscode.DebugAdapterServer(port, host);
-		} else{
-			throw new Error('Invalid entry "request" in debug config. Valid entries are "launch" and "attach"');
-		}
-	}
-}
-

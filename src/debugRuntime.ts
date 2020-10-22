@@ -1,6 +1,3 @@
-/*---------------------------------------------------------
- * Copyright (C) Microsoft Corporation. All rights reserved.
- *--------------------------------------------------------*/
 
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
@@ -80,22 +77,18 @@ export class DebugRuntime extends EventEmitter {
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: MDebugProtocol.InitializeRequestArguments, request: MDebugProtocol.InitializeRequest) {
 		// This function initializes a debug session with the following steps:
 		// 1. Handle arguments
-		// 2. Launch a child process 
+		// 2. Launch a child process running R
 		// 3. Check that the child process started 
 		// 4. Load the R package vscDebugger
 		// 5. Check that the R package is present and has a correct version
 
 
 		//// (1) Handle arguments
-		if(args.rStrings){
-			const rs1 = args.rStrings;
-			const rs0 = this.rStrings;
-			this.rStrings.prompt = rs1.prompt || rs0.prompt;
-			this.rStrings.continue = rs1.continue || rs0.continue;
-			this.rStrings.startup = rs1.startup || rs0.startup;
-			this.rStrings.libraryNotFound = rs1.libraryNotFound || rs0.libraryNotFound;
-			this.rStrings.packageName = rs1.packageName || rs0.packageName;
-		}
+		// update rStrings
+		this.rStrings = {
+			...this.rStrings,
+			...args.rStrings
+		};
 		args.rStrings = this.rStrings;
 
 		// read settings from vsc-settings
@@ -106,7 +99,7 @@ export class DebugRuntime extends EventEmitter {
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
 		// start R in child process
-		const rStartupArguments: MDebugProtocol.RStartupArguments = await getRStartupArguments();
+		const rStartupArguments  = await getRStartupArguments();
 		const openFolders = vscode.workspace.workspaceFolders;
 		if(openFolders){
 			rStartupArguments.cwd = openFolders[0].uri.fsPath;
@@ -114,7 +107,6 @@ export class DebugRuntime extends EventEmitter {
 
 		if(!rStartupArguments.path){
 			const message = 'No R path was found in the settings/path/registry.\n(Can be changed in setting rdebugger.rterm.XXX)';
-			// const message = 'R path not working:\n' + rPath + '\n';
 			await this.abortInitializeRequest(response, message);
 			return false;
 		}
@@ -123,7 +115,6 @@ export class DebugRuntime extends EventEmitter {
 		// everything following this is printed in (collapsed) group
 		this.startOutputGroup('Starting R session...', true);
 		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
-
 
 		//// (2) Launch child process
 		const tmpHandleLine: LineHandler = (line: string, from: DataSource, isFullLine: boolean) => {
@@ -143,7 +134,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// read ports that were assigned to the child process and add to initialize args
 		if(this.rSession.jsonPort <= 0 || this.rSession.sinkPort <= 0){
-			const message = 'Failed to connect to R process using ports!';
+			const message = 'Failed to listen on port!';
 			await this.abortInitializeRequest(response, message);
 			return false;
 		} else{
@@ -160,7 +151,7 @@ export class DebugRuntime extends EventEmitter {
 		const escapedStartupString = escapeStringForR(this.rStrings.startup + '\n');
 		const startupCmd = `base::cat(${escapedStartupString})`;
 		this.rSession.writeToStdin(startupCmd);
-		// this.rSession.callFunction('cat', this.rStrings.startup, '\n', true, 'base');
+
 		// `this.rSessionStartup` is notified when the output of the above `cat()` call is received
 		await this.rSessionStartup.wait(this.startupTimeout);
 		if (this.rSessionReady) {
@@ -169,9 +160,10 @@ export class DebugRuntime extends EventEmitter {
 			const rPath = rStartupArguments.path;
 			const message = 'R path not working:\n' + rPath + '\n(Can be changed in setting rdebugger.rterm.XXX)';
 			const abortPromise = this.abortInitializeRequest(response, message);
-			this.writeOutput('R not responding within ' + this.startupTimeout + 'ms!', true, true);
-			this.writeOutput('R path:\n' + rPath, true, true);
+			this.writeOutput(`R not responding within ${this.startupTimeout}ms!`, true, 'stderr');
+			this.writeOutput(`R path:\n${rPath}`, true, 'stderr');
 			this.writeOutput('If R is installed but in a different path, please adjust the setting rdebugger.rterm.windows/mac/linux.\n');
+			this.writeOutput(`If R might take more than ${this.startupTimeout}ms to launch, try increasing the setting rdebugger.timeouts.startup!\n`);
 			await abortPromise;
 			return false;
 		}
@@ -219,7 +211,7 @@ export class DebugRuntime extends EventEmitter {
 		return true;
 	}
 
-	private async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
+	protected async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
 		// used to abort the debug session and return an unsuccessful InitializeResponse
 		logger.error(message);
 		if(endOutputGroup){
@@ -230,7 +222,7 @@ export class DebugRuntime extends EventEmitter {
 		// prep and send response
 		response.success = false;
 		response.message = message;
-		this.sendEvent('response', response);
+		this.sendProtocolMessage(response);
 		this.killR();
 		return false;
 	}
@@ -240,7 +232,7 @@ export class DebugRuntime extends EventEmitter {
 	// Output-handlers: (for output of the R process to stdout/stderr)
 	//////////
 
-	public handleLine(line: string, from: DataSource, isFullLine: boolean): string {
+	protected handleLine(line: string, from: DataSource, isFullLine: boolean): string {
 		// handle output from the R process line by line
 		// is called by rSession.handleData()
 
@@ -348,7 +340,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// output line
 		if(lineOut.length>0 || showLine){
-			this.writeOutput(lineOut, isFullLine, isStderr);
+			this.writeOutput(lineOut, isFullLine, (isStderr ? 'stderr' : 'stdout'));
 		}
 
 		// if line is shown it counts as handled
@@ -358,7 +350,7 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
-	private async handlePrompt(which: "browser"|"topLevel", text?: string){
+	protected async handlePrompt(which: "browser"|"topLevel", text?: string){
 		logger.debug("matches prompt: " + which);
 
 		// wait for timeout to give json socket time to catch up
@@ -390,7 +382,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	private sendShowingPromptRequest(which: "browser"|"topLevel", text?: string){
+	protected sendShowingPromptRequest(which: "browser"|"topLevel", text?: string){
 		const request: MDebugProtocol.ShowingPromptRequest = {
 			command: "custom",
 			arguments: {
@@ -404,7 +396,7 @@ export class DebugRuntime extends EventEmitter {
 		this.dispatchRequest(request);
 	}
 
-	public handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true){
+	protected handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true){
 		if(!isFullLine){
 			return json;
 		} else{
@@ -414,7 +406,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	public handleJson(json: any){
+	protected handleJson(json: any){
 		if(json.type === "response"){
 			if(json.command === "initialize"){
 				this.rPackageFound = true;
@@ -427,12 +419,12 @@ export class DebugRuntime extends EventEmitter {
 				this.rPackageVersionCheck = versionCheck;
 				this.rPackageStartup.notify();
 				if(versionCheck.versionOk){
-					this.sendEvent("response", json);
+					this.sendProtocolMessage(json);
 				} else{
 					logger.info("event: " + json.event, json.body);
 				}
 			} else{
-				this.sendEvent("response", json);
+				this.sendProtocolMessage(json);
 			}
 		} else if(json.type === "event"){
 			if(json.event === 'custom'){
@@ -441,7 +433,7 @@ export class DebugRuntime extends EventEmitter {
 				}
 				logger.info("event: " + json.event, json.body);
 			} else{
-				this.sendEvent("event", json);
+				this.sendProtocolMessage(json);
 			}
 		} else{
 			logger.error("Unknown message:");
@@ -449,7 +441,12 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	public handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody){
+	// send DAP message to the debugSession
+	protected sendProtocolMessage(message: DebugProtocol.ProtocolMessage){
+		this.emit("protocolMessage", message);
+	}
+
+	protected handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody){
 		let count: number = 0;
 		if(args.count !== 0){
 			count = args.count || 1;
@@ -464,14 +461,13 @@ export class DebugRuntime extends EventEmitter {
 				this.writeToStdin(args.text);
 			}
 		} else{
-			let which: "prompt"|"browser"|"topLevel";
-			if(when === "prompt"){
-				which = "prompt";
-			} else if(when === "browserPrompt"){
+			let which: "prompt"|"browser"|"topLevel" = "prompt";
+			if(when === "browserPrompt"){
 				which = "browser";
 			} else if(when === "topLevelPrompt"){
 				which = "topLevel";
 			}
+
 			const newWriteOnPrompt: WriteOnPrompt = {
 				text: text,
 				which: which,
@@ -491,7 +487,6 @@ export class DebugRuntime extends EventEmitter {
 	public writeToStdin(text: string){
 		if(text){
 			logger.debug("Writing to stdin: ", text);
-			// this.rSession.runCommand(text, [], true);
 			this.rSession.writeToStdin(text);
 			return true;
 		} else{
@@ -519,12 +514,6 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 
-	// send event to the debugSession
-	private sendEvent(event: string, ... args: any[]) {
-		setImmediate(_ => {
-			this.emit(event, ...args);
-		});
-	}
 
 
 	//////////////////////////////////////////////
@@ -532,70 +521,50 @@ export class DebugRuntime extends EventEmitter {
 	public writeOutput(
 		text: string,
 		addNewline = false,
-		toStderr: (boolean|'console'|'stdout'|'stderr'|'telemetry') = false,
-		filePath = '',
+		category: ('console'|'stdout'|'stderr'|'telemetry') = 'stdout',
 		line = 1,
 		group?: ("start"|"startCollapsed"|"end"),
-		data?: object
-	){
+		data: object = {}
+	): boolean {
 		// writes output to the debug console (of the vsc instance runnning the R code)
+		// used during start up to print info about errors/progress
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
 		}
-		var doSendEvent: boolean = true;
-		if(group==='start' || group==='startCollapsed'){
+
+		if(group === 'end' && this.outputGroupLevel<=0){
+			// no more output groups to close -> abort
+			return false;
+		} else if(group==='start' || group==='startCollapsed'){
 			this.outputGroupLevel += 1;
 		} else if(group==='end'){
-			if(this.outputGroupLevel>0){
-				this.outputGroupLevel -= 1;
-			} else{
-				doSendEvent = false;
-			}
+			this.outputGroupLevel -= 1;
 		}
-		if(doSendEvent){
-			let category: string;
-			if(toStderr===true){
-				category = 'stderr';
-			} else if(toStderr===false){
-				category = 'stdout';
-			} else{
-				category = toStderr;
+
+		const event: DebugProtocol.OutputEvent = {
+			event: 'output',
+			seq: 0,
+			type: 'event',
+			body: {
+				category: category,
+				output: text,
+				group: group,
+				line: line,
+				column: 1,
+				data: data
 			}
-			// const category = (toStderr ? "stderr" : "stdout");
-			const column = 1;
-			this.sendEvent("output", text, category, filePath, line, column, group, data);
-		}
+		};
+		this.sendProtocolMessage(event);
+		return true; // output event was sent
 	}
-	private startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, filePath = '', line = 1){
-		let group: ("start"|"startCollapsed");
-		if(collapsed){
-			group = "startCollapsed";
-		} else{
-			group = "start";
-		}
-		this.writeOutput(text, addNewline, toStderr, filePath, line, group);
+	public startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, line = 1){
+		const group = (collapsed ? 'startCollapsed' : 'start');
+		this.writeOutput(text, addNewline, (toStderr ? 'stderr' : 'stdout'), line, group);
 	}
 	public endOutputGroup(){
-		this.writeOutput("", false, false, '', 1, "end");
+		this.writeOutput("", false, 'stdout', 1, 'end');
 	}
 
-
-	///////////////////////////////////////////////
-	// FLOW CONTROL
-	///////////////////////////////////////////////
-
-	// continue script execution:
-	public async continue(request: MDebugProtocol.ContinueRequest) {
-		const doc = vscode.window.activeTextEditor.document;
-		await doc.save();
-		const filename = doc.fileName;
-		request.arguments.callDebugSource = true;
-		request.arguments.source = {path: filename};
-		this.dispatchRequest(request);
-	}
-
-	///////////////////////////////
-	// functions to terminate the debug session
 
 	public killR(signal='SIGKILL'): void {
 		if(this.rSession){

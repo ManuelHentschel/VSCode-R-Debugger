@@ -73,7 +73,9 @@
     "debuggers": [
       {
         "type": "R-Debugger",
-        "languages": ["r"],
+        "languages": [
+          "r"
+        ],
         "label": "R Debugger",
         "program": "./out/debugAdapter.js",
         "runtime": "node",
@@ -367,7 +369,7 @@
   "devDependencies": {
     "@types/glob": "^7.1.3",
     "@types/mocha": "^7.0.2",
-    "@types/node": "^13.13.25",
+    "@types/node": "^13.13.27",
     "@types/vscode": "^1.50.0",
     "@typescript-eslint/eslint-plugin": "^2.34.0",
     "@typescript-eslint/parser": "^2.34.0",
@@ -375,6 +377,7 @@
     "glob": "^7.1.6",
     "mocha": "^7.2.0",
     "typescript": "^3.9.7",
+    "vscode-debugprotocol": "^1.42.0",
     "vscode-test": "^1.4.0"
   },
   "dependencies": {
@@ -383,7 +386,6 @@
     "net": "^1.0.2",
     "semver": "^7.3.2",
     "tree-kill": "^1.2.2",
-    "vscode-debugadapter": "^1.42.1",
     "winreg": "^1.2.4"
   },
   "definitions": {
