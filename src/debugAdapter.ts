@@ -1,10 +1,18 @@
 
-"use strict";
+/* 
+This file contains an implementation of vscode.Debugadapter.
+
+DAP messages are received via `DebugAdapter.handleMessage` and sent via
+`onDidSendMessage`.
+
+Most messages are simply passed to the R pacakge by calling
+`this.debugRuntime.dispatchRequest()`, only some requests are modified/handled
+in `this.dispatchRequest()`.
+*/
 
 import { DebugRuntime } from './debugRuntime';
-import { ProtocolServer } from './protocol';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequest, ResponseWithBody, InitializeRequestArguments, ContinueRequest } from './debugProtocolModifications';
+import { InitializeRequest } from './debugProtocolModifications';
 import { config, getVSCodePackageVersion } from './utils';
 
 import * as vscode from 'vscode';
@@ -28,25 +36,17 @@ function logMessage(message: DebugProtocol.ProtocolMessage){
     return ret;
 }
 
-export class DebugSession extends ProtocolServer {
 
-	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
-	private THREAD_ID = 1;
+export class DebugAdapter implements vscode.DebugAdapter {
 
-	// a runtime (or debugger)
-    private runtime: DebugRuntime;
-
+    // properties
+	private sendMessage = new vscode.EventEmitter<DebugProtocol.ProtocolMessage>(); // used by onDidSendMessage
+    private sequence: number = 0; // seq of messages sent to VS Code
+	private THREAD_ID = 1; // dummy value
+    private runtime: DebugRuntime; // actually handles requests etc. that are not forwarded
     private disconnectTimeout: number = config().get<number>('timeouts.startup', 1000);
 
-
-    sendProtocolMessage(message: DebugProtocol.ProtocolMessage): void {
-        logger.info(logMessage(message), message);
-        super.sendProtocolMessage(message);
-    }
-
     constructor() {
-        super();
-
 		// construct R runtime
 		this.runtime = new DebugRuntime();
 
@@ -56,12 +56,26 @@ export class DebugSession extends ProtocolServer {
         });
     }
 
-    // static run(debugSession: typeof DebugSession): void {
-    //     const session = new debugSession();
-    //     session.start(process.stdin, process.stdout);
-    // }
+    // dummy, required by vscode.Disposable (?)
+    public dispose(): void {};
+    
+    // used to send messages from R to VS Code
+	readonly onDidSendMessage: vscode.Event<DebugProtocol.ProtocolMessage> = this.sendMessage.event;
 
-    protected dispatchRequest(request: DebugProtocol.Request) {
+    // used to send messages from VS Code to R
+	public handleMessage(msg: DebugProtocol.ProtocolMessage): void {
+		if(msg.type === 'request') {
+			this.dispatchRequest(<DebugProtocol.Request>msg);
+		}
+	}
+
+	protected sendProtocolMessage(message: DebugProtocol.ProtocolMessage): void {
+        logger.info(logMessage(message), message);
+		message.seq = this.sequence++;
+		this.sendMessage.fire(message);
+	}
+
+    protected dispatchRequest(request: DebugProtocol.Request): void {
         // prepare response
         const response: DebugProtocol.Response = {
             command: request.command,
@@ -90,15 +104,18 @@ export class DebugSession extends ProtocolServer {
                 case 'evaluate':
                     const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments.expression);
                     if(matches){
+                        // send directly to stdin, don't send request
                         const toStdin = matches[1];
                         logger.debug('user to stdin:\n' + toStdin);
                         this.runtime.rSession.writeToStdin(toStdin);
                     } else{
+                        // dispatch normally
                         dispatchToR = true;
                         sendResponse = false;
                     }
                     break;
                 case 'disconnect':
+                    // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
                         console.log('killing R...');
                         this.runtime.killR();
@@ -107,7 +124,8 @@ export class DebugSession extends ProtocolServer {
                     sendResponse = false;
                     break;
                 case 'continue':
-                    // this.runtime.continue(<ContinueRequest>request);
+                    // pass info about the currently open text editor
+                    // can be used to start .vsc.debugSource(), when called from global workspace
                     const doc = vscode.window.activeTextEditor.document;
                     if(doc.uri.scheme === 'file'){
                         const filename = doc.fileName;
@@ -125,18 +143,25 @@ export class DebugSession extends ProtocolServer {
                     // request not handled here -> send to R
                     dispatchToR = true;
                     sendResponse = false;
+                // end cases
             }
-            if(dispatchToR){
-                this.runtime.dispatchRequest(request);
-            } else{
-                logger.info("request " + request.seq + " (handled in VS Code): " + request.command, request);
-            }
-            if(sendResponse){
-                this.sendProtocolMessage(response);
-            }
+        } catch (e) {
+            logger.error("Error while handling request " + request.seq + ": " + request.command);
+            response.success = false;
+            dispatchToR = false;
+            sendResponse = true;
         }
-        catch (e) {
-			logger.error("Error while handling request " + request.seq + ": " + request.command);
+
+        // dispatch to R if not (completely) handled here
+        if(dispatchToR){
+            this.runtime.dispatchRequest(request);
+        } else{
+            logger.info("request " + request.seq + " (handled in VS Code): " + request.command, request);
+        }
+
+        // send response if (completely) handled here
+        if(sendResponse){
+            this.sendProtocolMessage(response);
         }
     }
 }

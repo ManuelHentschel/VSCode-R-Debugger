@@ -1,12 +1,36 @@
 
 
-import * as net from 'net';
+/*
+The functions in this file are only used when debugging in attached mode.
 
-import { WriteToStdinEvent, WriteToStdinBody } from './debugProtocolModifications';
+
+This file contains functions to answer the custom request
+`writeToStdinRequest`
+which is used by the R package vscDebugger to request text written to its stdin.
+
+This approach is used, since there are no R functions to replace e.g.
+`n`, `f`, `c`
+when using the browser() prompt.
+
+Therefore, there is no way for the R package to continue execution or step
+through code by itself (as far as I'm aware).
+
+This problem can be solved to some extent by the R package requesting text
+like the commands mentioned above to its stdin.
+
+This approach is a bit hacky but seems to work fine in simple usecases.
+If the user is using the terminal at the same time, things probably get messy.
+*/
+
+
+
+
+import * as net from 'net';
 import * as vscode from 'vscode';
+import * as log from 'loglevel';
+import { WriteToStdinEvent, WriteToStdinBody } from './debugProtocolModifications';
 import { config, getPortNumber } from './utils';
 
-import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
 logger.setLevel(config().get<log.LogLevelDesc>('logLevelTerminals', 'INFO'));
 
