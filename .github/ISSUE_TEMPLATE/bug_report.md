@@ -7,6 +7,8 @@ assignees: ''
 
 ---
 
+**NOTE:** Before submitting an issue, please make sure to install the latest version of both the vscode extension and the R package. This can usually be achieved by running the command `rdebugger.updateRPackage` in vscode's command palette (`F1`).
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
@@ -14,7 +16,7 @@ A clear and concise description of what the bug is.
 Steps to reproduce the behavior:
 1. Go to '...'
 2. Click on '....'
-3. Scroll down to '....'
+3. ...
 4. See error
 
 **Your R code**
@@ -43,7 +45,8 @@ A clear and concise description of what happens instead.
 **Desktop (please complete the following information):**
  - OS: ...
  - R Version: ...
- - vscode-r-debugger version: ...
+ - vscDebugger Version: ...
+ - vscode-r-debugger Version: ...
 
 **Additional context**
 Add any other context about the problem here.
