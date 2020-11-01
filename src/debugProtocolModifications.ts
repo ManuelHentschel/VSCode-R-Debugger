@@ -1,6 +1,7 @@
 
 
 import { DebugProtocol } from 'vscode-debugprotocol';
+// @ts-ignore
 import * as VsCode from 'vscode';
 // import { DebugProtocol } from './debugProtocol';
 
@@ -46,6 +47,7 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     supportsWriteToStdinEvent?: boolean;
     supportsShowingPromptRequest?: boolean;
     supportsStdoutReading?: boolean;
+    supportsHelpViewer?: boolean;
     ignoreFlowControl?: boolean;
 
     useCustomSocket?: boolean;
@@ -140,6 +142,15 @@ export interface CustomEvent extends DebugProtocol.Event {
     body: {
         reason: string;
     }
+}
+
+// Request help panel
+export interface ViewHelpEvent extends CustomEvent {
+    body: ViewHelpBody;
+}
+export interface ViewHelpBody {
+    reason: "viewHelp";
+    requestPath: string;
 }
 
 // Indicate that VS-Code should write a given text to R's stdin

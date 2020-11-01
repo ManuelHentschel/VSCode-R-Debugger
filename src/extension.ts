@@ -11,16 +11,34 @@ import {
 import { updateRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
 
-let terminalHandler: TerminalHandler;
+import { RExtension, HelpPanel } from './rExtensionApi';
+
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
 
-	terminalHandler = new TerminalHandler();
+	console.log('activating');
+
+	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
+
+	let rHelpPanel: HelpPanel;
+
+	if(rExtension){
+		const api = await rExtension.activate();
+		if(api){
+			rHelpPanel = api.helpPanel;
+		}
+	}
+
+	const supportsHelpViewer = !!rHelpPanel;
+
+	const terminalHandler = new TerminalHandler();
 	const port = await terminalHandler.portPromise;
 
+	context.subscriptions.push(terminalHandler);
+
 	// register configuration resolver
-	const resolver = new DebugConfigurationResolver(port);
+	const resolver = new DebugConfigurationResolver(port, 'localhost', supportsHelpViewer);
 	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', resolver));
 
 	// register dynamic configuration provider
@@ -32,7 +50,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', initialProvider, DebugConfigurationProviderTriggerKind.Initial));
 
 	// register the debug adapter descriptor provider
-    const factory = new DebugAdapterDescriptorFactory();
+    const factory = new DebugAdapterDescriptorFactory(rHelpPanel);
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
 	if ('dispose' in factory) {
 		context.subscriptions.push(factory);
@@ -48,18 +66,18 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // this method is called when the extension is deactivated
-export function deactivate() {
-	// close connections opened by terminalHandler
-	if(terminalHandler){
-		terminalHandler.close();
-	}
-}
+export function deactivate() {}
 
 class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
+	helpPanel?: HelpPanel;
+
+	constructor(helpPanel?: HelpPanel){
+		this.helpPanel = helpPanel;
+	}
 	createDebugAdapterDescriptor(session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
 		const config = session.configuration;
 		if(config.request === 'launch'){
-			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter());
+			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel));
 		} else if(config.request === 'attach'){
 			const port: number = config.port || 18721;
 			const host: string = config.host || 'localhost';
@@ -168,10 +186,12 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 
 	readonly customPort: number;
 	readonly customHost: string;
+	readonly supportsHelpViewer: boolean;
 
-	constructor(customPort: number, customHost: string = 'localhost') {
+	constructor(customPort: number, customHost: string = 'localhost', supportsHelpViewer: boolean = false) {
 		this.customPort = customPort;
 		this.customHost = customHost;
+		this.supportsHelpViewer = supportsHelpViewer;
 	}
 
 	resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: CancellationToken): ProviderResult<StrictDebugConfiguration> {
@@ -212,6 +232,7 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			config.supportsStdoutReading = true;
 			config.supportsWriteToStdinEvent = true;
 			config.supportsShowingPromptRequest = true;
+			config.supportsHelpViewer = this.supportsHelpViewer;
 		} else if (config.request === 'attach'){
 			// communication info with TerminalHandler():
 			config.customPort = config.customPort ?? this.customPort;

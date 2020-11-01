@@ -14,6 +14,7 @@ import { DebugRuntime } from './debugRuntime';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { InitializeRequest } from './debugProtocolModifications';
 import { config, getVSCodePackageVersion } from './utils';
+import { RExtension, HelpPanel } from './rExtensionApi';
 
 import * as vscode from 'vscode';
 
@@ -46,9 +47,9 @@ export class DebugAdapter implements vscode.DebugAdapter {
     private runtime: DebugRuntime; // actually handles requests etc. that are not forwarded
     private disconnectTimeout: number = config().get<number>('timeouts.startup', 1000);
 
-    constructor() {
+    constructor(helpPanel?: HelpPanel) {
 		// construct R runtime
-		this.runtime = new DebugRuntime();
+		this.runtime = new DebugRuntime(helpPanel);
 
 		// setup event handler
         this.runtime.on('protocolMessage', (message: DebugProtocol.ProtocolMessage) => {

@@ -122,7 +122,7 @@ export class TerminalHandler {
         this.portPromise = portPromise;
     }
 
-    public close(){
+    public dispose(){
         console.log('Closing custom server connections');
         this.lineCache.forEach((_, socket) => {
             socket.destroy();
