@@ -387,12 +387,5 @@
     "semver": "^7.3.2",
     "tree-kill": "^1.2.2",
     "winreg": "^1.2.4"
-  },
-  "definitions": {
-    "testDefinition": {
-      "type": "string",
-      "default": "testDefault",
-      "description": "testDescription"
-    }
   }
 }
