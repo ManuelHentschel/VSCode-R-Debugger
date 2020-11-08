@@ -34,12 +34,9 @@ export async function activate(context: vscode.ExtensionContext) {
 	// register the debug adapter descriptor provider
     const factory = new DebugAdapterDescriptorFactory();
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
-	if ('dispose' in factory) {
-		context.subscriptions.push(factory);
-	}
 
 	if(vscode.workspace.getConfiguration('rdebugger').get<boolean>('trackTerminals', false)){
-		trackTerminals();
+		trackTerminals(context.environmentVariableCollection);
 	}
 
 	context.subscriptions.push(
