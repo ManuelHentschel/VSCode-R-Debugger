@@ -17,6 +17,7 @@ export class RSession {
     private cp: child.ChildProcessWithoutNullStreams;
     private handleLine: LineHandler;
     private handleJsonString: JsonHandler;
+    private echoStdin?: (text: string) => void;
     private restOfLine: {[k in DataSource]?: string} = {};
 
     public ignoreOutput: boolean = false;
@@ -34,7 +35,12 @@ export class RSession {
 		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'silent'));
     };
     
-    public async startR(args: RStartupArguments, handleLine: LineHandler, handleJson: JsonHandler): Promise<boolean> {
+    public async startR(
+        args: RStartupArguments,
+        handleLine: LineHandler,
+        handleJson: JsonHandler,
+        echoStdin?: (text: string) => void
+    ): Promise<boolean> {
         this.cp = spawnRProcess(args);
 
         if(this.cp.pid === undefined){
@@ -44,6 +50,7 @@ export class RSession {
         // store line/json handlers (are called by this.handleData)
         this.handleLine = handleLine;
         this.handleJsonString = handleJson;
+        this.echoStdin = echoStdin || ((text: string) => {});
 
 		// handle output from the R-process
 		this.cp.stdout.on("data", data => {
@@ -104,6 +111,7 @@ export class RSession {
         }
 
         // log and write text
+        this.echoStdin(text);
         logger.info('cp.stdin:\n' + text.trim());
         this.cp.stdin.write(text);
     }

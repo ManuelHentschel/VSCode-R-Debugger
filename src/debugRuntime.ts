@@ -19,7 +19,7 @@ logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
 export type JsonHandler = (json: string, from: DataSource, isFullLine: boolean) => string;
 
-export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket";
+export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket"|"stdin";
 export type OutputMode = "all"|"filtered"|"nothing";
 
 interface WriteOnPrompt {
@@ -96,6 +96,7 @@ export class DebugRuntime extends EventEmitter {
 		this.terminateTimeout = config().get<number>('timeouts.terminate', this.terminateTimeout);
 		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
 		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
+		this.outputModes["stdin"] =  config().get<OutputMode>('printStdin', 'nothing');
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
 		// start R in child process
@@ -123,9 +124,14 @@ export class DebugRuntime extends EventEmitter {
 		const tmpHandleJsonString: JsonHandler = (json: string, from?: DataSource, isFullLine: boolean = true) => {
 			return this.handleJsonString(json, from, isFullLine);
 		};
+		const tmpEchoStdin = (text: string) => {
+			if(this.outputModes["stdin"] === "all"){
+				this.writeOutput(text, false, "stdout");
+			}
+		};
 		this.rSession = new RSession();
 		// check that the child process launched properly
-		const successTerminal = await this.rSession.startR(rStartupArguments, tmpHandleLine, tmpHandleJsonString);
+		const successTerminal = await this.rSession.startR(rStartupArguments, tmpHandleLine, tmpHandleJsonString, tmpEchoStdin);
 		if (!successTerminal) {
 			const message = 'Failed to spawn a child process!';
 			await this.abortInitializeRequest(response, message);
