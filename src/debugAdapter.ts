@@ -57,7 +57,9 @@ export class DebugAdapter implements vscode.DebugAdapter {
     }
 
     // dummy, required by vscode.Disposable (?)
-    public dispose(): void {};
+    public dispose(): void {
+        this.runtime.killR();
+    };
     
     // used to send messages from R to VS Code
 	readonly onDidSendMessage: vscode.Event<DebugProtocol.ProtocolMessage> = this.sendMessage.event;
