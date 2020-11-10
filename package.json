@@ -163,10 +163,6 @@
             }
           },
           "launch": {
-            "required": [
-              "debugMode",
-              "allowGlobalDebugging"
-            ],
             "properties": {
               "debugMode": {
                 "type": "string",
