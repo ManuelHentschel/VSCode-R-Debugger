@@ -245,6 +245,14 @@
                 },
                 "default": [],
                 "description": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
+              },
+              "loadPackages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "descriptions": "EXPERIMENTAL: Paths of packages to be loaded with `pkgload::load_all` before launching the debugger."
               }
             }
           }
