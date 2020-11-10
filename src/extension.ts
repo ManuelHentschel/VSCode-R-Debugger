@@ -175,12 +175,12 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 
 		let strictConfig: StrictDebugConfiguration|null = null;
 
+		const doc = vscode.window.activeTextEditor;
+		const docValid = doc && doc.document.uri.scheme === 'file';
+		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
+
 		// if the debugger was launched without config
 		if (!config.type && !config.request && !config.name) {
-
-			const doc = vscode.window.activeTextEditor;
-			const docValid = doc && doc.document.uri.scheme === 'file';
-			const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
 			if(docValid){
 				// if file is open, debug file
 				config = {
@@ -203,6 +203,8 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			}
 		}
 
+		config.debugMode = config.debugMode || (docValid ? "file" : "workspace");
+
 		// fill custom capabilities/socket info
 		if(config.request === 'launch'){
 			// capabilities that are always true for this extension:
@@ -224,18 +226,18 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			strictConfig = <AttachConfiguration>config;
 		} else if(debugMode === "function"){
 			// make sure that all required fields (workingDirectory, file, function) are filled:
-			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.workingDirectory = config.workingDirectory || wd;
 			config.file = config.file || '${file}';
 			config.mainFunction = config.mainFunction || 'main';
 			strictConfig = <FunctionDebugConfiguration>config;
 		} else if(debugMode === "file"){
 			// make sure that all required fields (workingDirectory, file) are filled:
-			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.workingDirectory = config.workingDirectory || wd;
 			config.file = config.file || '${file}';
 			strictConfig = <FileDebugConfiguration>config;
 		} else if(debugMode === "workspace"){
 			// make sure that all required fields (workingDirectory) are filled:
-			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.workingDirectory = config.workingDirectory || wd;
 			strictConfig = <WorkspaceDebugConfiguration>config;
 		} else{
 			strictConfig = null;
