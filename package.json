@@ -34,7 +34,6 @@
     "onLanguage:rd",
     "onLanguage:rmd",
     "onCommand:rdebugger.updateRPackage",
-    "workspaceContains:*.{rproj,Rproj,r,R,rd,Rd,rmd,Rmd}",
     "onDebugDynamicConfigurations:R-Debugger",
     "onDebug"
   ],
