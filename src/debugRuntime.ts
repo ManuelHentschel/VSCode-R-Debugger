@@ -126,7 +126,7 @@ export class DebugRuntime extends EventEmitter {
 		};
 		const tmpEchoStdin = (text: string) => {
 			if(this.outputModes["stdin"] === "all"){
-				this.writeOutput(text, false, "stdout");
+				setTimeout(() => this.writeOutput(text, false, "stdout"), 0);
 			}
 		};
 		this.rSession = new RSession();
@@ -253,6 +253,12 @@ export class DebugRuntime extends EventEmitter {
 		// only show the line to the user if it is complete & relevant
 		var showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
 
+		if(outputMode === 'all'){
+			setTimeout(() => {
+				this.writeOutput(line0, isFullLine, (isStderr ? 'stderr' : 'stdout'));
+			}, 0);
+		}
+
 		// differentiate data source. Is non exclusive, in case sinkServer is not used
 		if(isStdout){
 			if(!this.rPackageFound && isFullLine){
@@ -334,9 +340,11 @@ export class DebugRuntime extends EventEmitter {
 		// determine if/what part of line is printed
 		var lineOut: string;
 		if(outputMode === "all"){
-			lineOut = line0;
+			// lineOut = line0;
+			lineOut = "";
 			line = "";
-			showLine = true;
+			// showLine = true;
+			showLine = false;
 		} else if(showLine && outputMode === "filtered"){
 			lineOut = line;
 		} else{
