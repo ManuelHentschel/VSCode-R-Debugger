@@ -248,6 +248,11 @@
                 },
                 "default": [],
                 "descriptions": "EXPERIMENTAL: Paths of packages to be loaded with `pkgload::load_all` before launching the debugger."
+              },
+              "loadSilently": {
+                "type": "boolean",
+                "default": false,
+                "description": "EXPERIMENTAL: Whether to suppress messages while loading a package."
               }
             }
           }
