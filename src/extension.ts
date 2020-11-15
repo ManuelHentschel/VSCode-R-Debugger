@@ -217,6 +217,7 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			config.customHost = config.customHost || this.customHost;
 			config.useCustomSocket = config.useCustomSocket ?? true;
 			config.supportsWriteToStdinEvent = config.supportsWriteToStdinEvent ?? true;
+			config.overwriteLoadAll = false;
 		}
 
 		// make sure the config matches the requirements of one of the debug modes

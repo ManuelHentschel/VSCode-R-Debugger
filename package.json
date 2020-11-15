@@ -223,6 +223,11 @@
                 "default": true,
                 "description": "Whether to attach a modified source() function (direct calls to base::source are not affected)."
               },
+              "overwriteLoadAll": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to attach a modified load_all() function (requries pkgload, direct calls to pkgload::load_all() are not affected)."
+              },
               "setBreakpointsInPackages": {
                 "type": "boolean",
                 "default": false,
@@ -247,12 +252,12 @@
                   "type": "string"
                 },
                 "default": [],
-                "descriptions": "EXPERIMENTAL: Paths of packages to be loaded with `pkgload::load_all` before launching the debugger."
+                "descriptions": "Paths of packages to be loaded with `pkgload::load_all` before launching the debugger."
               },
               "loadSilently": {
                 "type": "boolean",
                 "default": false,
-                "description": "EXPERIMENTAL: Whether to suppress messages while loading a package."
+                "description": "Whether to suppress messages while loading a package specified in `loadPackages`."
               }
             }
           }
