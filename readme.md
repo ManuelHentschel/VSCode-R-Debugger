@@ -94,19 +94,27 @@ These lines are also hidden from the user.
 
 
 ## Debugging R Packages
-In general, R packages can also be debugged using this extension.
+**New:** Packages can now be debugged using `load_all` from `pkgload`.
+To do so, it is required to install `pkgload` (part of `devtools`).
+By default, `load_all` will be masked by a modified version that automatically sets breakpoints
+in the loaded package and attaches the modified versions of `print`, `cat`, `message`.
+To always load a package when launching a debug session, you can specify an array of paths in the launch config entry `"loadPackages"`.
+This is done (for the currently opened package) in the example debug config `"Debug R-Package"`.
+
+
+Packages with a more complicated installation that might not be compatible with `load_all` can also be debugged.
 For this to work, the proper source information must be retained during the installation of the package
 (check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')` for some function from the package):
 * The package must be installed from source code (not CRAN or `.tar.gz`)
 * The flag `--with-keep.source` should be set
-* Extensions containing C code seem to cause problems sometimes.
+* Extensions containing C code might cause problems.
 Sometimes it helps to install the package using
 `devtools::install(quick=FALSE, ...)`
 to compile the binaries and again with
 `devtools::install(quick=TRUE, ...)`
 to retain the source information.
 
-The packages that are being debugged need to be specified in the launch config as follows:
+The packages that are being debugged then need to be specified in the launch config as follows:
 ```json
 "debuggedPackages": ["MyPackage"],
 ...

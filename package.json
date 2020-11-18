@@ -257,7 +257,7 @@
               "loadSilently": {
                 "type": "boolean",
                 "default": false,
-                "markdownDescription": "Whether to suppress messages while loading a package specified in `loadPackages`."
+                "markdownDescription": "Whether to suppress messages while loading packages specified in `loadPackages`."
               }
             }
           }
