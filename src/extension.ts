@@ -11,15 +11,10 @@ import {
 import { updateRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
 
-<<<<<<< Updated upstream
 let terminalHandler: TerminalHandler;
-=======
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { RExtension, HelpPanel } from './rExtensionApi';
-
->>>>>>> Stashed changes
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
