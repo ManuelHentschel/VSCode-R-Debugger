@@ -204,9 +204,22 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 		const docValid = doc && doc.document.uri.scheme === 'file';
 		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
 
+		const hasDescription = folder && fs.existsSync(path.join(folder.uri.fsPath, 'DESCRIPTION'));
+
 		// if the debugger was launched without config
 		if (!config.type && !config.request && !config.name) {
-			if(docValid){
+			if(hasDescription){
+				config = {
+					type: "R-Debugger",
+					name: "Debug R-Package",
+					request: "launch",
+					debugMode: "workspace",
+					workingDirectory: wd,
+					loadPackages: ["."],
+					includePackageScopes: true,
+					allowGlobalDebugging: true
+				};
+			} else if(docValid){
 				// if file is open, debug file
 				config = {
 					type: "R-Debugger",
