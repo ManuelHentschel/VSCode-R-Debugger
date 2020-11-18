@@ -11,7 +11,15 @@ import {
 import { updateRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
 
+<<<<<<< Updated upstream
 let terminalHandler: TerminalHandler;
+=======
+import * as fs from 'fs';
+import * as path from 'path';
+
+import { RExtension, HelpPanel } from './rExtensionApi';
+
+>>>>>>> Stashed changes
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
@@ -73,30 +81,37 @@ class InitialDebugConfigurationProvider implements vscode.DebugConfigurationProv
 		return [
 			{
 				type: "R-Debugger",
+				name: "Launch R-Workspace",
 				request: "launch",
-				name: "Launch Workspace",
 				debugMode: "workspace",
-				workingDirectory: "${workspaceFolder}",
-				allowGlobalDebugging: true
+				workingDirectory: "${workspaceFolder}"
 			},
 			{
 				type: "R-Debugger",
-				request: "launch",
 				name: "Debug R-File",
+				request: "launch",
 				debugMode: "file",
 				workingDirectory: "${workspaceFolder}",
-				file: "${file}",
-				allowGlobalDebugging: true
+				file: "${file}"
 			},
 			{
 				type: "R-Debugger",
-				request: "launch",
 				name: "Debug R-Function",
+				request: "launch",
 				debugMode: "function",
 				workingDirectory: "${workspaceFolder}",
 				file: "${file}",
 				mainFunction: "main",
 				allowGlobalDebugging: false
+			},
+			{
+				type: "R-Debugger",
+				name: "Debug R-Package",
+				request: "launch",
+				debugMode: "workspace",
+				workingDirectory: "${workspaceFolder}",
+				includePackageScopes: true,
+				loadPackages: ["."]
 			},
 			{
 				type: "R-Debugger",
@@ -116,12 +131,14 @@ class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProv
 		const docValid = doc && doc.document.uri.scheme === 'file';
 		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
 
+		const hasDescription = folder && fs.existsSync(path.join(folder.uri.fsPath, 'DESCRIPTION'));
+
 		let configs: StrictDebugConfiguration[] = [];
 
 		configs.push({
             type: "R-Debugger",
             request: "launch",
-            name: "Launch Workspace",
+            name: "Launch R-Workspace",
             debugMode: "workspace",
             workingDirectory: wd,
             allowGlobalDebugging: true
@@ -149,6 +166,19 @@ class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProv
 				allowGlobalDebugging: false
 			});
 		};
+
+		if(hasDescription){
+			configs.push({
+				type: "R-Debugger",
+				name: "Debug R-Package",
+				request: "launch",
+				debugMode: "workspace",
+				workingDirectory: wd,
+				loadPackages: ["."],
+				includePackageScopes: true,
+				allowGlobalDebugging: true
+			});
+		}
 
 		configs.push({
             type: "R-Debugger",
@@ -204,6 +234,7 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 		}
 
 		config.debugMode = config.debugMode || (docValid ? "file" : "workspace");
+		config.allowGlobalDebugging = config.allowGlobalDebugging ?? true;
 
 		// fill custom capabilities/socket info
 		if(config.request === 'launch'){
