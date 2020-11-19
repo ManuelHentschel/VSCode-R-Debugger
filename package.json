@@ -84,72 +84,72 @@
               "supportsWriteToStdinEvent": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to use custom events to request text written to R's stdin. Is used to implement next/step/continue requests."
+                "markdownDescription": "Whether to use custom events to request text written to R's stdin. Is used to implement next/step/continue requests."
               },
               "useCustomSocket": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to use a separate socket for custom events. Usually necessary in attach mode."
+                "markdownDescription": "Whether to use a separate socket for custom events. Usually necessary in attach mode."
               },
               "customPort": {
                 "type": "number",
                 "default": 0,
-                "description": "Port number of custom socket. Leave emtpy/0 to assign automatically."
+                "markdownDescription": "Port number of custom socket. Leave emtpy/0 to assign automatically."
               },
               "customHost": {
                 "type": "string",
                 "default": "localhost",
-                "description": "Host name of custom socket. Leave empty to use localhost."
+                "markdownDescription": "Host name of custom socket. Leave empty to use localhost."
               },
               "port": {
                 "type": "number",
                 "default": 18721,
-                "description": "Port number where vscDebugger is listening for DAP messages."
+                "markdownDescription": "Port number where vscDebugger is listening for DAP messages."
               },
               "host": {
                 "type": "string",
                 "default": "localhost",
-                "description": "Host name where vscDebugger is listening for DAP messages."
+                "markdownDescription": "Host name where vscDebugger is listening for DAP messages."
               },
               "splitOverwrittenOutput": {
                 "type": "boolean",
                 "default": false,
-                "description": "Whether to show the overwritten output in the normal stdout/stderr as well."
+                "markdownDescription": "Whether to show the overwritten output in the normal stdout/stderr as well."
               },
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified print() function (direct calls to base::print are not affected)."
+                "markdownDescription": "Whether to attach a modified `print()` function (direct calls to `base::print()` are not affected)."
               },
               "overwriteStr": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified str() function (direct calls to base::str are not affected)."
+                "markdownDescription": "Whether to attach a modified `str()` function (direct calls to `base::str()` are not affected)."
               },
               "overwriteMessage": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified message() function (direct calls to base::message are not affected)."
+                "markdownDescription": "Whether to attach a modified `message()` function (direct calls to `base::message()` are not affected)."
               },
               "overwriteCat": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified cat() function (direct calls to base::cat are not affected)."
+                "markdownDescription": "Whether to attach a modified `cat()` function (direct calls to `base::cat()` are not affected)."
               },
               "overwriteSource": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified source() function (direct calls to base::source are not affected)."
+                "markdownDescription": "Whether to attach a modified `source()` function (direct calls to `base::source()` are not affected)."
               },
               "setBreakpointsInPackages": {
                 "type": "boolean",
                 "default": false,
-                "description": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
+                "markdownDescription": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
               },
               "includePackageScopes": {
                 "type": "boolean",
                 "default": false,
-                "description": "Set to true to show package scopes in the variable window."
+                "markdownDescription": "Set to true to show package scopes in the variable window."
               },
               "debuggedPackages": {
                 "type": "array",
@@ -157,15 +157,11 @@
                   "type": "string"
                 },
                 "default": [],
-                "description": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
+                "markdownDescription": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
               }
             }
           },
           "launch": {
-            "required": [
-              "debugMode",
-              "allowGlobalDebugging"
-            ],
             "properties": {
               "debugMode": {
                 "type": "string",
@@ -179,63 +175,68 @@
                   "Run an R file",
                   "Start an empty R workspace"
                 ],
-                "description": "Debug a single main-FUNCTION, run an R FILE, or just start an empty R WORKSPACE",
+                "markdownDescription": "Debug a single main-FUNCTION, run an R FILE, or just start an empty R WORKSPACE",
                 "default": "file"
               },
               "allowGlobalDebugging": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to allow debugging in the global workspace after running the function/file."
+                "markdownDescription": "Whether to allow debugging in the global workspace after running the function/file."
               },
               "workingDirectory": {
                 "type": "string",
-                "description": "Absolute path to a directory.",
+                "markdownDescription": "Absolute path to a directory.",
                 "default": "${workspaceFolder}"
               },
               "file": {
                 "type": "string",
-                "description": "Absolute path to an R file",
+                "markdownDescription": "Absolute path to an R file",
                 "default": "${file}"
               },
               "mainFunction": {
                 "type": "string",
                 "default": "main",
-                "description": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
+                "markdownDescription": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
               },
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified print() function (direct calls to base::print are not affected)."
+                "markdownDescription": "Whether to attach a modified `print()` function (direct calls to `base::print()` are not affected)."
               },
               "overwriteStr": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified str() function (direct calls to base::str are not affected)."
+                "markdownDescription": "Whether to attach a modified `str()` function (direct calls to `base::str()` are not affected)."
               },
               "overwriteMessage": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified message() function (direct calls to base::message are not affected)."
+                "markdownDescription": "Whether to attach a modified `message()` function (direct calls to `base::message()` are not affected)."
               },
               "overwriteCat": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified cat() function (direct calls to base::cat are not affected)."
+                "markdownDescription": "Whether to attach a modified `cat()` function (direct calls to `base::cat()` are not affected)."
               },
               "overwriteSource": {
                 "type": "boolean",
                 "default": true,
-                "description": "Whether to attach a modified source() function (direct calls to base::source are not affected)."
+                "markdownDescription": "Whether to attach a modified `source()` function (direct calls to `base::source()` are not affected)."
+              },
+              "overwriteLoadAll": {
+                "type": "boolean",
+                "default": true,
+                "markdownDescription": "Whether to attach a modified `load_all()` function (requries pkgload, direct calls to `pkgload::load_all()` are not affected)."
               },
               "setBreakpointsInPackages": {
                 "type": "boolean",
                 "default": false,
-                "description": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
+                "markdownDescription": "Whether to enable breakpoints in exported functions from ALL packages. Usually, `debuggedPackages` is preferred."
               },
               "includePackageScopes": {
                 "type": "boolean",
                 "default": false,
-                "description": "Set to true to show package scopes in the variable window."
+                "markdownDescription": "Set to true to show package scopes in the variable window."
               },
               "debuggedPackages": {
                 "type": "array",
@@ -243,7 +244,20 @@
                   "type": "string"
                 },
                 "default": [],
-                "description": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
+                "markdownDescription": "Packages to be debugged. Are loaded before launching the R script/file/function, and can contain breakpoints."
+              },
+              "loadPackages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": ["."],
+                "markdownDescription": "Paths of packages to be loaded with `pkgload::load_all` before launching the debugger. Requires `pkgload` to be installed."
+              },
+              "loadSilently": {
+                "type": "boolean",
+                "default": false,
+                "markdownDescription": "Whether to suppress messages while loading packages specified in `loadPackages`."
               }
             }
           }
@@ -253,31 +267,29 @@
             "label": "R: Launch Workspace",
             "body": {
               "type": "R-Debugger",
+              "name": "Launch R-Workspace",
               "request": "launch",
-              "name": "Launch Workspace",
               "debugMode": "workspace",
-              "workingDirectory": "${workspaceFolder}",
-              "allowGlobalDebugging": true
+              "workingDirectory": "${workspaceFolder}"
             }
           },
           {
             "label": "R: Debug File",
             "body": {
               "type": "R-Debugger",
-              "request": "launch",
               "name": "Debug R-File",
+              "request": "launch",
               "debugMode": "file",
               "workingDirectory": "${workspaceFolder}",
-              "file": "${file}",
-              "allowGlobalDebugging": true
+              "file": "${file}"
             }
           },
           {
             "label": "R: Debug Function",
             "body": {
               "type": "R-Debugger",
-              "request": "launch",
               "name": "Debug R-Function",
+              "request": "launch",
               "debugMode": "function",
               "workingDirectory": "${workspaceFolder}",
               "file": "${file}",
@@ -286,11 +298,23 @@
             }
           },
           {
+            "label": "R: Debug Package with pkload",
+            "body": {
+              "type": "R-Debugger",
+              "name": "Debug R-Package",
+              "request": "launch",
+              "debugMode": "workspace",
+              "workingDirectory": "${workspaceFolder}",
+              "includePackageScopes": true,
+              "loadPackages": ["."]
+            }
+          },
+          {
             "label": "R: Attach to process",
             "body": {
               "type": "R-Debugger",
-              "request": "attach",
               "name": "Attach to R process",
+              "request": "attach",
               "splitOverwrittenOutput": true
             }
           }
@@ -304,17 +328,17 @@
         "rdebugger.rterm.windows": {
           "type": "string",
           "default": "",
-          "description": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable."
+          "markdownDescription": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable."
         },
         "rdebugger.rterm.mac": {
           "type": "string",
           "default": "",
-          "description": "R path for macOS. If empty, the PATH is searched for an R executable."
+          "markdownDescription": "R path for macOS. If empty, the PATH is searched for an R executable."
         },
         "rdebugger.rterm.linux": {
           "type": "string",
           "default": "",
-          "description": "R path for Linux. If empty, the PATH is searched for an R executable."
+          "markdownDescription": "R path for Linux. If empty, the PATH is searched for an R executable."
         },
         "rdebugger.rterm.args": {
           "type": "array",
@@ -322,22 +346,22 @@
             "type": "string"
           },
           "default": [],
-          "description": "Additional command line arguments used when launching R."
+          "markdownDescription": "Additional command line arguments used when launching R."
         },
         "rdebugger.timeouts.startup": {
           "type": "number",
           "default": 2000,
-          "description": "The maximum time in ms that is waited for R to startup. Is also used for some other timeouts."
+          "markdownDescription": "The maximum time in ms that is waited for R to startup. Is also used for some other timeouts."
         },
         "rdebugger.timeouts.terminate": {
           "type": "number",
           "default": 50,
-          "description": "Time in ms that is waited when terminating R to allow messages etc. to appear."
+          "markdownDescription": "Time in ms that is waited when terminating R to allow messages etc. to appear."
         },
         "rdebugger.timeouts.prompt": {
           "type": "number",
           "default": 0,
-          "description": "Time in ms that is waited before handling input prompts on stdout (to avoid async issues)."
+          "markdownDescription": "Time in ms that is waited before handling input prompts on stdout (to avoid async issues)."
         },
         "rdebugger.checkVersion": {
           "type": "string",
@@ -347,12 +371,12 @@
             "recommended"
           ],
           "default": "recommended",
-          "description": "Whether to check the version of the R package before launching the debugger."
+          "markdownDescription": "Whether to check the version of the R package before launching the debugger."
         },
         "rdebugger.trackTerminals": {
           "type": "boolean",
           "default": false,
-          "description": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
+          "markdownDescription": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
         }
       }
     }
