@@ -43,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('rdebugger.updateRPackage', updateRPackage)
+		vscode.commands.registerCommand('rdebugger.updateRPackage', () => updateRPackage(context.extensionPath))
 	);
 }
 
