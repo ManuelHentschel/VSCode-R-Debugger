@@ -1,8 +1,8 @@
 repos <- getOption("repos")
 if (is.null(repos) || identical(repos, c(CRAN = "@CRAN@"))) {
-  repos <- c(CRAN = "https://cloud.r-project.org/")
+  options(repos = c(CRAN = "https://cloud.r-project.org/"))
 }
 
 url <- commandArgs(trailingOnly = TRUE)[[1]]
-install.packages(c("jsonlite", "R6"), repos = repos)
-install.packages(url, repos = NULL)
+install.packages("remotes")
+remotes::install_url(url, dependencies = TRUE)
