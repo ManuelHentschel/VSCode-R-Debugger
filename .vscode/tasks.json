@@ -17,7 +17,7 @@
 			"label": "Package and install Extension",
 			"type": "shell",
 			"problemMatcher": [],
-			"command": "vsce package -o rdebugger.vsix && code --install-extension rdebugger.vsix --force",
+			"command": "vsce package -o ${workspaceFolderBasename}.vsix && code --install-extension ${workspaceFolderBasename}.vsix --force",
 			"group": {
 				"kind": "build",
 				"isDefault": true

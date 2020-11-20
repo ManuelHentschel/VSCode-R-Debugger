@@ -14,12 +14,13 @@ import { DebugRuntime } from './debugRuntime';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import { InitializeRequest } from './debugProtocolModifications';
 import { config, getVSCodePackageVersion } from './utils';
+import { RExtension, HelpPanel } from './rExtensionApi';
 
 import * as vscode from 'vscode';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugSession");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'INFO'));
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'SILENT'));
 
 
 function logMessage(message: DebugProtocol.ProtocolMessage){
@@ -46,9 +47,9 @@ export class DebugAdapter implements vscode.DebugAdapter {
     private runtime: DebugRuntime; // actually handles requests etc. that are not forwarded
     private disconnectTimeout: number = config().get<number>('timeouts.startup', 1000);
 
-    constructor() {
+    constructor(helpPanel?: HelpPanel) {
 		// construct R runtime
-		this.runtime = new DebugRuntime();
+		this.runtime = new DebugRuntime(helpPanel);
 
 		// setup event handler
         this.runtime.on('protocolMessage', (message: DebugProtocol.ProtocolMessage) => {
@@ -119,7 +120,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 case 'disconnect':
                     // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
-                        console.log('killing R...');
+                        logger.info('killing R...');
                         this.runtime.killR();
                     }, this.disconnectTimeout);
                     dispatchToR = true;

@@ -8,12 +8,13 @@ import { RSession } from './rSession';
 import { DebugProtocol } from 'vscode-debugprotocol';
 import * as MDebugProtocol from './debugProtocolModifications';
 import { explainRPackage, PackageVersionInfo } from './installRPackage';
+import { RExtension, HelpPanel } from './rExtensionApi';
 
 const { Subject } = require('await-notify');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'SILENT'));
 
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
@@ -46,6 +47,8 @@ export class DebugRuntime extends EventEmitter {
 	// The rSession used to run the code
 	public rSession: RSession;
 
+	readonly helpPanel: HelpPanel;
+
 	// // state info about the R session
 	// R session
 	private rSessionStartup = new Subject(); // used to wait for R session to start
@@ -70,8 +73,9 @@ export class DebugRuntime extends EventEmitter {
 	private writeOnPrompt: WriteOnPrompt[] = [];
 
 	// constructor
-	constructor() {
+	constructor(helpPanel?: HelpPanel) {
 		super();
+		this.helpPanel = helpPanel;
 	}
 
 	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: MDebugProtocol.InitializeRequestArguments, request: MDebugProtocol.InitializeRequest) {
@@ -387,7 +391,7 @@ export class DebugRuntime extends EventEmitter {
 				this.writeToStdin(wop.text);
 				this.writeOnPrompt.unshift(wop);
 			} else{
-				console.log('invalid wop');
+				logger.error('invalid writeOnPrompt entry');
 			}
 		} else {
 			const cmdListen = this.rStrings.packageName + `::.vsc.listenForJSON(timeout = -1)`;
@@ -444,6 +448,8 @@ export class DebugRuntime extends EventEmitter {
 			if(json.event === 'custom'){
 				if(json.body.reason === "writeToStdin"){
 					this.handleWriteToStdinEvent(json.body);
+				} else if(json.body.reason === "viewHelp" && json.body.requestPath){
+					this.helpPanel.showHelpForPath(json.body.requestPath);
 				}
 				logger.info("event: " + json.event, json.body);
 			} else{

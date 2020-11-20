@@ -32,7 +32,7 @@ import { WriteToStdinEvent, WriteToStdinBody } from './debugProtocolModification
 import { config, getPortNumber } from './utils';
 
 const logger = log.getLogger("DebugRuntime");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelTerminals', 'INFO'));
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelTerminals', 'SILENT'));
 
 let doTrackTerminals: boolean = false;
 
@@ -106,8 +106,8 @@ export class TerminalHandler {
         this.portPromise = portPromise;
     }
 
-    public close(){
-        console.log('Closing custom server connections');
+    public dispose(){
+        logger.info('Closing custom server connections');
         this.lineCache.forEach((_, socket) => {
             socket.destroy();
         });

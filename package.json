@@ -228,6 +228,11 @@
                 "default": true,
                 "markdownDescription": "Whether to attach a modified `load_all()` function (requries pkgload, direct calls to `pkgload::load_all()` are not affected)."
               },
+              "overwriteHelp": {
+                "type": "boolean",
+                "default": true,
+                "markdownDescription": "Whether to register a new S3 print method for `help_files_with_topic` to use the help panel from vscode-R."
+              },
               "setBreakpointsInPackages": {
                 "type": "boolean",
                 "default": false,
@@ -410,12 +415,5 @@
     "semver": "^7.3.2",
     "tree-kill": "^1.2.2",
     "winreg": "^1.2.4"
-  },
-  "definitions": {
-    "testDefinition": {
-      "type": "string",
-      "default": "testDefault",
-      "description": "testDescription"
-    }
   }
 }
