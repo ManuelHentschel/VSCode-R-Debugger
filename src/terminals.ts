@@ -36,34 +36,21 @@ logger.setLevel(config().get<log.LogLevelDesc>('logLevelTerminals', 'INFO'));
 
 let doTrackTerminals: boolean = false;
 
-export function trackTerminals(){
-    const platform: string = process.platform;
-    const terminalEnvSetting: string = "terminal.integrated.env";
-    let platformString: string;
-    if(platform === "win32"){
-        platformString = "windows";
-    } else if(platform === "darwin"){
-        platformString = "osx";
-    } else if(platform === "linux"){
-        platformString = "linux";
-    } else{
-        // abort
-        return false;
+
+
+export function trackTerminals(envCol: vscode.EnvironmentVariableCollection){
+
+    let terminalId = 1;
+    
+    function getAndUpdateTerminalId(): string {
+        const oldId = `${terminalId}`;
+        terminalId += 1;
+        envCol.replace('VSCODE_R_DEBUGGER_TERMINAL_ID', `${terminalId}`);
+        return oldId;
     }
 
-    function getAndUpdateTerminalId(): string {
-		const config = vscode.workspace.getConfiguration(terminalEnvSetting);
-		const envVars = config.get<{VSCODE_R_DEBUGGER_TERMINAL_ID?: string}>(platformString, {});
-		const oldId = envVars.VSCODE_R_DEBUGGER_TERMINAL_ID;
-		const newId = (Number(oldId) || 1) + 1;
-		envVars.VSCODE_R_DEBUGGER_TERMINAL_ID = '' + newId;
-		config.update(
-			platformString,
-			envVars,
-			false
-        );
-        return(oldId);
-    }
+    // initialize the EnvironmentVariableMutator
+    getAndUpdateTerminalId();
 
 	vscode.window.onDidOpenTerminal((term: vscode.Terminal) => {
 		(<TerminalWithTerminalId>term).vscodeRDebuggerTerminalId = getAndUpdateTerminalId();
@@ -71,11 +58,8 @@ export function trackTerminals(){
     });
 
     doTrackTerminals = true;
-
-    getAndUpdateTerminalId();
-
-    return true;
 }
+
 
 interface WriteToStdinArgs {
     text: string;

@@ -13,6 +13,9 @@ import { trackTerminals, TerminalHandler } from './terminals';
 
 import { RExtension, HelpPanel } from './rExtensionApi';
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
@@ -52,16 +55,13 @@ export async function activate(context: vscode.ExtensionContext) {
 	// register the debug adapter descriptor provider
     const factory = new DebugAdapterDescriptorFactory(rHelpPanel);
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
-	if ('dispose' in factory) {
-		context.subscriptions.push(factory);
-	}
 
 	if(vscode.workspace.getConfiguration('rdebugger').get<boolean>('trackTerminals', false)){
-		trackTerminals();
+		trackTerminals(context.environmentVariableCollection);
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('rdebugger.updateRPackage', updateRPackage)
+		vscode.commands.registerCommand('rdebugger.updateRPackage', () => updateRPackage(context.extensionPath))
 	);
 }
 
@@ -94,30 +94,37 @@ class InitialDebugConfigurationProvider implements vscode.DebugConfigurationProv
 		return [
 			{
 				type: "R-Debugger",
+				name: "Launch R-Workspace",
 				request: "launch",
-				name: "Launch Workspace",
 				debugMode: "workspace",
-				workingDirectory: "${workspaceFolder}",
-				allowGlobalDebugging: true
+				workingDirectory: "${workspaceFolder}"
 			},
 			{
 				type: "R-Debugger",
-				request: "launch",
 				name: "Debug R-File",
+				request: "launch",
 				debugMode: "file",
 				workingDirectory: "${workspaceFolder}",
-				file: "${file}",
-				allowGlobalDebugging: true
+				file: "${file}"
 			},
 			{
 				type: "R-Debugger",
-				request: "launch",
 				name: "Debug R-Function",
+				request: "launch",
 				debugMode: "function",
 				workingDirectory: "${workspaceFolder}",
 				file: "${file}",
 				mainFunction: "main",
 				allowGlobalDebugging: false
+			},
+			{
+				type: "R-Debugger",
+				name: "Debug R-Package",
+				request: "launch",
+				debugMode: "workspace",
+				workingDirectory: "${workspaceFolder}",
+				includePackageScopes: true,
+				loadPackages: ["."]
 			},
 			{
 				type: "R-Debugger",
@@ -137,12 +144,14 @@ class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProv
 		const docValid = doc && doc.document.uri.scheme === 'file';
 		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
 
+		const hasDescription = folder && fs.existsSync(path.join(folder.uri.fsPath, 'DESCRIPTION'));
+
 		let configs: StrictDebugConfiguration[] = [];
 
 		configs.push({
             type: "R-Debugger",
             request: "launch",
-            name: "Launch Workspace",
+            name: "Launch R-Workspace",
             debugMode: "workspace",
             workingDirectory: wd,
             allowGlobalDebugging: true
@@ -171,6 +180,19 @@ class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProv
 			});
 		};
 
+		if(hasDescription){
+			configs.push({
+				type: "R-Debugger",
+				name: "Debug R-Package",
+				request: "launch",
+				debugMode: "workspace",
+				workingDirectory: wd,
+				loadPackages: ["."],
+				includePackageScopes: true,
+				allowGlobalDebugging: true
+			});
+		}
+
 		configs.push({
             type: "R-Debugger",
             request: "attach",
@@ -198,13 +220,26 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 
 		let strictConfig: StrictDebugConfiguration|null = null;
 
+		const doc = vscode.window.activeTextEditor;
+		const docValid = doc && doc.document.uri.scheme === 'file';
+		const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
+
+		const hasDescription = folder && fs.existsSync(path.join(folder.uri.fsPath, 'DESCRIPTION'));
+
 		// if the debugger was launched without config
 		if (!config.type && !config.request && !config.name) {
-
-			const doc = vscode.window.activeTextEditor;
-			const docValid = doc && doc.document.uri.scheme === 'file';
-			const wd = (folder ? '${workspaceFolder}' : (docValid ? '${fileDirname}' : '.'));
-			if(docValid){
+			if(hasDescription){
+				config = {
+					type: "R-Debugger",
+					name: "Debug R-Package",
+					request: "launch",
+					debugMode: "workspace",
+					workingDirectory: wd,
+					loadPackages: ["."],
+					includePackageScopes: true,
+					allowGlobalDebugging: true
+				};
+			} else if(docValid){
 				// if file is open, debug file
 				config = {
 					type: "R-Debugger",
@@ -226,6 +261,9 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			}
 		}
 
+		config.debugMode = config.debugMode || (docValid ? "file" : "workspace");
+		config.allowGlobalDebugging = config.allowGlobalDebugging ?? true;
+
 		// fill custom capabilities/socket info
 		if(config.request === 'launch'){
 			// capabilities that are always true for this extension:
@@ -239,6 +277,7 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			config.customHost = config.customHost || this.customHost;
 			config.useCustomSocket = config.useCustomSocket ?? true;
 			config.supportsWriteToStdinEvent = config.supportsWriteToStdinEvent ?? true;
+			config.overwriteLoadAll = false;
 		}
 
 		// make sure the config matches the requirements of one of the debug modes
@@ -248,18 +287,18 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			strictConfig = <AttachConfiguration>config;
 		} else if(debugMode === "function"){
 			// make sure that all required fields (workingDirectory, file, function) are filled:
-			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.workingDirectory = config.workingDirectory || wd;
 			config.file = config.file || '${file}';
 			config.mainFunction = config.mainFunction || 'main';
 			strictConfig = <FunctionDebugConfiguration>config;
 		} else if(debugMode === "file"){
 			// make sure that all required fields (workingDirectory, file) are filled:
-			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.workingDirectory = config.workingDirectory || wd;
 			config.file = config.file || '${file}';
 			strictConfig = <FileDebugConfiguration>config;
 		} else if(debugMode === "workspace"){
 			// make sure that all required fields (workingDirectory) are filled:
-			config.workingDirectory = config.workingDirectory || '${workspaceFolder}';
+			config.workingDirectory = config.workingDirectory || wd;
 			strictConfig = <WorkspaceDebugConfiguration>config;
 		} else{
 			strictConfig = null;
