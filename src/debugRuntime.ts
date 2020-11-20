@@ -14,7 +14,7 @@ const { Subject } = require('await-notify');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'info'));
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'SILENT'));
 
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
@@ -391,7 +391,7 @@ export class DebugRuntime extends EventEmitter {
 				this.writeToStdin(wop.text);
 				this.writeOnPrompt.unshift(wop);
 			} else{
-				console.log('invalid wop');
+				logger.error('invalid writeOnPrompt entry');
 			}
 		} else {
 			const cmdListen = this.rStrings.packageName + `::.vsc.listenForJSON(timeout = -1)`;

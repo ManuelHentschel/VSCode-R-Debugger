@@ -32,7 +32,7 @@ export class RSession {
 
 
     constructor(){
-		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'silent'));
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'SILENT'));
     };
     
     public async startR(

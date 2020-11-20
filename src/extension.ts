@@ -20,8 +20,6 @@ import * as path from 'path';
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
 
-	console.log('activating');
-
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
 	let rHelpPanel: HelpPanel;

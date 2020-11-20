@@ -20,7 +20,7 @@ import * as vscode from 'vscode';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugSession");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'INFO'));
+logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'SILENT'));
 
 
 function logMessage(message: DebugProtocol.ProtocolMessage){
@@ -120,7 +120,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 case 'disconnect':
                     // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
-                        console.log('killing R...');
+                        logger.info('killing R...');
                         this.runtime.killR();
                     }, this.disconnectTimeout);
                     dispatchToR = true;
