@@ -228,6 +228,11 @@
                 "default": true,
                 "markdownDescription": "Whether to attach a modified `load_all()` function (requries pkgload, direct calls to `pkgload::load_all()` are not affected)."
               },
+              "overwriteHelp": {
+                "type": "boolean",
+                "default": true,
+                "markdownDescription": "Whether to register a new S3 print method for `help_files_with_topic` to use the help panel from vscode-R."
+              },
               "setBreakpointsInPackages": {
                 "type": "boolean",
                 "default": false,

@@ -44,6 +44,7 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     overwriteStr?: boolean;
     overwriteSource?: boolean;
     overwriteLoadAll?: boolean;
+    overwriteHelp?: boolean;
     splitOverwrittenOutput?: boolean;
 
     // custom events/requests/capabilities:

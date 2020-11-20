@@ -22,7 +22,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
-	let rHelpPanel: HelpPanel;
+	let rHelpPanel: HelpPanel = undefined;
 
 	if(rExtension){
 		const api = await rExtension.activate();
@@ -268,7 +268,9 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			config.supportsStdoutReading = true;
 			config.supportsWriteToStdinEvent = true;
 			config.supportsShowingPromptRequest = true;
-			config.supportsHelpViewer = this.supportsHelpViewer;
+			// set to true if not specified. necessary since its default in vscDebugger is FALSE:
+			config.overwriteHelp = config.overwriteHelp ?? true; 
+			config.overwriteHelp =  config.overwriteHelp && this.supportsHelpViewer; // check if helpview available
 		} else if (config.request === 'attach'){
 			// communication info with TerminalHandler():
 			config.customPort = config.customPort ?? this.customPort;
