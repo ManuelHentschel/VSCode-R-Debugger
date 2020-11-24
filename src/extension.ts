@@ -75,7 +75,11 @@ class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFact
 	createDebugAdapterDescriptor(session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
 		const config = session.configuration;
 		if(config.request === 'launch'){
-			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel));
+			const commandLineArgs = [];
+			if('commandLineArgs' in config){
+				commandLineArgs.push(...config.commandLineArgs);
+			}
+			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel, commandLineArgs));
 		} else if(config.request === 'attach'){
 			const port: number = config.port || 18721;
 			const host: string = config.host || 'localhost';

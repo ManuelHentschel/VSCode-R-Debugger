@@ -243,6 +243,14 @@
                 "default": false,
                 "markdownDescription": "Set to true to show package scopes in the variable window."
               },
+              "commandLineArgs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "markdownDescription": "Additional command line arguments used when launching R."
+              },
               "debuggedPackages": {
                 "type": "array",
                 "items": {

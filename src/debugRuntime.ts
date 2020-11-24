@@ -49,6 +49,8 @@ export class DebugRuntime extends EventEmitter {
 
 	readonly helpPanel: HelpPanel;
 
+    private readonly addCommandLineArgs: string[];
+
 	// // state info about the R session
 	// R session
 	private rSessionStartup = new Subject(); // used to wait for R session to start
@@ -73,8 +75,9 @@ export class DebugRuntime extends EventEmitter {
 	private writeOnPrompt: WriteOnPrompt[] = [];
 
 	// constructor
-	constructor(helpPanel?: HelpPanel) {
+	constructor(helpPanel?: HelpPanel, addCommandLineArgs: string[] = []) {
 		super();
+		this.addCommandLineArgs = addCommandLineArgs || [];
 		this.helpPanel = helpPanel;
 	}
 
@@ -104,7 +107,7 @@ export class DebugRuntime extends EventEmitter {
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
 		// start R in child process
-		const rStartupArguments  = await getRStartupArguments();
+		const rStartupArguments  = await getRStartupArguments(this.addCommandLineArgs);
 		const openFolders = vscode.workspace.workspaceFolders;
 		if(openFolders){
 			rStartupArguments.cwd = openFolders[0].uri.fsPath;
