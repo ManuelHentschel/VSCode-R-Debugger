@@ -12,7 +12,7 @@ The behaviour of the debugger can be configured in four different ways:
 These settings can be accessed e.g. by right-clicking on this extension
 in the Extensions-window and selecting `Extension Settings`.
 Current settings are:
-* `r.debugger.rterm.XXX (string)`: The path to the R executable itself (not just the directory!).
+* `r.rpath.XXX (string)`: The path to the R executable itself (not just the directory!).
 Can usually be left empty on a windows installation with the default settings.
 * `r.debugger.timeouts.startup (number)`: The maximum time in ms that is waited for R to startup.
 Can be set to a larger value if launching the debugger fails with a notification 

@@ -43,7 +43,7 @@ To install the latest development version of the required R-package from GitHub,
 or install from the artifacts found 
 [here](https://github.com/ManuelHentschel/vscDebugger/actions).
 
-If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `r.debugger.rterm.*`.
+If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `r.rpath.xxx`.
 
 **Note on the package version:**
 Since the debugger is still under initial development, both this extension and the accompanying R package are major version 0.y.z.
