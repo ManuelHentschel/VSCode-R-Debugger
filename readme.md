@@ -27,7 +27,7 @@ For many variables it is also possible to assign a new value to the variable or 
 The latest "stable" version of the VS Code extension can be installed from the
 [marketplace](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).
 After installing the extension, the R package can be installed using the command 
-`rdebugger.updateRPackage`.
+`r.debugger.updateRPackage`.
 If this does not work, you can find the source code and compiled binaries on the
 [releases site](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases).
 
@@ -43,7 +43,7 @@ To install the latest development version of the required R-package from GitHub,
 or install from the artifacts found 
 [here](https://github.com/ManuelHentschel/vscDebugger/actions).
 
-If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `rdebugger.rterm.*`.
+If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `r.debugger.rterm.*`.
 
 **Note on the package version:**
 Since the debugger is still under initial development, both this extension and the accompanying R package are major version 0.y.z.

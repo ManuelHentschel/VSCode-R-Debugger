@@ -1,5 +1,5 @@
 
-import { DebugProtocolMessage, window, workspace } from "vscode";
+import * as vscode from "vscode";
 import { platform } from "os";
 import { RStartupArguments } from './debugProtocolModifications';
 import * as net from 'net';
@@ -11,7 +11,7 @@ import winreg = require("winreg");
 const packageJson = require('../package.json');
 
 export function config() {
-    return workspace.getConfiguration("rdebugger");
+    return vscode.workspace.getConfiguration("r.debugger");
 }
 
 function getRfromEnvPath(platform: string) {
@@ -33,6 +33,67 @@ function getRfromEnvPath(platform: string) {
     return "";
 }
 
+export async function getRpathFromSystem() {
+    
+    let rpath: string = '';
+    const platform: string = process.platform;
+    
+    if ( platform === 'win32') {
+        // Find path from registry
+        try {
+            const key = new winreg({
+                hive: winreg.HKLM,
+                key: '\\Software\\R-Core\\R',
+            });
+            const item: winreg.RegistryItem = await new Promise((c, e) =>
+                key.get('InstallPath', (err, result) => err === null ? c(result) : e(err)));
+            rpath = path.join(item.value, 'bin', 'R.exe');
+        } catch (e) {
+            rpath = '';
+        }
+    }
+
+    rpath ||= getRfromEnvPath(platform);
+
+    return rpath;
+}
+
+export async function getRpath(quote: boolean=false, overwriteConfig?: string): Promise<string> {
+    let rpath: string = '';
+    
+    const configEntry = (
+        process.platform === 'win32' ? 'rpath.windows' :
+        process.platform === 'darwin' ? 'rpath.mac' :
+        'rpath.linux'
+    );
+
+    // try the config entry specified in the function arg:
+    if(overwriteConfig){
+        rpath = config().get<string>(overwriteConfig);
+    }
+
+    // try the os-specific config entry for the rpath:
+    rpath ||= config().get<string>(configEntry);
+
+    // read from path/registry:
+    rpath ||= await getRpathFromSystem();
+
+    // represent all invalid paths (undefined, '', null) as undefined:
+    rpath ||= undefined;
+
+    if(!rpath){
+        // inform user about missing R path:
+        vscode.window.showErrorMessage(`${process.platform} can't use R`);
+    } else if(quote && rpath.match(/^[^'"].* .*[^'"]$/)){
+        // if requested and rpath contains spaces, add quotes:
+        rpath = `"${rpath}"`;
+    } else if(process.platform === "win32" && rpath.match(/^'.* .*'$/)){
+        // replace single quotes with double quotes on windows
+        rpath = rpath.replace(/^'(.*)'$/, '"$1"');
+    }
+
+    return rpath;
+}
 
 export function getPortNumber(server: net.Server){
     const address = server.address();
@@ -49,53 +110,21 @@ export function timeout(ms: number) {
 }
 
 
-export async function getRStartupArguments(): Promise<RStartupArguments> {
-    let rpath: string = "";
+export async function getRStartupArguments(addCommandLineArgs: string[] = []): Promise<RStartupArguments> {
     const platform: string = process.platform;
-    let rArgs: string[];
 
-    if (platform === "win32") {
-        rpath = config().get<string>("rterm.windows", "");
-        if (rpath === "") {
-            // Find path from registry
-            try {
-                const key = new winreg({
-                    hive: winreg.HKLM,
-                    key: "\\Software\\R-Core\\R",
-                });
-                const item: winreg.RegistryItem = await new Promise((c, e) =>
-                    key.get("InstallPath", (err, result) => err === null ? c(result) : e(err)));
-                rpath = path.join(item.value, "bin", "R.exe");
-                rpath = '"' + rpath + '"';
-            } catch (e) {
-                rpath = "";
-            }
-        }
-        rArgs = ['--ess', '--quiet', '--no-save'];
-    } else if (platform === "darwin") {
-        rpath = config().get<string>("rterm.mac", "");
-        rArgs = ['--quiet', '--interactive', '--no-save'];
-    } else if (platform === "linux") {
-        rpath = config().get<string>("rterm.linux", "");
-        rArgs = ['--quiet', '--interactive', '--no-save'];
-    }
+    const rpath = await getRpath(true);
 
-    if (rpath === "") {
-        rpath = getRfromEnvPath(platform);
-    }
-
-    // enclose path in quotes if it contains spaces (and isn't quoted yet)
-    if(rpath.match(/^[^"'].* .*[^"']$/)){
-        rpath = `"${rpath}"`;
-    }
-    // replace single quotes with double quotes on windows
-    if(platform === "win32" && rpath.match(/^'.* .*'$/)){
-        rpath = rpath.replace(/^'(.*)'$/, '"$1"');
-    }
+    const rArgs: string[] = [
+        "--quiet",
+        "--no-save",
+        (platform === 'win32' ? '--ess' : '--interactive')
+    ];
 
     // add user specified args
     const customArgs = config().get<Array<string>>("rterm.args", []);
-    rArgs = rArgs.concat(customArgs);
+    rArgs.push(...customArgs);
+    rArgs.push(...addCommandLineArgs);
 
     const ret: RStartupArguments = {
         path: rpath,
@@ -104,7 +133,7 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
     };
 
     if(rpath === ""){
-        window.showErrorMessage(`${process.platform} can't find R`);
+        vscode.window.showErrorMessage(`${process.platform} can't find R`);
     }
     return ret;
 }
@@ -176,3 +205,54 @@ export function escapeStringForR(s: string, quote: string='"') {
 }
 
 
+export async function checkSettings(): Promise<boolean> {
+    const config0 = vscode.workspace.getConfiguration('rdebugger');
+
+    const keys = Object.getOwnPropertyNames(config0);
+
+    const deprecated = [
+        "rterm",
+        "timeouts",
+        "checkVersion",
+        "trackTerminals"
+    ];
+
+    const foundDeprecated = deprecated.filter((v) => checkDeprecated(config0, v));
+
+    console.log(keys);
+    console.log(foundDeprecated);
+
+    if(foundDeprecated.length === 0){
+        return false;
+    }
+
+    const ret1 = 'Open Settings';
+    const ret2 = 'Don\'t show again';
+
+    const ret = await vscode.window.showInformationMessage(
+        `Configuration for R-Debugger has moved (affects: ${foundDeprecated.map(v => 'rdebugger.' + v).join(', ')}). Open settings?`,
+        ret1,
+        ret2
+    );
+
+    if(ret === ret1){
+        vscode.commands.executeCommand('workbench.action.openSettings', '@ext:rdebugger.r-debugger');
+    }
+
+    return ret === ret2;
+}
+
+function checkDeprecated(config: vscode.WorkspaceConfiguration, entry: string){
+    const info = config.inspect(entry);
+
+    const changed = (
+        info.globalLanguageValue ||
+        info.globalValue ||
+        info.workspaceFolderLanguageValue ||
+        info.workspaceFolderValue ||
+        info.workspaceLanguageValue ||
+        info.workspaceValue
+    );
+
+    return changed;
+}

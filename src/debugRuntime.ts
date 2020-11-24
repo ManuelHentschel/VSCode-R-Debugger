@@ -114,7 +114,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		if(!rStartupArguments.path){
-			const message = 'No R path was found in the settings/path/registry.\n(Can be changed in setting rdebugger.rterm.XXX)';
+			const message = 'No R path was found in the settings/path/registry.\n(Can be changed in setting r.rpath.XXX)';
 			await this.abortInitializeRequest(response, message);
 			return false;
 		}
@@ -171,12 +171,12 @@ export class DebugRuntime extends EventEmitter {
 			logger.info("R Session ready");
 		} else {
 			const rPath = rStartupArguments.path;
-			const message = 'R path not working:\n' + rPath + '\n(Can be changed in setting rdebugger.rterm.XXX)';
+			const message = 'R path not working:\n' + rPath + '\n(Can be changed in setting r.debugger.rterm.XXX)';
 			const abortPromise = this.abortInitializeRequest(response, message);
 			this.writeOutput(`R not responding within ${this.startupTimeout}ms!`, true, 'stderr');
 			this.writeOutput(`R path:\n${rPath}`, true, 'stderr');
-			this.writeOutput('If R is installed but in a different path, please adjust the setting rdebugger.rterm.windows/mac/linux.\n');
-			this.writeOutput(`If R might take more than ${this.startupTimeout}ms to launch, try increasing the setting rdebugger.timeouts.startup!\n`);
+			this.writeOutput('If R is installed but in a different path, please adjust the setting r.debugger.rterm.windows/mac/linux.\n');
+			this.writeOutput(`If R might take more than ${this.startupTimeout}ms to launch, try increasing the setting r.debugger.timeouts.startup!\n`);
 			await abortPromise;
 			return false;
 		}
