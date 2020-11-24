@@ -243,6 +243,14 @@
                 "default": false,
                 "markdownDescription": "Set to true to show package scopes in the variable window."
               },
+              "commandLineArgs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "markdownDescription": "Additional command line arguments used when launching R."
+              },
               "debuggedPackages": {
                 "type": "array",
                 "items": {
@@ -256,7 +264,9 @@
                 "items": {
                   "type": "string"
                 },
-                "default": ["."],
+                "default": [
+                  "."
+                ],
                 "markdownDescription": "Paths of packages to be loaded with `pkgload::load_all` before launching the debugger. Requires `pkgload` to be installed."
               },
               "loadSilently": {
@@ -311,7 +321,9 @@
               "debugMode": "workspace",
               "workingDirectory": "${workspaceFolder}",
               "includePackageScopes": true,
-              "loadPackages": ["."]
+              "loadPackages": [
+                "."
+              ]
             }
           },
           {
