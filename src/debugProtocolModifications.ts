@@ -59,21 +59,23 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
     customHost?: string;
 }
 
-export interface FunctionDebugConfiguration extends DebugConfiguration {
+export interface LaunchConfiguration extends DebugConfiguration {
     request: "launch";
+    commandLineArgs?: string[];
+}
+
+export interface FunctionDebugConfiguration extends LaunchConfiguration {
     debugMode: "function";
     workingDirectory: string;
     file: string;
     mainFunction: string;
 }
-export interface FileDebugConfiguration extends DebugConfiguration {
-    request: "launch";
+export interface FileDebugConfiguration extends LaunchConfiguration {
     debugMode: "file";
     workingDirectory: string;
     file: string;
 }
-export interface WorkspaceDebugConfiguration extends DebugConfiguration {
-    request: "launch";
+export interface WorkspaceDebugConfiguration extends LaunchConfiguration {
     debugMode: "workspace";
     workingDirectory: string;
 }

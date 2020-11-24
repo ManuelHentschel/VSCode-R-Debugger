@@ -49,7 +49,7 @@ export function timeout(ms: number) {
 }
 
 
-export async function getRStartupArguments(): Promise<RStartupArguments> {
+export async function getRStartupArguments(addCommandLineArgs: string[] = []): Promise<RStartupArguments> {
     let rpath: string = "";
     const platform: string = process.platform;
     let rArgs: string[];
@@ -95,7 +95,8 @@ export async function getRStartupArguments(): Promise<RStartupArguments> {
 
     // add user specified args
     const customArgs = config().get<Array<string>>("rterm.args", []);
-    rArgs = rArgs.concat(customArgs);
+    rArgs.push(...customArgs);
+    rArgs.push(...addCommandLineArgs);
 
     const ret: RStartupArguments = {
         path: rpath,
