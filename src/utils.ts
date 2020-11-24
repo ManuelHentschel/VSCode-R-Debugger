@@ -10,8 +10,12 @@ import winreg = require("winreg");
 
 const packageJson = require('../package.json');
 
-export function config() {
-    return vscode.workspace.getConfiguration("r.debugger");
+export function config(onlyDebugger: boolean = true) {
+    if(onlyDebugger){
+        return vscode.workspace.getConfiguration("r.debugger");
+    } else{
+        return vscode.workspace.getConfiguration("r");
+    }
 }
 
 function getRfromEnvPath(platform: string) {
@@ -73,7 +77,7 @@ export async function getRpath(quote: boolean=false, overwriteConfig?: string): 
     }
 
     // try the os-specific config entry for the rpath:
-    rpath ||= config().get<string>(configEntry);
+    rpath ||= config(false).get<string>(configEntry);
 
     // read from path/registry:
     rpath ||= await getRpathFromSystem();
@@ -122,7 +126,7 @@ export async function getRStartupArguments(addCommandLineArgs: string[] = []): P
     ];
 
     // add user specified args
-    const customArgs = config().get<Array<string>>("rterm.args", []);
+    const customArgs = config().get<Array<string>>("commandLineArgs", []);
     rArgs.push(...customArgs);
     rArgs.push(...addCommandLineArgs);
 
