@@ -13,12 +13,20 @@ import { trackTerminals, TerminalHandler } from './terminals';
 
 import { RExtension, HelpPanel } from './rExtensionApi';
 
+import { checkSettings } from './utils';
+
 import * as fs from 'fs';
 import * as path from 'path';
 
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
+
+	if(context.globalState.get<boolean>('ignoreDeprecatedConfig', false) !== true){
+		checkSettings().then((ret) => {
+			context.globalState.update('ignoreDeprecatedConfig', ret);
+		});
+	}
 
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
@@ -54,12 +62,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const factory = new DebugAdapterDescriptorFactory(rHelpPanel);
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
 
-	if(vscode.workspace.getConfiguration('rdebugger').get<boolean>('trackTerminals', false)){
+	if(vscode.workspace.getConfiguration('r.debugger').get<boolean>('trackTerminals', false)){
 		trackTerminals(context.environmentVariableCollection);
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('rdebugger.updateRPackage', () => updateRPackage(context.extensionPath))
+		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath))
 	);
 }
 

@@ -12,16 +12,16 @@ The behaviour of the debugger can be configured in four different ways:
 These settings can be accessed e.g. by right-clicking on this extension
 in the Extensions-window and selecting `Extension Settings`.
 Current settings are:
-* `rdebugger.rterm.XXX (string)`: The path to the R executable itself (not just the directory!).
+* `r.rpath.XXX (string)`: The path to the R executable itself (not just the directory!).
 Can usually be left empty on a windows installation with the default settings.
-* `rdebugger.timeouts.startup (number)`: The maximum time in ms that is waited for R to startup.
+* `r.debugger.timeouts.startup (number)`: The maximum time in ms that is waited for R to startup.
 Can be set to a larger value if launching the debugger fails with a notification 
 "R path not valid".
-* `rdebugger.timeouts.terminate (number)`: The time in ms that is waited when terminating.
+* `r.debugger.timeouts.terminate (number)`: The time in ms that is waited when terminating.
 Is used to allow messages etc. to appear before terminating the debugger.
-* `rdebugger.timeouts.prompt (number)`: The time in ms that is waited before handling input prompts on stdout.
+* `r.debugger.timeouts.prompt (number)`: The time in ms that is waited before handling input prompts on stdout.
 Might be helpful to avoid async issues between stdout/stderr/sockets.
-* `rdebugger.checkVersion ("none"|"required"|"recommended")`:
+* `r.debugger.checkVersion ("none"|"required"|"recommended")`:
 Whether to check the version of the R package vscDebugger before launching the debugger.
 The debugger always checks if the package is present at all.
 It is recommended to set this setting to `recommended` or `required`.
@@ -29,12 +29,12 @@ It is recommended to set this setting to `recommended` or `required`.
 ## 2. Additional VS Code settings
 These settings can be set by editing the `settings.json`, either globally or on a per workspace basis.
 They are useful mostly for debugging the debugger itself and their behaviour might change without notice.
-* `rdebugger.logLevelRuntime`, `rdebugger.logLevelSession`, `rdebugger.logLevelRSession`
+* `r.debugger.logLevelRuntime`, `r.debugger.logLevelSession`, `r.debugger.logLevelRSession`
 (`"silent"|"info"|"debug"`):
 Log level of the debugger itself
 (visible e.g. in the 'parent session' when running the debugger from code).
-* `rdebugger.packageURL`: Overwrite for the URL used to download the R package when installing it automatically.
-* `rdebugger.printStdout`, `rdebugger.printStderr`, `rdebugger.printSinkSocket` (`"nothing"|"all"|"filtered"`):
+* `r.debugger.packageURL`: Overwrite for the URL used to download the R package when installing it automatically.
+* `r.debugger.printStdout`, `r.debugger.printStderr`, `r.debugger.printSinkSocket` (`"nothing"|"all"|"filtered"`):
 To what extent output by the R process is printed to the debug console.
 
 ## 3. Launch Config

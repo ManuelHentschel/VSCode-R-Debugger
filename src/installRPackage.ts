@@ -30,7 +30,7 @@ export function explainRPackage(writeOutput: (text: string)=>void, message: stri
     message = message + (
         "\n\nIt can be attempted to install this package and the dependencies (currently R6 and jsonlite) automatically."
         + "\n\nTo do so, run the following command in the command palette (ctrl+shift+p):"
-        + "\n\n\n\t\t" + "rdebugger.updateRPackage" + "\n"
+        + "\n\n\n\t\t" + "r.debugger.updateRPackage" + "\n"
         + "\n\nThis feature is still somewhat experimental!"
         + "\n\nIf this does not work or you want to make sure you have the latest version, follow the instructions in the readme to install the package yourself."
         + "\n\n\n"
@@ -63,7 +63,7 @@ export function checkPackageVersion(version: string): PackageVersionInfo {
             packageName +
             "!\n\nCurrently installed: " +
             version +
-            "\n\nTo disable this warning, set the option \"rdebugger.checkVersion\"=\"none\".\n"
+            "\n\nTo disable this warning, set the option \"r.debugger.checkVersion\"=\"none\".\n"
         );
     } else if(semver.gt(recommendedVersion, version) && checkLevel==="recommended"){
         versionOk = false;
@@ -75,7 +75,7 @@ export function checkPackageVersion(version: string): PackageVersionInfo {
             packageName +
             "!\n\nCurrently installed: " +
             version +
-            "\n\nTo disable this warning, set the option \"rdebugger.checkVersion\"=\"none\" or \"rdebugger.checkVersion\"=\"required\".\n"
+            "\n\nTo disable this warning, set the option \"r.debugger.checkVersion\"=\"none\" or \"r.debugger.checkVersion\"=\"required\".\n"
         );
     }
 

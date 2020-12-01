@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-**NOTE:** Before submitting an issue, please make sure to install the latest version of both the vscode extension and the R package. This can usually be achieved by running the command `rdebugger.updateRPackage` in vscode's command palette (`F1`).
+**NOTE:** Before submitting an issue, please make sure to install the latest version of both the vscode extension and the R package. This can usually be achieved by running the command `r.debugger.updateRPackage` in vscode's command palette (`F1`).
 
 **Describe the bug**
 A clear and concise description of what the bug is.
