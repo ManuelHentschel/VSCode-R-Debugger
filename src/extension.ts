@@ -22,6 +22,8 @@ import * as path from 'path';
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
 
+	console.log('test...');
+
 	if(context.globalState.get<boolean>('ignoreDeprecatedConfig', false) !== true){
 		checkSettings().then((ret) => {
 			context.globalState.update('ignoreDeprecatedConfig', ret);
