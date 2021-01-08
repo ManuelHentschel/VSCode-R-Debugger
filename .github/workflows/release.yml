@@ -48,5 +48,5 @@ jobs:
             artifacts/*/*
             assets/*
           prerelease: false
-          draft: true # add R binaries and change description before release
+          draft: false 
 
