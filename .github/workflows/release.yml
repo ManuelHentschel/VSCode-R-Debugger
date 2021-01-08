@@ -50,3 +50,16 @@ jobs:
           prerelease: false
           draft: false 
 
+  publish:
+    name: Publish
+    timeout-minutes: 30
+    needs: release # just to make sure that vscDebugger binaries are available
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: npm install
+      - uses: lannonbr/vsce-action@master
+        with:
+          args: "publish -p $VSCE_TOKEN"
+        env:
+          VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
