@@ -3,7 +3,8 @@
 This extension adds debugging capabilities for the
 [R](https://www.r-project.org/)
 programming language to Visual Studio Code
-and depends on the R package [vscDebugger](https://github.com/ManuelHentschel/vscDebugger).
+and depends on the R package [vscDebugger](https://github.com/ManuelHentschel/vscDebugger)
+([documentation](https://manuelhentschel.github.io/vscDebugger/)).
 For further R support in VS Code see e.g. [vscode-R](https://github.com/Ikuyadeu/vscode-R) and [R LSP](https://github.com/REditorSupport/vscode-r-lsp).
 
 ## Features
@@ -44,13 +45,6 @@ or install from the artifacts found
 [here](https://github.com/ManuelHentschel/vscDebugger/actions).
 
 If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `r.rpath.xxx`.
-
-**Note on the package version:**
-Since the debugger is still under initial development, both this extension and the accompanying R package are major version 0.y.z.
-The minor version (x.Y.z) is incremented when backward incompatible changes to the interface/communication between the VS Code extension and the R package are introduced.
-Compatibility between the two is only intended ("guaranteed") if both have the same minor version.
-The patch version (x.y.Z) is incremented independently for all other changes that justify a new release.
-
 
 ## Using the Debugger
 ### Launch Mode
