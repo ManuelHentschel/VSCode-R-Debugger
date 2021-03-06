@@ -12,6 +12,7 @@ The behaviour of the debugger can be configured in four different ways:
 These settings can be accessed e.g. by right-clicking on this extension
 in the Extensions-window and selecting `Extension Settings`.
 Current settings are:
+
 * `r.rpath.XXX (string)`: The path to the R executable itself (not just the directory!).
 Can usually be left empty on a windows installation with the default settings.
 * `r.debugger.timeouts.startup (number)`: The maximum time in ms that is waited for R to startup.
@@ -29,6 +30,7 @@ It is recommended to set this setting to `recommended` or `required`.
 ## 2. Additional VS Code settings
 These settings can be set by editing the `settings.json`, either globally or on a per workspace basis.
 They are useful mostly for debugging the debugger itself and their behaviour might change without notice.
+
 * `r.debugger.logLevelRuntime`, `r.debugger.logLevelSession`, `r.debugger.logLevelRSession`
 (`"silent"|"info"|"debug"`):
 Log level of the debugger itself
@@ -97,6 +99,7 @@ Whether to show the overwritten output in the normal stdout/stderr as well.
 
 ### 3.3 Shared config entries
 These configuration entries are used in both modes.
+
 * `"setBreakpointsInPackages"`:
 Whether to try and set breakpoints in exported functions from ALL packages.
 Very slow!
