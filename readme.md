@@ -80,12 +80,14 @@ For a detailed explanation of possible launch config entries and other settings,
 
 ## How it works
 The debugger works as follows:
+
 * An R process is started inside a child process
 * The R package `vscDebugger` is loaded.
 * The Debugger starts and controls R programs by sending input to stdin of the child process
 * After each step, function call etc., the debugger calls functions from the package `vscDebugger` to get info about the stack/variables
 
 The output of the R process is read and parsed as follows:
+
 * Information sent by functions from `vscDebugger` is encoded as json and sent via a TCP socket.
 These lines are parsed by the VS Code extension and not shown to the user.
 * Information printed by the `browser()` function is parsed and used to update the source file/line highlighted inside VS Code.
@@ -105,6 +107,7 @@ This is done (for the currently opened package) in the example debug config `"De
 Packages with a more complicated installation that might not be compatible with `load_all` can also be debugged.
 For this to work, the proper source information must be retained during the installation of the package
 (check `attr(attr(FUNCTION_NAME, 'srcref'), 'srcfile')` for some function from the package):
+
 * The package must be installed from source code (not CRAN or `.tar.gz`)
 * The flag `--with-keep.source` should be set
 * Extensions containing C code might cause problems.
@@ -132,6 +135,7 @@ This assignment can be overwritten by the debugger with
 
 ## Warning
 In the following cases the debugger might not work correctly/as expected:
+
 * Calls to `trace()`, `tracingstate()`:
 These are used to implement breakpoints, so usage might interfere with the debugger's breakpoints
 * Custom `options(error=...)`: the debugger uses its own `options(error=...)` to show stack trace etc. on error
