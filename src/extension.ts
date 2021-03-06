@@ -6,7 +6,9 @@ import {
 	DebugMode, FunctionDebugConfiguration,
 	FileDebugConfiguration, WorkspaceDebugConfiguration,
 	StrictDebugConfiguration,
-	AttachConfiguration
+	AttachConfiguration,
+	ShowDataViewerArguments,
+	DebugWindowCommandArg
 } from './debugProtocolModifications';
 import { updateRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
@@ -21,12 +23,24 @@ import * as path from 'path';
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
-
+	
 	if(context.globalState.get<boolean>('ignoreDeprecatedConfig', false) !== true){
 		checkSettings().then((ret) => {
 			context.globalState.update('ignoreDeprecatedConfig', ret);
 		});
 	}
+	
+	vscode.commands.registerCommand('r.debugger.showDataViewer', (arg: DebugWindowCommandArg) => {
+		const args: ShowDataViewerArguments = {
+			reason: 'showDataViewer',
+			variablesReference: arg.container.variablesReference,
+			name: arg.variable.name
+		};
+		vscode.debug.activeDebugSession?.customRequest(
+			"custom",
+			args
+		);
+	});
 
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
