@@ -6,9 +6,7 @@ import {
 	DebugMode, FunctionDebugConfiguration,
 	FileDebugConfiguration, WorkspaceDebugConfiguration,
 	StrictDebugConfiguration,
-	AttachConfiguration,
-	ShowDataViewerArguments,
-	DebugWindowCommandArg
+	AttachConfiguration
 } from './debugProtocolModifications';
 import { updateRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
@@ -16,6 +14,8 @@ import { trackTerminals, TerminalHandler } from './terminals';
 import { RExtension, HelpPanel } from './rExtensionApi';
 
 import { checkSettings } from './utils';
+
+import { DebugWindowCommandArg, showDataViewer } from './commands';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -30,18 +30,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		});
 	}
 	
-	vscode.commands.registerCommand('r.debugger.showDataViewer', (arg: DebugWindowCommandArg) => {
-		const args: ShowDataViewerArguments = {
-			reason: 'showDataViewer',
-			variablesReference: arg.container.variablesReference,
-			name: arg.variable.name
-		};
-		vscode.debug.activeDebugSession?.customRequest(
-			"custom",
-			args
-		);
-	});
-
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
 	let rHelpPanel: HelpPanel = undefined;
@@ -81,7 +69,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath))
+		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath)),
+		vscode.commands.registerCommand('r.debugger.showDataViewer', (arg: DebugWindowCommandArg) => {
+			showDataViewer(arg);
+		})
 	);
 }
 

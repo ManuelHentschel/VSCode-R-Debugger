@@ -30,9 +30,6 @@
     "Debuggers"
   ],
   "activationEvents": [
-    "onLanguage:r",
-    "onLanguage:rd",
-    "onLanguage:rmd",
     "onCommand:r.debugger.updateRPackage",
     "onCommand:r.debugger.showDataViewer",
     "onDebugDynamicConfigurations:R-Debugger",

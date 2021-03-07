@@ -207,15 +207,3 @@ export interface ShowDataViewerArguments {
     /** The name of the variable in the container. */
     name: string;
 }
-
-// Argument provided by vscode when a command is called
-// via the context menu of a variable in the debug panel
-export interface DebugWindowCommandArg {
-    container: {
-        variablesReference: number;
-    };
-    variable: {
-        name: string;
-    }
-}
-
