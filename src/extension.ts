@@ -15,19 +15,21 @@ import { RExtension, HelpPanel } from './rExtensionApi';
 
 import { checkSettings } from './utils';
 
+import { DebugWindowCommandArg, showDataViewer } from './commands';
+
 import * as fs from 'fs';
 import * as path from 'path';
 
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext) {
-
+	
 	if(context.globalState.get<boolean>('ignoreDeprecatedConfig', false) !== true){
 		checkSettings().then((ret) => {
 			context.globalState.update('ignoreDeprecatedConfig', ret);
 		});
 	}
-
+	
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
 	let rHelpPanel: HelpPanel = undefined;
@@ -67,7 +69,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath))
+		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath)),
+		vscode.commands.registerCommand('r.debugger.showDataViewer', (arg: DebugWindowCommandArg) => {
+			showDataViewer(arg);
+		})
 	);
 }
 
