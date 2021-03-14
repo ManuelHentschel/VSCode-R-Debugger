@@ -24,6 +24,7 @@
         "curly": "warn",
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
-        "semi": "warn"
+        "semi": "warn",
+        "quotes": ["warn", "single"]
     }
 }

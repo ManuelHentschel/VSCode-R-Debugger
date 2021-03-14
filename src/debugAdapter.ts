@@ -18,9 +18,7 @@ import { HelpPanel } from './rExtensionApi';
 
 import * as vscode from 'vscode';
 
-import * as log from 'loglevel';
-const logger = log.getLogger("DebugSession");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelSession', 'SILENT'));
+import { logger } from './logging';
 
 
 function logMessage(message: DebugProtocol.ProtocolMessage){
