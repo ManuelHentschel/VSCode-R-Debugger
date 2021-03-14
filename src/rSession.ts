@@ -6,11 +6,11 @@ import { RStartupArguments } from './debugProtocolModifications';
 import { config, getPortNumber } from './utils';
 import * as net from 'net';
 
+import { logger } from './logging';
+
 import { Subject } from './subject';
 import kill = require('tree-kill');
 
-import * as log from 'loglevel';
-const logger = log.getLogger("RSession");
 
 
 export class RSession {
@@ -35,8 +35,6 @@ export class RSession {
         handleJson: JsonHandler,
         echoStdin?: (text: string) => void
     ){
-		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'SILENT'));
-
         // store line/json handlers (are called by this.handleData)
         this.handleLine = handleLine;
         this.handleJsonString = handleJson;
@@ -68,6 +66,7 @@ export class RSession {
         this.jsonServer = net.createServer((socket) => {
             socket.on('data', (data) => {
                 this.handleData(data, 'jsonSocket');
+                logger.log('jsonIn', data);
             });
             this.jsonSocket = socket;
         });
@@ -85,6 +84,7 @@ export class RSession {
         this.sinkServer = net.createServer((socket) => {
             socket.on('data', (data) => {
                 this.handleData(data, 'sinkSocket');
+                logger.log('sink', data);
             });
             this.sinkSocket = socket;
         });
@@ -104,28 +104,36 @@ export class RSession {
     public writeToStdin(text: string, checkNewLine: boolean = true): void {
         // make sure text ends in exactly one newline
         if(checkNewLine){
-            while(text.length>0 && text.slice(-1) === '\n'){
-                text = text.slice(0, -1);
-            }
-            text = text + '\n';
+            text = text.replace(/\n*$/,'\n');
         }
 
         // log and write text
         this.echoStdin(text);
-        logger.info('cp.stdin:\n' + text.trim());
+        logger.log('stdin', text);
         this.cp?.stdin.write(text);
+        if(!this.cp){
+            logger.error('No child process available');
+        }
+    }
+    public writeToJsonSocket(text: string): void {
+        this.jsonSocket?.write(text);
+        logger.log('jsonOut', text);
+        if(!this.jsonSocket){
+            logger.error('No Json socket available');
+        }
+
     }
 
     // Kill the child process
     public killChildProcess(signal = 'SIGKILL'): void{
         if(!this.cp){
-            logger.info('No child process to kill');
+            // logger.info('No child process to kill');
         } else if(this.cp.exitCode === null){
-            logger.info('sending signal' + signal + '...');
+            logger.log('cpinfo', `sending signal ${signal}...`);
             kill(this.cp.pid, signal);
-            logger.info('sent signal');
+            logger.log('cpinfo', 'sent signal');
         } else{
-            logger.info(`process already exited with code ${this.cp.exitCode}`);
+            logger.log('cpinfo', `process already exited with code ${this.cp.exitCode}`);
         }
     }
 
@@ -136,7 +144,7 @@ export class RSession {
         text = (this.restOfLine[from] || "") + text; // append to rest of line from previouse call
         const lines = text.split(/\n/); // split into lines
 
-        logger.debug(`data from ${from}: ${text}`);
+        // logger.debug(`data from ${from}: ${text}`);
         
         for(let i = 0; i<lines.length; i++){
 			// abort output handling if ignoreOutput has been set to true
@@ -147,12 +155,12 @@ export class RSession {
             const isLastLine = i === lines.length-1;
             const line = lines[i];
             let restOfLine: string;
-            if(isLastLine && line===""){
+            if(isLastLine && line === ""){
                 restOfLine = "";
             } else if(from === "jsonSocket"){
-                restOfLine = this.handleJsonString(lines[i], from, !isLastLine);
+                restOfLine = this.handleJsonString(line, from, !isLastLine);
             } else{
-                restOfLine = this.handleLine(lines[i], from, !isLastLine);
+                restOfLine = this.handleLine(line, from, !isLastLine);
             }
             this.restOfLine[from] = restOfLine; // save unhandled part for next call
         }
@@ -180,16 +188,16 @@ function spawnRProcess(args: RStartupArguments){
 
     // log output
     cp.stdout.on("data", data => {
-        logger.debug('cp.stdout:\n' + String(data));
+        logger.log('stdout', data);
     });
     cp.stderr.on("data", data => {
-        logger.debug('cp.stderr:\n' + String(data));
+        logger.log('stderr', data);
     });
     cp.on("close", code => {
-        logger.debug(`Child process exited with code: ${code}`);
+        logger.log('cpinfo', `Child process exited with code: ${code}`);
     });
-    cp.on("error", (error) => {
-        logger.debug('cp.error:\n' + error.message);
+    cp.on("error", error => {
+        logger.log('cpinfo', `cp.error:${error.message}`);
     });
     return cp;
 }

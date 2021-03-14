@@ -27,15 +27,12 @@ If the user is using the terminal at the same time, things probably get messy.
 
 import * as net from 'net';
 import * as vscode from 'vscode';
-import * as log from 'loglevel';
 import { WriteToStdinEvent, WriteToStdinBody } from './debugProtocolModifications';
 import { config, getPortNumber } from './utils';
 
-const logger = log.getLogger("DebugRuntime");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelTerminals', 'SILENT'));
+import { logger } from './logging';
 
 let doTrackTerminals: boolean = false;
-
 
 
 export function trackTerminals(envCol: vscode.EnvironmentVariableCollection): void{

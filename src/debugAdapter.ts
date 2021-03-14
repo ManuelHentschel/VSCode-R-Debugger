@@ -102,7 +102,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 case 'launch':
                     dispatchToR = true;
                     sendResponse = false;
-                    this.runtime.writeOutput('Launch Arguments:\n' + JSON.stringify(request.arguments, undefined, 2));
+                    logger.info('Launch Arguments:', request.arguments);
                     this.runtime.endOutputGroup();
                     break;
                 case 'evaluate': {
@@ -122,7 +122,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 case 'disconnect':
                     // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
-                        logger.info('killing R...');
+                        logger.info('Killing R...');
                         this.runtime.killR();
                     }, this.disconnectTimeout);
                     dispatchToR = true;
@@ -153,7 +153,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 // end cases
             }
         } catch (e) {
-            logger.error(`Error while handling request ${request.seq}: ${request.command}`);
+            logger.error(`Error while handling request ${request.seq}: ${request.command}`, e);
             response.success = false;
             dispatchToR = false;
             sendResponse = true;
@@ -163,7 +163,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
         if(dispatchToR){
             this.runtime.dispatchRequest(request);
         } else{
-            logger.info(`request ${request.seq} (handled in VS Code): ${request.command}`, request);
+            logger.info(`Request ${request.seq} handled in VS Code: ${request.command}`, request);
         }
 
         // send response if (completely) handled here

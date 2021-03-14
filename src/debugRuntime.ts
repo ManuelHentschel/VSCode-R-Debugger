@@ -12,10 +12,7 @@ import { RExtension, HelpPanel } from './rExtensionApi';
 
 import { Subject } from './subject';
 
-import * as log from 'loglevel';
-const logger = log.getLogger("DebugRuntime");
-logger.setLevel(config().get<log.LogLevelDesc>('logLevelRuntime', 'SILENT'));
-
+import { logger } from './logging';
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
 export type JsonHandler = (json: string, from: DataSource, isFullLine: boolean) => string;
@@ -102,12 +99,13 @@ export class DebugRuntime extends EventEmitter {
 		args.rStrings = this.rStrings;
 
 		// read settings from vsc-settings
-		this.startupTimeout = config().get<number>('timeouts.startup', this.startupTimeout);
-		this.terminateTimeout = config().get<number>('timeouts.terminate', this.terminateTimeout);
-		this.outputModes["stdout"] = config().get<OutputMode>('printStdout', 'nothing');
-		this.outputModes["stderr"] =  config().get<OutputMode>('printStderr', 'all');
-		this.outputModes["stdin"] =  config().get<OutputMode>('printStdin', 'nothing');
-		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
+		const cfg = config();
+		this.startupTimeout = cfg.get<number>('timeouts.startup', this.startupTimeout);
+		this.terminateTimeout = cfg.get<number>('timeouts.terminate', this.terminateTimeout);
+		this.outputModes["stdout"] = cfg.get<OutputMode>('printStdout', 'nothing');
+		this.outputModes["stderr"] =  cfg.get<OutputMode>('printStderr', 'all');
+		this.outputModes["stdin"] =  cfg.get<OutputMode>('printStdin', 'nothing');
+		this.outputModes["sinkSocket"] =  cfg.get<OutputMode>('printSinkSocket', 'filtered');
 
 		// start R in child process
 		const rStartupArguments  = await getRStartupArguments(this.launchConfig);
@@ -121,8 +119,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// print some info about the rSession
 		// everything following this is printed in (collapsed) group
-		this.startOutputGroup('Starting R session...', true);
-		this.writeOutput('R Startup:\n' + JSON.stringify(rStartupArguments, undefined, 2));
+		logger.info('R Startup:', rStartupArguments);
 
 		//// (2) Launch child process
 		const tmpHandleLine: LineHandler = (line: string, from: DataSource, isFullLine: boolean) => {
@@ -168,7 +165,7 @@ export class DebugRuntime extends EventEmitter {
 		// `this.rSessionStartup` is notified when the output of the above `cat()` call is received
 		await this.rSessionStartup.wait(this.startupTimeout);
 		if (this.rSessionReady) {
-			logger.info("R Session ready");
+			logger.info('R Session ready');
 		} else {
 			const rPath = rStartupArguments.path;
 			const message = 'R path not working:\n' + rPath + '\n(Can be changed in setting r.rpath.XXX)';
@@ -188,7 +185,7 @@ export class DebugRuntime extends EventEmitter {
 		const libraryCmd = `base::tryCatch(expr=base::library(${this.rStrings.packageName}), error=function(e) base::cat(${escapedLibraryNotFoundString}))`;
 		this.rSession.writeToStdin(libraryCmd);
 
-		this.writeOutput('Initialize Arguments:\n' + JSON.stringify(args, undefined, 2));
+		logger.info('Initialize Arguments:', args);
 
 		// actually dispatch the (modified) initialize request to the R package
 		request.arguments = args;
@@ -252,10 +249,10 @@ export class DebugRuntime extends EventEmitter {
 		const line0 = line;
 
 		const isStderr = (from === "stderr");
-		const outputMode = this.outputModes[from] || "all";
+		const isSink = (from === "sinkSocket");
+		const isStdout = (from === "stdout");
 
-		const isSink = from === "sinkSocket";
-		const isStdout = from === "stdout";
+		const outputMode = this.outputModes[from] || "all";
 
 		// only show the line to the user if it is complete & relevant
 		let showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
@@ -443,8 +440,6 @@ export class DebugRuntime extends EventEmitter {
 				this.rPackageStartup.notify();
 				if(versionCheck.versionOk){
 					this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
-				} else{
-					logger.info(`event: ${String(json.event)}`, json.body);
 				}
 			} else{
 				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
@@ -457,7 +452,6 @@ export class DebugRuntime extends EventEmitter {
 				} else if(body.reason === "viewHelp" && body.requestPath){
 					this.helpPanel?.showHelpForPath(body.requestPath);
 				}
-				logger.info(`event: ${String(json.event)}`, json.body);
 			} else{
 				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
 			}
@@ -526,17 +520,14 @@ export class DebugRuntime extends EventEmitter {
 	// This version dispatches requests to the tcp connection instead of stdin
 	public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = true): void {
 		const json = JSON.stringify(request);
-		logger.info(`request ${request.seq}: ${request.command}`, request);
 		if(!this.rSession?.jsonSocket){
-			logger.debug('not using socket!');
 			const escapedJson = escapeStringForR(json);
 			const cmdJson = `${this.rStrings.packageName}::.vsc.handleJson(json=${escapedJson})`;
 			this.rSession?.writeToStdin(cmdJson);
 			// console.log(cmdJson);
 			// this.rSession.callFunction('.vsc.handleJson', {json: json});
 		} else {
-			logger.debug('using socket!');
-			this.rSession.jsonSocket.write(json + '\n');
+			this.rSession.writeToJsonSocket(json + '\n');
 		}
 	}
 
