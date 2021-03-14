@@ -136,7 +136,7 @@ export class TerminalHandler {
                 }
                 body.pid = body.pid || 0;
                 body.ppid = body.ppid || 0;
-                if(body.when === "now" || body.fallBackToNow){
+                if(body.when === 'now' || body.fallBackToNow){
                     // make sure, all mandatory fields are assigned above!
                     return writeToStdin(<WriteToStdinArgs>body);
                 } else{

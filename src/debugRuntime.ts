@@ -1,7 +1,7 @@
 
 import { EventEmitter } from 'events';
 import * as vscode from 'vscode';
-import { config, escapeForRegex, getRStartupArguments, timeout, escapeStringForR } from "./utils";
+import { config, escapeForRegex, getRStartupArguments, timeout, escapeStringForR } from './utils';
 import { checkPackageVersion } from './installRPackage';
 
 import { RSession } from './rSession';
@@ -17,12 +17,12 @@ import { logger } from './logging';
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
 export type JsonHandler = (json: string, from: DataSource, isFullLine: boolean) => string;
 
-export type DataSource = "stdout"|"stderr"|"jsonSocket"|"sinkSocket"|"stdin";
-export type OutputMode = "all"|"filtered"|"nothing";
+export type DataSource = 'stdout'|'stderr'|'jsonSocket'|'sinkSocket'|'stdin';
+export type OutputMode = 'all'|'filtered'|'nothing';
 
 interface WriteOnPrompt {
 	text: string;
-	which: "browser"|"topLevel"|"prompt";
+	which: 'browser'|'topLevel'|'prompt';
 	count: number;
 	addNewLine?: boolean;
 }
@@ -102,10 +102,10 @@ export class DebugRuntime extends EventEmitter {
 		const cfg = config();
 		this.startupTimeout = cfg.get<number>('timeouts.startup', this.startupTimeout);
 		this.terminateTimeout = cfg.get<number>('timeouts.terminate', this.terminateTimeout);
-		this.outputModes["stdout"] = cfg.get<OutputMode>('printStdout', 'nothing');
-		this.outputModes["stderr"] =  cfg.get<OutputMode>('printStderr', 'all');
-		this.outputModes["stdin"] =  cfg.get<OutputMode>('printStdin', 'nothing');
-		this.outputModes["sinkSocket"] =  cfg.get<OutputMode>('printSinkSocket', 'filtered');
+		this.outputModes['stdout'] = cfg.get<OutputMode>('printStdout', 'nothing');
+		this.outputModes['stderr'] =  cfg.get<OutputMode>('printStderr', 'all');
+		this.outputModes['stdin'] =  cfg.get<OutputMode>('printStdin', 'nothing');
+		this.outputModes['sinkSocket'] =  cfg.get<OutputMode>('printSinkSocket', 'filtered');
 
 		// start R in child process
 		const rStartupArguments  = await getRStartupArguments(this.launchConfig);
@@ -129,8 +129,8 @@ export class DebugRuntime extends EventEmitter {
 			return this.handleJsonString(json, from, isFullLine);
 		};
 		const tmpEchoStdin = (text: string) => {
-			if(this.outputModes["stdin"] === "all"){
-				setTimeout(() => this.writeOutput(text, false, "stdout"), 0);
+			if(this.outputModes['stdin'] === 'all'){
+				setTimeout(() => this.writeOutput(text, false, 'stdout'), 0);
 			}
 		};
 		this.rSession = new RSession(tmpHandleLine, tmpHandleJsonString, tmpEchoStdin);
@@ -248,11 +248,11 @@ export class DebugRuntime extends EventEmitter {
 
 		const line0 = line;
 
-		const isStderr = (from === "stderr");
-		const isSink = (from === "sinkSocket");
-		const isStdout = (from === "stdout");
+		const isStderr = (from === 'stderr');
+		const isSink = (from === 'sinkSocket');
+		const isStdout = (from === 'stdout');
 
-		const outputMode = this.outputModes[from] || "all";
+		const outputMode = this.outputModes[from] || 'all';
 
 		// only show the line to the user if it is complete & relevant
 		let showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
@@ -282,7 +282,7 @@ export class DebugRuntime extends EventEmitter {
 				// Check for browser prompt
 				const browserRegex = /Browse\[\d+\]> /;
 				if(browserRegex.test(line)){
-					void this.handlePrompt("browser");
+					void this.handlePrompt('browser');
 					// R has entered the browser
 					line = line.replace(browserRegex,'');
 					showLine = false;
@@ -300,7 +300,7 @@ export class DebugRuntime extends EventEmitter {
 				// check for prompt
 				const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
 				if (promptRegex.test(line) && isFullLine) {
-					void this.handlePrompt("topLevel");
+					void this.handlePrompt('topLevel');
 					showLine = false;
 					line = '';
 				}
@@ -308,8 +308,8 @@ export class DebugRuntime extends EventEmitter {
 				// check for continue prompt
 				const continueRegex = new RegExp(escapeForRegex(this.rStrings.continue));
 				if(continueRegex.test(line) && isFullLine){
-					logger.debug("matches: continue prompt");
-					this.writeOutput("...");
+					logger.debug('matches: continue prompt');
+					this.writeOutput('...');
 					showLine = false;
 				}
 			}
@@ -343,16 +343,16 @@ export class DebugRuntime extends EventEmitter {
 
 		// determine if/what part of line is printed
 		let lineOut: string;
-		if(outputMode === "all"){
+		if(outputMode === 'all'){
 			// lineOut = line0;
-			lineOut = "";
-			line = "";
+			lineOut = '';
+			line = '';
 			// showLine = true;
 			showLine = false;
-		} else if(showLine && outputMode === "filtered"){
+		} else if(showLine && outputMode === 'filtered'){
 			lineOut = line;
 		} else{
-			lineOut = "";
+			lineOut = '';
 			showLine = false;
 		}
 
@@ -368,8 +368,8 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
-	protected async handlePrompt(which: "browser"|"topLevel", text?: string): Promise<void> {
-		logger.debug("matches prompt: " + which);
+	protected async handlePrompt(which: 'browser'|'topLevel', text?: string): Promise<void> {
+		logger.debug('matches prompt: ' + which);
 
 		// wait for timeout to give json socket time to catch up
 		// might be useful to avoid async issues
@@ -381,7 +381,7 @@ export class DebugRuntime extends EventEmitter {
 		if(this.writeOnPrompt.length > 0){
 			const wop = this.writeOnPrompt.shift();
 			if(wop){
-				const matchesPrompt = (wop.which === "prompt" || wop.which === which);
+				const matchesPrompt = (wop.which === 'prompt' || wop.which === which);
 				if(matchesPrompt && wop.count > 0){
 					this.writeToStdin(wop.text);
 					wop.count -= 1;
@@ -396,22 +396,22 @@ export class DebugRuntime extends EventEmitter {
 				}
 			}
 		} else {
-			const cmdListen = this.rStrings.packageName + `::.vsc.listenForJSON(timeout = -1)`;
+			const cmdListen = this.rStrings.packageName + '::.vsc.listenForJSON(timeout = -1)';
 			this.rSession?.writeToStdin(cmdListen);
 			this.sendShowingPromptRequest(which, text);
 		}
 	}
 
-	protected sendShowingPromptRequest(which: "browser"|"topLevel", text?: string): void{
+	protected sendShowingPromptRequest(which: 'browser'|'topLevel', text?: string): void{
 		const request: MDebugProtocol.ShowingPromptRequest = {
-			command: "custom",
+			command: 'custom',
 			arguments: {
-				reason: "showingPrompt",
+				reason: 'showingPrompt',
 				which: which,
 				text: text
 			},
 			seq: 0,
-			type: "request"
+			type: 'request'
 		};
 		this.dispatchRequest(request);
 	}
@@ -422,13 +422,13 @@ export class DebugRuntime extends EventEmitter {
 		} else{
 			const j = <{[key: string]: any}>JSON.parse(json);
 			this.handleJson(j);
-			return "";
+			return '';
 		}
 	}
 
 	protected handleJson(json: {[key: string]: any}): void {
-		if(json.type === "response"){
-			if(json.command === "initialize"){
+		if(json.type === 'response'){
+			if(json.command === 'initialize'){
 				this.rPackageFound = true;
 				this.rPackageInfo = (
 					(<MDebugProtocol.InitializeResponse>json).packageInfo ||
@@ -444,26 +444,26 @@ export class DebugRuntime extends EventEmitter {
 			} else{
 				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
 			}
-		} else if(json.type === "event"){
+		} else if(json.type === 'event'){
 			if(json.event === 'custom'){
 				const body = json.body as {[key: string]: any};
-				if(body.reason === "writeToStdin"){
+				if(body.reason === 'writeToStdin'){
 					this.handleWriteToStdinEvent(json.body);
-				} else if(body.reason === "viewHelp" && body.requestPath){
+				} else if(body.reason === 'viewHelp' && body.requestPath){
 					this.helpPanel?.showHelpForPath(body.requestPath);
 				}
 			} else{
 				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
 			}
 		} else{
-			logger.error("Unknown message:");
+			logger.error('Unknown message:');
 			logger.error(json);
 		}
 	}
 
 	// send DAP message to the debugSession
 	protected sendProtocolMessage(message: DebugProtocol.ProtocolMessage): void {
-		this.emit("protocolMessage", message);
+		this.emit('protocolMessage', message);
 	}
 
 	protected handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody): void {
@@ -471,21 +471,21 @@ export class DebugRuntime extends EventEmitter {
 		if(args.count !== 0){
 			count = args.count || 1;
 		}
-		const when = args.when || "now";
+		const when = args.when || 'now';
 		let text = args.text;
-		if(args.addNewLine && args.text.slice(-1)!=="\n"){
-			text = text + "\n";
+		if(args.addNewLine && args.text.slice(-1)!=='\n'){
+			text = text + '\n';
 		}
-		if(when==="now"){
+		if(when==='now'){
 			for(let i=0; i<count; i++){
 				this.writeToStdin(args.text);
 			}
 		} else{
-			let which: "prompt"|"browser"|"topLevel" = "prompt";
-			if(when === "browserPrompt"){
-				which = "browser";
-			} else if(when === "topLevelPrompt"){
-				which = "topLevel";
+			let which: 'prompt'|'browser'|'topLevel' = 'prompt';
+			if(when === 'browserPrompt'){
+				which = 'browser';
+			} else if(when === 'topLevelPrompt'){
+				which = 'topLevel';
 			}
 
 			const newWriteOnPrompt: WriteOnPrompt = {
@@ -506,7 +506,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 	public writeToStdin(text: string): boolean {
 		if(text){
-			logger.debug("Writing to stdin: ", text);
+			logger.debug('Writing to stdin: ', text);
 			this.rSession?.writeToStdin(text);
 			return true;
 		} else{
@@ -540,7 +540,7 @@ export class DebugRuntime extends EventEmitter {
 		addNewline = false,
 		category: ('console'|'stdout'|'stderr'|'telemetry') = 'stdout',
 		line = 1,
-		group?: ("start"|"startCollapsed"|"end"),
+		group?: ('start'|'startCollapsed'|'end'),
 		data: any = {}
 	): boolean {
 		// writes output to the debug console (of the vsc instance runnning the R code)
@@ -575,12 +575,12 @@ export class DebugRuntime extends EventEmitter {
 		this.sendProtocolMessage(event);
 		return true; // output event was sent
 	}
-	public startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, line = 1): void {
+	public startOutputGroup(text: string = '', collapsed: boolean = false, addNewline = false, toStderr = false, line = 1): void {
 		const group = (collapsed ? 'startCollapsed' : 'start');
 		this.writeOutput(text, addNewline, (toStderr ? 'stderr' : 'stdout'), line, group);
 	}
 	public endOutputGroup(): void {
-		this.writeOutput("", false, 'stdout', 1, 'end');
+		this.writeOutput('', false, 'stdout', 1, 'end');
 	}
 
 

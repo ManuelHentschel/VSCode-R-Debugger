@@ -10,7 +10,7 @@ import * as VsCode from 'vscode';
 // Regular extension of the DAP:
 //
 
-export type DebugMode = "function"|"file"|"workspace";
+export type DebugMode = 'function'|'file'|'workspace';
 
 export interface RStartupArguments {
     path: string;
@@ -24,8 +24,8 @@ export interface RStartupArguments {
 }
 
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
-    type: "R-Debugger";
-    request: "launch"|"attach";
+    type: 'R-Debugger';
+    request: 'launch'|'attach';
 
     // specify how/where to debug (some required, depends on request/debugMode)
     debugMode?: DebugMode;
@@ -63,7 +63,7 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
 }
 
 export interface LaunchConfiguration extends DebugConfiguration {
-    request: "launch";
+    request: 'launch';
     commandLineArgs?: string[];
     env?: {
         [key: string]: string;
@@ -71,23 +71,23 @@ export interface LaunchConfiguration extends DebugConfiguration {
 }
 
 export interface FunctionDebugConfiguration extends LaunchConfiguration {
-    debugMode: "function";
+    debugMode: 'function';
     workingDirectory: string;
     file: string;
     mainFunction: string;
 }
 export interface FileDebugConfiguration extends LaunchConfiguration {
-    debugMode: "file";
+    debugMode: 'file';
     workingDirectory: string;
     file: string;
 }
 export interface WorkspaceDebugConfiguration extends LaunchConfiguration {
-    debugMode: "workspace";
+    debugMode: 'workspace';
     workingDirectory: string;
 }
 
 export interface AttachConfiguration extends DebugConfiguration {
-    request: "attach";
+    request: 'attach';
     port?: number; //default = 18721
     host?: string;
 }
@@ -156,7 +156,7 @@ export interface ResponseWithBody extends DebugProtocol.Response {
 
 // Used to send info to VS Code that is not part of the DAP
 export interface CustomEvent extends DebugProtocol.Event {
-    event: "custom";
+    event: 'custom';
     body: {
         reason: string;
     }
@@ -167,7 +167,7 @@ export interface ViewHelpEvent extends CustomEvent {
     body: ViewHelpBody;
 }
 export interface ViewHelpBody {
-    reason: "viewHelp";
+    reason: 'viewHelp';
     requestPath: string;
 }
 
@@ -176,9 +176,9 @@ export interface WriteToStdinEvent extends CustomEvent {
     body: WriteToStdinBody;
 }
 export interface WriteToStdinBody {
-    reason: "writeToStdin";
+    reason: 'writeToStdin';
     text: string;
-    when?: "now"|"browserPrompt"|"topLevelPrompt"|"prompt";
+    when?: 'now'|'browserPrompt'|'topLevelPrompt'|'prompt';
     fallBackToNow?: boolean;
     addNewLine?: boolean; //=false (in vscode), =true (in R)
     count?: number; // =1
@@ -192,7 +192,7 @@ export interface WriteToStdinBody {
 
 // Used to send info to R that is not part of the DAP
 export interface CustomRequest extends DebugProtocol.Request {
-    command: "custom"
+    command: 'custom'
     arguments: {
         reason: string;
     }
@@ -201,8 +201,8 @@ export interface CustomRequest extends DebugProtocol.Request {
 // Indicate that R is showing the input prompt in its stdout
 export interface ShowingPromptRequest extends CustomRequest {
     arguments: {
-        reason: "showingPrompt";
-        which?: "browser"|"topLevel";
+        reason: 'showingPrompt';
+        which?: 'browser'|'topLevel';
         text?: string;
     }
 }

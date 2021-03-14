@@ -11,14 +11,14 @@ in `this.dispatchRequest()`.
 */
 
 import { DebugRuntime } from './debugRuntime';
-import { DebugProtocol } from 'vscode-debugprotocol';
-import * as MDebugProtocol from './debugProtocolModifications';
 import { config, getVSCodePackageVersion } from './utils';
 import { HelpPanel } from './rExtensionApi';
+import { logger } from './logging';
+import * as MDebugProtocol from './debugProtocolModifications';
 
+import { DebugProtocol } from 'vscode-debugprotocol';
 import * as vscode from 'vscode';
 
-import { logger } from './logging';
 
 
 function logMessage(message: DebugProtocol.ProtocolMessage){

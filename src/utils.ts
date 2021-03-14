@@ -1,40 +1,40 @@
 
-import * as vscode from "vscode";
-import { platform } from "os";
+import * as vscode from 'vscode';
+import { platform } from 'os';
 import { RStartupArguments } from './debugProtocolModifications';
 import * as net from 'net';
 
-import path = require("path");
-import fs = require("fs");
-import winreg = require("winreg");
+import path = require('path');
+import fs = require('fs');
+import winreg = require('winreg');
 
 const packageJson = <{[key: string]: any}>(require('../package.json'));
 
 export function config(onlyDebugger: boolean = true): vscode.WorkspaceConfiguration {
     if(onlyDebugger){
-        return vscode.workspace.getConfiguration("r.debugger");
+        return vscode.workspace.getConfiguration('r.debugger');
     } else{
-        return vscode.workspace.getConfiguration("r");
+        return vscode.workspace.getConfiguration('r');
     }
 }
 
 function getRfromEnvPath(platform: string) {
-    let splitChar: string = ":";
-    let fileExtension: string = "";
+    let splitChar: string = ':';
+    let fileExtension: string = '';
 
-    if (platform === "win32") {
-        splitChar = ";";
-        fileExtension = ".exe";
+    if (platform === 'win32') {
+        splitChar = ';';
+        fileExtension = '.exe';
     }
 
     const os_paths: string[] = process.env.PATH?.split(splitChar) || [];
     for (const os_path of os_paths) {
-        const os_r_path: string = path.join(os_path, "R" + fileExtension);
+        const os_r_path: string = path.join(os_path, 'R' + fileExtension);
         if (fs.existsSync(os_r_path)) {
             return os_r_path;
         }
     }
-    return "";
+    return '';
 }
 
 export async function getRpathFromSystem(): Promise<string> {
@@ -91,7 +91,7 @@ export async function getRpath(quote: boolean=false, overwriteConfig?: string): 
     } else if(quote && /^[^'"].* .*[^'"]$/.exec(rpath)){
         // if requested and rpath contains spaces, add quotes:
         rpath = `"${rpath}"`;
-    } else if(process.platform === "win32" && /^'.* .*'$/.exec(rpath)){
+    } else if(process.platform === 'win32' && /^'.* .*'$/.exec(rpath)){
         // replace single quotes with double quotes on windows
         rpath = rpath.replace(/^'(.*)'$/, '"$1"');
     }
@@ -120,13 +120,13 @@ export async function getRStartupArguments(launchConfig: {env?: {[key: string]: 
     const rpath = await getRpath(true);
 
     const rArgs: string[] = [
-        "--quiet",
-        "--no-save",
+        '--quiet',
+        '--no-save',
         (platform === 'win32' ? '--ess' : '--interactive')
     ];
 
     // add user specified args
-    const customArgs = config().get<Array<string>>("commandLineArgs", []);
+    const customArgs = config().get<Array<string>>('commandLineArgs', []);
     rArgs.push(...customArgs);
     rArgs.push(...(launchConfig.commandLineArgs || []));
 
@@ -137,7 +137,7 @@ export async function getRStartupArguments(launchConfig: {env?: {[key: string]: 
         env: launchConfig.env
     };
 
-    if(rpath === ""){
+    if(rpath === ''){
         void vscode.window.showErrorMessage(`${process.platform} can't find R`);
     }
     return ret;
@@ -145,25 +145,25 @@ export async function getRStartupArguments(launchConfig: {env?: {[key: string]: 
 
 
 export function getRDownloadLink(packageName: string): string{
-    let url: string = config().get<string>("packageURL", "");
+    let url: string = config().get<string>('packageURL', '');
 
-    if(url === ""){
+    if(url === ''){
         const platform: string = process.platform;
         const version: string = String(packageJson.version); // e.g. "0.1.2"
         const urlBase = 
-            "https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/download/v" +
+            'https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/download/v' +
             version +
-            "/" +
+            '/' +
             packageName +
-            "_" +
+            '_' +
             version;
 
-        if(platform === "win32"){
-            url = urlBase + ".zip";
-        } else if(platform === "darwin"){
-            url = urlBase + ".tgz";
+        if(platform === 'win32'){
+            url = urlBase + '.zip';
+        } else if(platform === 'darwin'){
+            url = urlBase + '.tgz';
         } else{
-            url = urlBase + ".tar.gz";
+            url = urlBase + '.tar.gz';
         }
     }
     return url;
@@ -195,18 +195,18 @@ export function getRequiredRPackageVersion(): RequiredRPackageVersion {
 
 export function escapeStringForR(s: string, quote: string='"'): string {
     if (s === undefined) {
-        return "NULL";
+        return 'NULL';
     } else {
         return(
             quote
-            + s.replace(/\\/g, "\\\\")
-                .replace(RegExp(quote, "g"), `\\${quote}`)
-                .replace(/\n/g, "\\n")
+            + s.replace(/\\/g, '\\\\')
+                .replace(RegExp(quote, 'g'), `\\${quote}`)
+                .replace(/\n/g, '\\n')
                 // .replace(/\r/g, "\\r")
-                .replace(/\r/g, "")
-                .replace(/\t/g, "\\t")
-                .replace(/\f/g, "\\f")
-                .replace(/\v/g, "\\v")
+                .replace(/\r/g, '')
+                .replace(/\t/g, '\\t')
+                .replace(/\f/g, '\\f')
+                .replace(/\v/g, '\\v')
             + quote);
     }
 }
@@ -218,10 +218,10 @@ export async function checkSettings(): Promise<boolean> {
     const keys = Object.getOwnPropertyNames(config0);
 
     const deprecated = [
-        "rterm",
-        "timeouts",
-        "checkVersion",
-        "trackTerminals"
+        'rterm',
+        'timeouts',
+        'checkVersion',
+        'trackTerminals'
     ];
 
     const foundDeprecated = deprecated.filter((v) => checkDeprecated(config0, v));
