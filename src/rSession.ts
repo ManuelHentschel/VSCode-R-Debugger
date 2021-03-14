@@ -51,11 +51,11 @@ export class RSession {
         }
 
 		// handle output from the R-process
-		this.cp.stdout.on("data", data => {
-			this.handleData(data, "stdout");
+		this.cp.stdout.on('data', data => {
+			this.handleData(data, 'stdout');
 		});
-		this.cp.stderr.on("data", data => {
-			this.handleData(data, "stderr");
+		this.cp.stderr.on('data', data => {
+			this.handleData(data, 'stderr');
         });
 
         // set up json port
@@ -141,7 +141,7 @@ export class RSession {
 
         let text: string = data.toString();
         text = text.replace(/\r/g,''); //keep only \n as linebreak
-        text = (this.restOfLine[from] || "") + text; // append to rest of line from previouse call
+        text = (this.restOfLine[from] || '') + text; // append to rest of line from previouse call
         const lines = text.split(/\n/); // split into lines
 
         // logger.debug(`data from ${from}: ${text}`);
@@ -155,9 +155,9 @@ export class RSession {
             const isLastLine = i === lines.length-1;
             const line = lines[i];
             let restOfLine: string;
-            if(isLastLine && line === ""){
-                restOfLine = "";
-            } else if(from === "jsonSocket"){
+            if(isLastLine && line === ''){
+                restOfLine = '';
+            } else if(from === 'jsonSocket'){
                 restOfLine = this.handleJsonString(line, from, !isLastLine);
             } else{
                 restOfLine = this.handleLine(line, from, !isLastLine);
@@ -173,7 +173,7 @@ export class RSession {
 function spawnRProcess(args: RStartupArguments){
     const options: child.SpawnOptionsWithoutStdio = {
         env: {
-            VSCODE_DEBUG_SESSION: "1",
+            VSCODE_DEBUG_SESSION: '1',
             ...args.env,
             ...process.env
         },
@@ -187,16 +187,16 @@ function spawnRProcess(args: RStartupArguments){
     const cp = child.spawn(rPath, rArgs, options);
 
     // log output
-    cp.stdout.on("data", data => {
+    cp.stdout.on('data', data => {
         logger.log('stdout', data);
     });
-    cp.stderr.on("data", data => {
+    cp.stderr.on('data', data => {
         logger.log('stderr', data);
     });
-    cp.on("close", code => {
+    cp.on('close', code => {
         logger.log('cpinfo', `Child process exited with code: ${code}`);
     });
-    cp.on("error", error => {
+    cp.on('error', error => {
         logger.log('cpinfo', `cp.error:${error.message}`);
     });
     return cp;
