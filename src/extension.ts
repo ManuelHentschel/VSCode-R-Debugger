@@ -6,7 +6,7 @@ import {
 	DebugMode, FunctionDebugConfiguration,
 	FileDebugConfiguration, WorkspaceDebugConfiguration,
 	StrictDebugConfiguration,
-	AttachConfiguration
+	AttachConfiguration, LaunchConfiguration
 } from './debugProtocolModifications';
 import { updateRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
@@ -20,18 +20,17 @@ import * as path from 'path';
 
 
 // this method is called when the extension is activated
-export async function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
 
 	if(context.globalState.get<boolean>('ignoreDeprecatedConfig', false) !== true){
-		checkSettings().then((ret) => {
-			context.globalState.update('ignoreDeprecatedConfig', ret);
+		void checkSettings().then((ret) => {
+			void context.globalState.update('ignoreDeprecatedConfig', ret);
 		});
 	}
 
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
-	let rHelpPanel: HelpPanel = undefined;
-
+	let rHelpPanel: HelpPanel | undefined = undefined;
 	if(rExtension){
 		const api = await rExtension.activate();
 		if(api){
@@ -72,7 +71,9 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // this method is called when the extension is deactivated
-export function deactivate() {}
+export function deactivate(): void {
+	// dummy
+}
 
 class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
 	helpPanel?: HelpPanel;
@@ -87,10 +88,10 @@ class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFact
 			if('commandLineArgs' in config){
 				commandLineArgs.push(...config.commandLineArgs);
 			}
-			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel, commandLineArgs));
+			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel, <LaunchConfiguration>config));
 		} else if(config.request === 'attach'){
-			const port: number = config.port || 18721;
-			const host: string = config.host || 'localhost';
+			const port = Number(config.port || 18721);
+			const host = String(config.host || 'localhost');
 			return new vscode.DebugAdapterServer(port, host);
 		} else{
 			throw new Error('Invalid entry "request" in debug config. Valid entries are "launch" and "attach"');
@@ -156,7 +157,7 @@ class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProv
 
 		const hasDescription = folder && fs.existsSync(path.join(folder.uri.fsPath, 'DESCRIPTION'));
 
-		let configs: StrictDebugConfiguration[] = [];
+		const configs: StrictDebugConfiguration[] = [];
 
 		configs.push({
             type: "R-Debugger",
@@ -188,7 +189,7 @@ class DynamicDebugConfigurationProvider implements vscode.DebugConfigurationProv
 				mainFunction: "main",
 				allowGlobalDebugging: false
 			});
-		};
+		}
 
 		if(hasDescription){
 			configs.push({
@@ -271,8 +272,8 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			}
 		}
 
-		config.debugMode = config.debugMode || (docValid ? "file" : "workspace");
-		config.allowGlobalDebugging = config.allowGlobalDebugging ?? true;
+		config.debugMode ||= (docValid ? "file" : "workspace");
+		config.allowGlobalDebugging ??= true;
 
 		// fill custom capabilities/socket info
 		if(config.request === 'launch'){
@@ -281,36 +282,36 @@ class DebugConfigurationResolver implements vscode.DebugConfigurationProvider {
 			config.supportsWriteToStdinEvent = true;
 			config.supportsShowingPromptRequest = true;
 			// set to true if not specified. necessary since its default in vscDebugger is FALSE:
-			config.overwriteHelp = config.overwriteHelp ?? true; 
-			config.overwriteHelp =  config.overwriteHelp && this.supportsHelpViewer; // check if helpview available
+			config.overwriteHelp ??= true; 
+			config.overwriteHelp &&= this.supportsHelpViewer; // check if helpview available
 		} else if (config.request === 'attach'){
 			// communication info with TerminalHandler():
-			config.customPort = config.customPort ?? this.customPort;
-			config.customHost = config.customHost || this.customHost;
-			config.useCustomSocket = config.useCustomSocket ?? true;
-			config.supportsWriteToStdinEvent = config.supportsWriteToStdinEvent ?? true;
+			config.customPort ??= this.customPort;
+			config.customHost ||= this.customHost;
+			config.useCustomSocket ??= true;
+			config.supportsWriteToStdinEvent ??= true;
 			config.overwriteLoadAll = false;
 		}
 
 		// make sure the config matches the requirements of one of the debug modes
-		const debugMode: DebugMode|undefined = config.debugMode;
+		const debugMode = <DebugMode | undefined>config.debugMode;
 		if(config.request === 'attach'){
 			// no fields mandatory
 			strictConfig = <AttachConfiguration>config;
 		} else if(debugMode === "function"){
 			// make sure that all required fields (workingDirectory, file, function) are filled:
-			config.workingDirectory = config.workingDirectory || wd;
-			config.file = config.file || '${file}';
-			config.mainFunction = config.mainFunction || 'main';
+			config.workingDirectory ||= wd;
+			config.file ||= '${file}';
+			config.mainFunction ||= 'main';
 			strictConfig = <FunctionDebugConfiguration>config;
 		} else if(debugMode === "file"){
 			// make sure that all required fields (workingDirectory, file) are filled:
-			config.workingDirectory = config.workingDirectory || wd;
-			config.file = config.file || '${file}';
+			config.workingDirectory ||= wd;
+			config.file ||= '${file}';
 			strictConfig = <FileDebugConfiguration>config;
 		} else if(debugMode === "workspace"){
 			// make sure that all required fields (workingDirectory) are filled:
-			config.workingDirectory = config.workingDirectory || wd;
+			config.workingDirectory ||= wd;
 			strictConfig = <WorkspaceDebugConfiguration>config;
 		} else{
 			strictConfig = null;

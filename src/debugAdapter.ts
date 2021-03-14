@@ -12,9 +12,9 @@ in `this.dispatchRequest()`.
 
 import { DebugRuntime } from './debugRuntime';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { InitializeRequest } from './debugProtocolModifications';
+import * as MDebugProtocol from './debugProtocolModifications';
 import { config, getVSCodePackageVersion } from './utils';
-import { RExtension, HelpPanel } from './rExtensionApi';
+import { HelpPanel } from './rExtensionApi';
 
 import * as vscode from 'vscode';
 
@@ -47,9 +47,9 @@ export class DebugAdapter implements vscode.DebugAdapter {
     private runtime: DebugRuntime; // actually handles requests etc. that are not forwarded
     private disconnectTimeout: number = config().get<number>('timeouts.startup', 1000);
 
-    constructor(helpPanel?: HelpPanel, addCommandLineArgs: string[] = []) {
+    constructor(helpPanel: HelpPanel | undefined, launchConfig: MDebugProtocol.LaunchConfiguration) {
 		// construct R runtime
-        this.runtime = new DebugRuntime(helpPanel, addCommandLineArgs);
+        this.runtime = new DebugRuntime(helpPanel, launchConfig);
         
 		// setup event handler
         this.runtime.on('protocolMessage', (message: DebugProtocol.ProtocolMessage) => {
@@ -60,7 +60,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
     // dummy, required by vscode.Disposable (?)
     public dispose(): void {
         this.runtime.killR();
-    };
+    }
     
     // used to send messages from R to VS Code
 	readonly onDidSendMessage: vscode.Event<DebugProtocol.ProtocolMessage> = this.sendMessage.event;
@@ -68,7 +68,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
     // used to send messages from VS Code to R
 	public handleMessage(msg: DebugProtocol.ProtocolMessage): void {
 		if(msg.type === 'request') {
-			this.dispatchRequest(<DebugProtocol.Request>msg);
+			this.dispatchRequest(<MDebugProtocol.Request>msg);
 		}
 	}
 
@@ -78,7 +78,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
 		this.sendMessage.fire(message);
 	}
 
-    protected dispatchRequest(request: DebugProtocol.Request): void {
+    protected dispatchRequest(request: MDebugProtocol.Request): void {
         // prepare response
         const response: DebugProtocol.Response = {
             command: request.command,
@@ -91,32 +91,34 @@ export class DebugAdapter implements vscode.DebugAdapter {
         let sendResponse: boolean = true; // for cases handled here, the response must also be sent from here
         try {
             switch(request.command){
-                case 'initialize':
-                    request.arguments = request.arguments || {};
-                    request.arguments.threadId = this.THREAD_ID;
-                    request.arguments.extensionVersion = getVSCodePackageVersion();
-                    this.runtime.initializeRequest(response, request.arguments, <InitializeRequest>request);
+                case 'initialize': {
+                    const args = request.arguments as MDebugProtocol.InitializeRequestArguments || {};
+                    args.threadId = this.THREAD_ID;
+                    args.extensionVersion = getVSCodePackageVersion();
+                    void this.runtime.initializeRequest(response, args, <MDebugProtocol.InitializeRequest>request);
                     sendResponse = false;
                     break;
+                }
                 case 'launch':
                     dispatchToR = true;
                     sendResponse = false;
                     this.runtime.writeOutput('Launch Arguments:\n' + JSON.stringify(request.arguments, undefined, 2));
                     this.runtime.endOutputGroup();
                     break;
-                case 'evaluate':
-                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments.expression);
+                case 'evaluate': {
+                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments?.expression);
                     if(matches){
                         // send directly to stdin, don't send request
                         const toStdin = matches[1];
                         logger.debug('user to stdin:\n' + toStdin);
-                        this.runtime.rSession.writeToStdin(toStdin);
+                        this.runtime.rSession?.writeToStdin(toStdin);
                     } else{
                         // dispatch normally
                         dispatchToR = true;
                         sendResponse = false;
                     }
                     break;
+                }
                 case 'disconnect':
                     // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
@@ -126,18 +128,20 @@ export class DebugAdapter implements vscode.DebugAdapter {
                     dispatchToR = true;
                     sendResponse = false;
                     break;
-                case 'continue':
+                case 'continue': {
                     // pass info about the currently open text editor
                     // can be used to start .vsc.debugSource(), when called from global workspace
-                    const doc = vscode.window.activeTextEditor.document;
-                    if(doc.uri.scheme === 'file'){
+                    const doc = vscode.window.activeTextEditor?.document;
+                    if(doc?.uri.scheme === 'file'){
                         const filename = doc.fileName;
+                        request.arguments ||= {};
                         request.arguments.callDebugSource = true;
                         request.arguments.source = {path: filename};
-                    };
+                    }
                     dispatchToR = true;
                     sendResponse = false;
                     break;
+                }
                 case 'pause':
                     // this._runtime.killR('SIGSTOP'); // doesn't work
                     response.success = false;
@@ -149,7 +153,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 // end cases
             }
         } catch (e) {
-            logger.error("Error while handling request " + request.seq + ": " + request.command);
+            logger.error(`Error while handling request ${request.seq}: ${request.command}`);
             response.success = false;
             dispatchToR = false;
             sendResponse = true;
@@ -159,7 +163,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
         if(dispatchToR){
             this.runtime.dispatchRequest(request);
         } else{
-            logger.info("request " + request.seq + " (handled in VS Code): " + request.command, request);
+            logger.info(`request ${request.seq} (handled in VS Code): ${request.command}`, request);
         }
 
         // send response if (completely) handled here

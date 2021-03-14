@@ -1,7 +1,7 @@
 
 
 import { DebugProtocol } from 'vscode-debugprotocol';
-// @ts-ignore
+
 import * as VsCode from 'vscode';
 // import { DebugProtocol } from './debugProtocol';
 
@@ -17,7 +17,10 @@ export interface RStartupArguments {
     args: string[];
     jsonPort?: number;
     sinkPort?: number;
-    cwd: string;
+    cwd?: string;
+    env?: {
+        [key: string]: string;
+    };
 }
 
 export interface DebugConfiguration extends VsCode.DebugConfiguration {
@@ -62,6 +65,9 @@ export interface DebugConfiguration extends VsCode.DebugConfiguration {
 export interface LaunchConfiguration extends DebugConfiguration {
     request: "launch";
     commandLineArgs?: string[];
+    env?: {
+        [key: string]: string;
+    }
 }
 
 export interface FunctionDebugConfiguration extends LaunchConfiguration {
@@ -106,6 +112,12 @@ export interface RStrings {
 // Non standard extension/modification of the DAP:
 // 
 
+export interface Request extends DebugProtocol.Request {
+    arguments?: {
+        [key: string]: any;
+    }
+}
+
 export interface InitializeRequest extends DebugProtocol.InitializeRequest {
     arguments: InitializeRequestArguments;
 }
@@ -127,7 +139,7 @@ export interface InitializeResponse extends DebugProtocol.InitializeResponse {
 export interface PackageInfo {
     Package: string;
     Version: string;
-};
+}
 
 export interface ContinueRequest extends DebugProtocol.ContinueRequest {
     arguments: ContinueArguments;

@@ -6,51 +6,51 @@ import { RStartupArguments } from './debugProtocolModifications';
 import { config, getPortNumber } from './utils';
 import * as net from 'net';
 
-const { Subject } = require('await-notify');
-const kill = require('tree-kill');
+import { Subject } from './subject';
+import kill = require('tree-kill');
 
 import * as log from 'loglevel';
 const logger = log.getLogger("RSession");
 
 
 export class RSession {
-    private cp: child.ChildProcessWithoutNullStreams;
+    private cp?: child.ChildProcessWithoutNullStreams;
     private handleLine: LineHandler;
     private handleJsonString: JsonHandler;
-    private echoStdin?: (text: string) => void;
+    private echoStdin: (text: string) => void;
     private restOfLine: {[k in DataSource]?: string} = {};
 
     public ignoreOutput: boolean = false;
 
     public host: string = 'localhost';
-    public jsonSocket: net.Socket;
-    public sinkSocket: net.Socket;
-    public jsonServer: net.Server;
-    public sinkServer: net.Server;
+    public jsonSocket?: net.Socket;
+    public sinkSocket?: net.Socket;
+    public jsonServer?: net.Server;
+    public sinkServer?: net.Server;
     public jsonPort: number = -1;
     public sinkPort: number = -1;
 
-
-    constructor(){
-		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'SILENT'));
-    };
-    
-    public async startR(
-        args: RStartupArguments,
+    constructor(
         handleLine: LineHandler,
         handleJson: JsonHandler,
         echoStdin?: (text: string) => void
+    ){
+		logger.setLevel(config().get<log.LogLevelDesc>('logLevelRSession', 'SILENT'));
+
+        // store line/json handlers (are called by this.handleData)
+        this.handleLine = handleLine;
+        this.handleJsonString = handleJson;
+        this.echoStdin = echoStdin || ((text: string) => {/* dummy */});
+    }
+    
+    public async startR(
+        args: RStartupArguments,
     ): Promise<boolean> {
         this.cp = spawnRProcess(args);
 
         if(this.cp.pid === undefined){
             return false;
         }
-
-        // store line/json handlers (are called by this.handleData)
-        this.handleLine = handleLine;
-        this.handleJsonString = handleJson;
-        this.echoStdin = echoStdin || ((text: string) => {});
 
 		// handle output from the R-process
 		this.cp.stdout.on("data", data => {
@@ -101,7 +101,7 @@ export class RSession {
         return true;
     }
 
-    public writeToStdin(text: string, checkNewLine: boolean = true){
+    public writeToStdin(text: string, checkNewLine: boolean = true): void {
         // make sure text ends in exactly one newline
         if(checkNewLine){
             while(text.length>0 && text.slice(-1) === '\n'){
@@ -113,21 +113,23 @@ export class RSession {
         // log and write text
         this.echoStdin(text);
         logger.info('cp.stdin:\n' + text.trim());
-        this.cp.stdin.write(text);
+        this.cp?.stdin.write(text);
     }
 
     // Kill the child process
-    public killChildProcess(signal = 'SIGKILL'){
-        if(this.cp.exitCode === null){
+    public killChildProcess(signal = 'SIGKILL'): void{
+        if(!this.cp){
+            logger.info('No child process to kill');
+        } else if(this.cp.exitCode === null){
             logger.info('sending signal' + signal + '...');
             kill(this.cp.pid, signal);
             logger.info('sent signal');
         } else{
-            logger.info('process already exited with code ' + this.cp.exitCode);
+            logger.info(`process already exited with code ${this.cp.exitCode}`);
         }
     }
 
-    public handleData(data: Buffer, from: DataSource){
+    public handleData(data: Buffer, from: DataSource): void{
 
         let text: string = data.toString();
         text = text.replace(/\r/g,''); //keep only \n as linebreak
@@ -144,7 +146,7 @@ export class RSession {
             }
             const isLastLine = i === lines.length-1;
             const line = lines[i];
-            let restOfLine: string = "";
+            let restOfLine: string;
             if(isLastLine && line===""){
                 restOfLine = "";
             } else if(from === "jsonSocket"){
@@ -164,6 +166,7 @@ function spawnRProcess(args: RStartupArguments){
     const options: child.SpawnOptionsWithoutStdio = {
         env: {
             VSCODE_DEBUG_SESSION: "1",
+            ...args.env,
             ...process.env
         },
         shell: true,
@@ -177,13 +180,13 @@ function spawnRProcess(args: RStartupArguments){
 
     // log output
     cp.stdout.on("data", data => {
-        logger.debug('cp.stdout:\n' + data);
+        logger.debug('cp.stdout:\n' + String(data));
     });
     cp.stderr.on("data", data => {
-        logger.debug('cp.stderr:\n' + data);
+        logger.debug('cp.stderr:\n' + String(data));
     });
     cp.on("close", code => {
-        logger.debug('Child process exited with code: ' + code);
+        logger.debug(`Child process exited with code: ${code}`);
     });
     cp.on("error", (error) => {
         logger.debug('cp.error:\n' + error.message);

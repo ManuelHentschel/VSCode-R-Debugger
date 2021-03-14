@@ -38,7 +38,7 @@ let doTrackTerminals: boolean = false;
 
 
 
-export function trackTerminals(envCol: vscode.EnvironmentVariableCollection){
+export function trackTerminals(envCol: vscode.EnvironmentVariableCollection): void{
 
     let terminalId = 1;
     
@@ -69,7 +69,7 @@ interface WriteToStdinArgs {
     useActiveTerminal: boolean;
     pid: number;
     ppid: number;
-};
+}
 
 interface TerminalWithTerminalId extends vscode.Terminal {
     vscodeRDebuggerTerminalId?: string;
@@ -77,12 +77,10 @@ interface TerminalWithTerminalId extends vscode.Terminal {
 
 export class TerminalHandler {
 
-    public port: number;
     readonly portPromise: Promise<number>;
-    readonly host: string;
 
     private server: net.Server;
-    private lineCache = new Map<net.Socket, string>();
+    private lineCache = new Map<net.Socket, string | undefined>();
 
     public constructor(port: number = 0, host: string = 'localhost'){
         const timeout = config().get<number>('timeouts.startup', 1000);
@@ -106,7 +104,7 @@ export class TerminalHandler {
         this.portPromise = portPromise;
     }
 
-    public dispose(){
+    public dispose(): void {
         logger.info('Closing custom server connections');
         this.lineCache.forEach((_, socket) => {
             socket.destroy();
@@ -122,16 +120,16 @@ export class TerminalHandler {
 
         this.lineCache.set(socket, lines.pop());
 
-        for(let line of lines){
-            const j = JSON.parse(line);
-            this.handleJson(j);
+        for(const line of lines){
+            const j = <{[key: string]: any}>JSON.parse(line);
+            void this.handleJson(j);
         }
     }
 
-    private handleJson(json: WriteToStdinEvent|any): (Promise<boolean>|boolean){
+    private handleJson(json: WriteToStdinEvent|{[key: string]: any}): (Promise<boolean>|boolean){
         if(json.type === 'event' && json.event === 'custom'){
-            if(json.body && json.body.reason === 'writeToStdin'){
-                const body: WriteToStdinBody = json.body;
+            const body = <Partial<WriteToStdinBody> | undefined> json.body;
+            if(body?.reason === 'writeToStdin'){
                 body.terminalId = body.terminalId || '0';
                 body.useActiveTerminal = body.useActiveTerminal || false;
                 body.text = body.text || '';
@@ -173,7 +171,7 @@ async function findTerminal(args: WriteToStdinArgs): Promise<vscode.Terminal|und
     // try looking by pid / parent pid
     if(args.pid>0 || args.ppid>0){
         for(term of vscode.window.terminals){
-            const pid: number = await term.processId;
+            const pid = await term.processId;
             if(pid === args.pid || pid === args.ppid){
                 logger.debug('identified terminal by pid');
                 return term;

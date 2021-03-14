@@ -10,7 +10,7 @@ import * as MDebugProtocol from './debugProtocolModifications';
 import { explainRPackage, PackageVersionInfo } from './installRPackage';
 import { RExtension, HelpPanel } from './rExtensionApi';
 
-const { Subject } = require('await-notify');
+import { Subject } from './subject';
 
 import * as log from 'loglevel';
 const logger = log.getLogger("DebugRuntime");
@@ -28,7 +28,7 @@ interface WriteOnPrompt {
 	which: "browser"|"topLevel"|"prompt";
 	count: number;
 	addNewLine?: boolean;
-};
+}
 
 
 export class DebugRuntime extends EventEmitter {
@@ -45,11 +45,10 @@ export class DebugRuntime extends EventEmitter {
 	};
 
 	// The rSession used to run the code
-	public rSession: RSession;
+	public rSession?: RSession;
 
-	readonly helpPanel: HelpPanel;
-
-    private readonly addCommandLineArgs: string[];
+	private readonly helpPanel?: HelpPanel;
+	private readonly launchConfig: MDebugProtocol.LaunchConfiguration;
 
 	// // state info about the R session
 	// R session
@@ -58,7 +57,7 @@ export class DebugRuntime extends EventEmitter {
 	// R package
 	private rPackageStartup = new Subject(); // used to wait for package to load
 	private rPackageFound: boolean = false; // is set to true after receiving a message 'go'/calling the main() function
-	private rPackageInfo: MDebugProtocol.PackageInfo = undefined;
+	private rPackageInfo?: MDebugProtocol.PackageInfo = undefined;
 	private rPackageVersionCheck: PackageVersionInfo = {versionOk: false, shortMessage: '', longMessage: ''};
 	// output state (of R process)
 	private stdoutIsBrowserInfo: boolean = false; // set to true if rSession.stdout is currently giving browser()-details
@@ -75,13 +74,17 @@ export class DebugRuntime extends EventEmitter {
 	private writeOnPrompt: WriteOnPrompt[] = [];
 
 	// constructor
-	constructor(helpPanel?: HelpPanel, addCommandLineArgs: string[] = []) {
+	constructor(helpPanel: HelpPanel | undefined, launchConfig: MDebugProtocol.LaunchConfiguration) {
 		super();
-		this.addCommandLineArgs = addCommandLineArgs || [];
 		this.helpPanel = helpPanel;
+		this.launchConfig = launchConfig;
 	}
 
-	public async initializeRequest(response: DebugProtocol.InitializeResponse, args: MDebugProtocol.InitializeRequestArguments, request: MDebugProtocol.InitializeRequest) {
+	public async initializeRequest(
+		response: DebugProtocol.InitializeResponse,
+		args: MDebugProtocol.InitializeRequestArguments,
+		request: MDebugProtocol.InitializeRequest
+	): Promise<boolean> {
 		// This function initializes a debug session with the following steps:
 		// 1. Handle arguments
 		// 2. Launch a child process running R
@@ -107,11 +110,8 @@ export class DebugRuntime extends EventEmitter {
 		this.outputModes["sinkSocket"] =  config().get<OutputMode>('printSinkSocket', 'filtered');
 
 		// start R in child process
-		const rStartupArguments  = await getRStartupArguments(this.addCommandLineArgs);
-		const openFolders = vscode.workspace.workspaceFolders;
-		if(openFolders){
-			rStartupArguments.cwd = openFolders[0].uri.fsPath;
-		}
+		const rStartupArguments  = await getRStartupArguments(this.launchConfig);
+		rStartupArguments.cwd = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
 
 		if(!rStartupArguments.path){
 			const message = 'No R path was found in the settings/path/registry.\n(Can be changed in setting r.rpath.XXX)';
@@ -136,9 +136,9 @@ export class DebugRuntime extends EventEmitter {
 				setTimeout(() => this.writeOutput(text, false, "stdout"), 0);
 			}
 		};
-		this.rSession = new RSession();
+		this.rSession = new RSession(tmpHandleLine, tmpHandleJsonString, tmpEchoStdin);
 		// check that the child process launched properly
-		const successTerminal = await this.rSession.startR(rStartupArguments, tmpHandleLine, tmpHandleJsonString, tmpEchoStdin);
+		const successTerminal = await this.rSession.startR(rStartupArguments);
 		if (!successTerminal) {
 			const message = 'Failed to spawn a child process!';
 			await this.abortInitializeRequest(response, message);
@@ -201,12 +201,12 @@ export class DebugRuntime extends EventEmitter {
 		if (this.rPackageFound && this.rPackageVersionCheck.versionOk) {
 			logger.info('R Package ok');
 		} else{
-			var shortMessage: string = '';
-			var longMessage: string = '';
+			let shortMessage: string = '';
+			let longMessage: string = '';
 			if(this.rPackageFound){ // but not version ok
 				logger.info('R Package version not ok');
 				shortMessage = this.rPackageVersionCheck.shortMessage;
-				longMessage = this.rPackageVersionCheck.longMessage;
+				longMessage = this.rPackageVersionCheck.longMessage || '';
 			} else{ // package completely missing
 				logger.info('R Package missing');
 				shortMessage = 'Please install the R package "' + this.rStrings.packageName + '"!';
@@ -224,7 +224,7 @@ export class DebugRuntime extends EventEmitter {
 		return true;
 	}
 
-	protected async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true){
+	protected async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true): Promise<boolean>{
 		// used to abort the debug session and return an unsuccessful InitializeResponse
 		logger.error(message);
 		if(endOutputGroup){
@@ -258,7 +258,7 @@ export class DebugRuntime extends EventEmitter {
 		const isStdout = from === "stdout";
 
 		// only show the line to the user if it is complete & relevant
-		var showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
+		let showLine = isFullLine && !this.stdoutIsBrowserInfo && isSink;
 
 		if(outputMode === 'all'){
 			setTimeout(() => {
@@ -285,7 +285,7 @@ export class DebugRuntime extends EventEmitter {
 				// Check for browser prompt
 				const browserRegex = /Browse\[\d+\]> /;
 				if(browserRegex.test(line)){
-					this.handlePrompt("browser");
+					void this.handlePrompt("browser");
 					// R has entered the browser
 					line = line.replace(browserRegex,'');
 					showLine = false;
@@ -303,7 +303,7 @@ export class DebugRuntime extends EventEmitter {
 				// check for prompt
 				const promptRegex = new RegExp(escapeForRegex(this.rStrings.prompt));
 				if (promptRegex.test(line) && isFullLine) {
-					this.handlePrompt("topLevel");
+					void this.handlePrompt("topLevel");
 					showLine = false;
 					line = '';
 				}
@@ -345,7 +345,7 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// determine if/what part of line is printed
-		var lineOut: string;
+		let lineOut: string;
 		if(outputMode === "all"){
 			// lineOut = line0;
 			lineOut = "";
@@ -371,7 +371,7 @@ export class DebugRuntime extends EventEmitter {
 		return line;
 	}
 
-	protected async handlePrompt(which: "browser"|"topLevel", text?: string){
+	protected async handlePrompt(which: "browser"|"topLevel", text?: string): Promise<void> {
 		logger.debug("matches prompt: " + which);
 
 		// wait for timeout to give json socket time to catch up
@@ -383,27 +383,29 @@ export class DebugRuntime extends EventEmitter {
 	
 		if(this.writeOnPrompt.length > 0){
 			const wop = this.writeOnPrompt.shift();
-			const matchesPrompt = (wop.which === "prompt" || wop.which === which);
-			if(matchesPrompt && wop.count > 0){
-				this.writeToStdin(wop.text);
-				wop.count -= 1;
-				if(wop.count > 0){
+			if(wop){
+				const matchesPrompt = (wop.which === "prompt" || wop.which === which);
+				if(matchesPrompt && wop.count > 0){
+					this.writeToStdin(wop.text);
+					wop.count -= 1;
+					if(wop.count > 0){
+						this.writeOnPrompt.unshift(wop);
+					}
+				} else if(matchesPrompt && wop.count < 0){
+					this.writeToStdin(wop.text);
 					this.writeOnPrompt.unshift(wop);
+				} else{
+					logger.error('invalid writeOnPrompt entry');
 				}
-			} else if(matchesPrompt && wop.count < 0){
-				this.writeToStdin(wop.text);
-				this.writeOnPrompt.unshift(wop);
-			} else{
-				logger.error('invalid writeOnPrompt entry');
 			}
 		} else {
 			const cmdListen = this.rStrings.packageName + `::.vsc.listenForJSON(timeout = -1)`;
-			this.rSession.writeToStdin(cmdListen);
+			this.rSession?.writeToStdin(cmdListen);
 			this.sendShowingPromptRequest(which, text);
 		}
 	}
 
-	protected sendShowingPromptRequest(which: "browser"|"topLevel", text?: string){
+	protected sendShowingPromptRequest(which: "browser"|"topLevel", text?: string): void{
 		const request: MDebugProtocol.ShowingPromptRequest = {
 			command: "custom",
 			arguments: {
@@ -417,17 +419,17 @@ export class DebugRuntime extends EventEmitter {
 		this.dispatchRequest(request);
 	}
 
-	protected handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true){
+	protected handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true): string {
 		if(!isFullLine){
 			return json;
 		} else{
-			const j = JSON.parse(json);
+			const j = <{[key: string]: any}>JSON.parse(json);
 			this.handleJson(j);
 			return "";
 		}
 	}
 
-	protected handleJson(json: any){
+	protected handleJson(json: {[key: string]: any}): void {
 		if(json.type === "response"){
 			if(json.command === "initialize"){
 				this.rPackageFound = true;
@@ -440,23 +442,24 @@ export class DebugRuntime extends EventEmitter {
 				this.rPackageVersionCheck = versionCheck;
 				this.rPackageStartup.notify();
 				if(versionCheck.versionOk){
-					this.sendProtocolMessage(json);
+					this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
 				} else{
-					logger.info("event: " + json.event, json.body);
+					logger.info(`event: ${String(json.event)}`, json.body);
 				}
 			} else{
-				this.sendProtocolMessage(json);
+				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
 			}
 		} else if(json.type === "event"){
 			if(json.event === 'custom'){
-				if(json.body.reason === "writeToStdin"){
+				const body = json.body as {[key: string]: any};
+				if(body.reason === "writeToStdin"){
 					this.handleWriteToStdinEvent(json.body);
-				} else if(json.body.reason === "viewHelp" && json.body.requestPath){
-					this.helpPanel.showHelpForPath(json.body.requestPath);
+				} else if(body.reason === "viewHelp" && body.requestPath){
+					this.helpPanel?.showHelpForPath(body.requestPath);
 				}
-				logger.info("event: " + json.event, json.body);
+				logger.info(`event: ${String(json.event)}`, json.body);
 			} else{
-				this.sendProtocolMessage(json);
+				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);
 			}
 		} else{
 			logger.error("Unknown message:");
@@ -465,11 +468,11 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	// send DAP message to the debugSession
-	protected sendProtocolMessage(message: DebugProtocol.ProtocolMessage){
+	protected sendProtocolMessage(message: DebugProtocol.ProtocolMessage): void {
 		this.emit("protocolMessage", message);
 	}
 
-	protected handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody){
+	protected handleWriteToStdinEvent(args: MDebugProtocol.WriteToStdinBody): void {
 		let count: number = 0;
 		if(args.count !== 0){
 			count = args.count || 1;
@@ -507,10 +510,10 @@ export class DebugRuntime extends EventEmitter {
 			}
 		}
 	}
-	public writeToStdin(text: string){
+	public writeToStdin(text: string): boolean {
 		if(text){
 			logger.debug("Writing to stdin: ", text);
-			this.rSession.writeToStdin(text);
+			this.rSession?.writeToStdin(text);
 			return true;
 		} else{
 			return false;
@@ -521,14 +524,14 @@ export class DebugRuntime extends EventEmitter {
 	// REQUESTS
 
 	// This version dispatches requests to the tcp connection instead of stdin
-	public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = true) {
+	public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = true): void {
 		const json = JSON.stringify(request);
-		logger.info('request ' + request.seq + ': ' + request.command, request);
-		if(!this.rSession.jsonSocket){
+		logger.info(`request ${request.seq}: ${request.command}`, request);
+		if(!this.rSession?.jsonSocket){
 			logger.debug('not using socket!');
 			const escapedJson = escapeStringForR(json);
 			const cmdJson = `${this.rStrings.packageName}::.vsc.handleJson(json=${escapedJson})`;
-			this.rSession.writeToStdin(cmdJson);
+			this.rSession?.writeToStdin(cmdJson);
 			// console.log(cmdJson);
 			// this.rSession.callFunction('.vsc.handleJson', {json: json});
 		} else {
@@ -547,7 +550,7 @@ export class DebugRuntime extends EventEmitter {
 		category: ('console'|'stdout'|'stderr'|'telemetry') = 'stdout',
 		line = 1,
 		group?: ("start"|"startCollapsed"|"end"),
-		data: object = {}
+		data: any = {}
 	): boolean {
 		// writes output to the debug console (of the vsc instance runnning the R code)
 		// used during start up to print info about errors/progress
@@ -574,17 +577,18 @@ export class DebugRuntime extends EventEmitter {
 				group: group,
 				line: line,
 				column: 1,
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 				data: data
 			}
 		};
 		this.sendProtocolMessage(event);
 		return true; // output event was sent
 	}
-	public startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, line = 1){
+	public startOutputGroup(text: string = "", collapsed: boolean = false, addNewline = false, toStderr = false, line = 1): void {
 		const group = (collapsed ? 'startCollapsed' : 'start');
 		this.writeOutput(text, addNewline, (toStderr ? 'stderr' : 'stdout'), line, group);
 	}
-	public endOutputGroup(){
+	public endOutputGroup(): void {
 		this.writeOutput("", false, 'stdout', 1, 'end');
 	}
 

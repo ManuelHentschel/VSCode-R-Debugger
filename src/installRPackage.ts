@@ -1,10 +1,7 @@
 
 import { getRDownloadLink, getRStartupArguments, config, getRequiredRPackageVersion } from './utils';
 import * as vscode from 'vscode';
-import { RSession } from './rSession';
-import { write } from 'fs';
 import { join } from 'path';
-import Subject = require('await-notify');
 import semver = require('semver');
 
 export interface PackageVersionInfo {
@@ -12,13 +9,13 @@ export interface PackageVersionInfo {
     shortMessage: string;
     longMessage?: string;
 	version?: string;
-};
+}
 
 export type VersionCheckLevel = "none"|"required"|"recommended";
 
 
-export async function updateRPackage(extensionPath: string, packageName:string = 'vscDebugger') {
-    vscode.window.showInformationMessage('Installing R Packages...');
+export async function updateRPackage(extensionPath: string, packageName:string = 'vscDebugger'): Promise<void> {
+    void vscode.window.showInformationMessage('Installing R Packages...');
     const url = getRDownloadLink(packageName);
     const rPath = (await getRStartupArguments()).path;
     const terminal = vscode.window.createTerminal('InstallRPackage');
@@ -26,7 +23,7 @@ export async function updateRPackage(extensionPath: string, packageName:string =
     terminal.sendText(`${rPath} --no-restore --quiet -f "${join(extensionPath, 'R', 'install.R')}" --args "${url}"`);
 }
 
-export function explainRPackage(writeOutput: (text: string)=>void, message: string = ""){
+export function explainRPackage(writeOutput: (text: string)=>void, message: string = ""): void {
     message = message + (
         "\n\nIt can be attempted to install this package and the dependencies (currently R6 and jsonlite) automatically."
         + "\n\nTo do so, run the following command in the command palette (ctrl+shift+p):"
@@ -47,9 +44,9 @@ export function checkPackageVersion(version: string): PackageVersionInfo {
     const warnIfNewerVersion = rPackageVersions.warnIfNewer || '999.99.99';
     const packageName = rPackageVersions.name || 'vscDebugger';
 
-    var versionOk: boolean = true;
-    var shortMessage: string="";
-    var longMessage: string="";
+    let versionOk: boolean = true;
+    let shortMessage: string="";
+    let longMessage: string="";
 
     if(checkLevel==="none"){
         versionOk = true;
