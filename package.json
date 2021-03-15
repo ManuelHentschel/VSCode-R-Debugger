@@ -30,10 +30,8 @@
     "Debuggers"
   ],
   "activationEvents": [
-    "onLanguage:r",
-    "onLanguage:rd",
-    "onLanguage:rmd",
     "onCommand:r.debugger.updateRPackage",
+    "onCommand:r.debugger.showDataViewer",
     "onDebugDynamicConfigurations:R-Debugger",
     "onDebug"
   ],
@@ -49,8 +47,27 @@
         "command": "r.debugger.updateRPackage",
         "title": "Update or install the required R Package",
         "category": "R Debugger"
+      },
+      {
+        "command": "r.debugger.showDataViewer",
+        "title": "Show in data viewer",
+        "enablement": ""
       }
     ],
+    "menus": {
+      "debug/variables/context": [
+        {
+          "command": "r.debugger.showDataViewer",
+          "when": "debugType == 'R-Debugger'"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "r.debugger.showDataViewer",
+          "when": "false"
+        }
+      ]
+    },
     "languages": [
       {
         "id": "r",

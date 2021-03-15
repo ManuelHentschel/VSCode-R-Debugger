@@ -207,4 +207,15 @@ export interface ShowingPromptRequest extends CustomRequest {
     }
 }
 
+// Tell R to show the data viewer for a variable
+export interface ShowDataViewerRequest extends CustomRequest {
+    arguments: ShowDataViewerArguments;
+}
 
+export interface ShowDataViewerArguments {
+    reason: 'showDataViewer';
+    /** The reference of the variable container. */
+    variablesReference: number;
+    /** The name of the variable in the container. */
+    name: string;
+}

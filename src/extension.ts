@@ -15,6 +15,7 @@ import {
 	DebugAdapterDescriptorFactory
 } from './debugConfig';
 
+import { DebugWindowCommandArg, showDataViewer } from './commands';
 
 // this method is called when the extension is activated
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -24,7 +25,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			void context.globalState.update('ignoreDeprecatedConfig', ret);
 		});
 	}
-
+	
 	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
 
 	let rHelpPanel: HelpPanel | undefined = undefined;
@@ -63,7 +64,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath))
+		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath)),
+		vscode.commands.registerCommand('r.debugger.showDataViewer', (arg: DebugWindowCommandArg) => {
+			showDataViewer(arg);
+		})
 	);
 }
 
