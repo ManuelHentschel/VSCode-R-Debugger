@@ -121,7 +121,6 @@ export class RSession {
         if(!this.jsonSocket){
             logger.error('No Json socket available');
         }
-
     }
 
     // Kill the child process

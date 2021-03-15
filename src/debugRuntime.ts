@@ -378,25 +378,23 @@ export class DebugRuntime extends EventEmitter {
 			await new Promise(resolve => setTimeout(resolve, timeout));
 		}
 	
-		if(this.writeOnPrompt.length > 0){
-			const wop = this.writeOnPrompt.shift();
-			if(wop){
-				const matchesPrompt = (wop.which === 'prompt' || wop.which === which);
-				if(matchesPrompt && wop.count > 0){
-					this.writeToStdin(wop.text);
-					wop.count -= 1;
-					if(wop.count > 0){
-						this.writeOnPrompt.unshift(wop);
-					}
-				} else if(matchesPrompt && wop.count < 0){
-					this.writeToStdin(wop.text);
+		const wop = this.writeOnPrompt.shift();
+		if(wop){
+			const matchesPrompt = (wop.which === 'prompt' || wop.which === which);
+			if(matchesPrompt && wop.count > 0){
+				this.writeToStdin(wop.text);
+				wop.count -= 1;
+				if(wop.count > 0){
 					this.writeOnPrompt.unshift(wop);
-				} else{
-					logger.error('invalid writeOnPrompt entry');
 				}
+			} else if(matchesPrompt && wop.count < 0){
+				this.writeToStdin(wop.text);
+				this.writeOnPrompt.unshift(wop);
+			} else{
+				logger.error('invalid writeOnPrompt entry');
 			}
 		} else {
-			const cmdListen = this.rStrings.packageName + '::.vsc.listenForJSON(timeout = -1)';
+			const cmdListen = `${this.rStrings.packageName}::.vsc.listenForJSON(timeout = -1)`;
 			this.rSession?.writeToStdin(cmdListen);
 			this.sendShowingPromptRequest(which, text);
 		}

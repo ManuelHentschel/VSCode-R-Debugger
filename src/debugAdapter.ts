@@ -20,22 +20,6 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import * as vscode from 'vscode';
 
 
-
-function logMessage(message: DebugProtocol.ProtocolMessage){
-    let ret: string = '';
-    if(message.type === 'event'){
-        const event = <DebugProtocol.Event>message;
-        ret = `event: ${event.event}`;
-    } else if(message.type === 'response'){
-        const response = <DebugProtocol.Response>message;
-        ret = `response ${response.request_seq}: ${response.command}`;
-    } else{
-        ret = `unknown protocol message type: ${message.type}`;
-    }
-    return ret;
-}
-
-
 export class DebugAdapter implements vscode.DebugAdapter {
 
     // properties
@@ -67,11 +51,12 @@ export class DebugAdapter implements vscode.DebugAdapter {
 	public handleMessage(msg: DebugProtocol.ProtocolMessage): void {
 		if(msg.type === 'request') {
 			this.dispatchRequest(<MDebugProtocol.Request>msg);
-		}
+		} else{
+            logger.error('Unknown DAP message:', msg);
+        }
 	}
 
 	protected sendProtocolMessage(message: DebugProtocol.ProtocolMessage): void {
-        logger.info(logMessage(message), message);
 		message.seq = this.sequence++;
 		this.sendMessage.fire(message);
 	}
@@ -151,7 +136,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 // end cases
             }
         } catch (e) {
-            logger.error(`Error while handling request ${request.seq}: ${request.command}`, e);
+            logger.error('Error while handling request:', request, e);
             response.success = false;
             dispatchToR = false;
             sendResponse = true;
@@ -161,7 +146,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
         if(dispatchToR){
             this.runtime.dispatchRequest(request);
         } else{
-            logger.info(`Request ${request.seq} handled in VS Code: ${request.command}`, request);
+            logger.info('Request handled in VS Code:', request);
         }
 
         // send response if (completely) handled here
