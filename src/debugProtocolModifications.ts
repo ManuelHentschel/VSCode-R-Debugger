@@ -2,7 +2,7 @@
 
 import { DebugProtocol } from 'vscode-debugprotocol';
 
-import * as VsCode from 'vscode';
+import * as vsCode from 'vscode';
 // import { DebugProtocol } from './debugProtocol';
 
 
@@ -23,7 +23,7 @@ export interface RStartupArguments {
     };
 }
 
-export interface DebugConfiguration extends VsCode.DebugConfiguration {
+export interface DebugConfiguration extends vsCode.DebugConfiguration {
     type: 'R-Debugger';
     request: 'launch'|'attach';
 
