@@ -53,7 +53,6 @@ jobs:
   publish:
     name: Publish
     timeout-minutes: 30
-    needs: release # just to make sure that vscDebugger binaries are available
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -63,3 +62,15 @@ jobs:
           args: "publish -p $VSCE_TOKEN"
         env:
           VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+
+  publish2:
+    name: PublishToOpenVsx
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: npm install
+      - run: npm install -g npx
+      - run: npx ovsx publish -p $OPEN_VSX_TOKEN
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
