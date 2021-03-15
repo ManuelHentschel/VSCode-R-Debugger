@@ -248,7 +248,9 @@
                 "items": {
                   "type": "string"
                 },
-                "default": [],
+                "default": [
+                  "--vanilla"
+                ],
                 "markdownDescription": "Additional command line arguments used when launching R."
               },
               "env": {
