@@ -15,14 +15,14 @@ export interface DebugWindowCommandArg {
 }
 
 // Sends a custom request to R to show a variable in the data viewer
-export function showDataViewer(arg: DebugWindowCommandArg){
+export function showDataViewer(arg: DebugWindowCommandArg): void {
     const args: ShowDataViewerArguments = {
         reason: 'showDataViewer',
         variablesReference: arg.container.variablesReference,
         name: arg.variable.name
     };
-    vscode.debug.activeDebugSession?.customRequest(
-        "custom",
+    void vscode.debug.activeDebugSession?.customRequest(
+        'custom',
         args
     );
 }

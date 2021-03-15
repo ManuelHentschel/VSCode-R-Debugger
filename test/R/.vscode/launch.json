@@ -10,7 +10,10 @@
             "name": "Launch Workspace",
             "debugMode": "workspace",
             "workingDirectory": "${workspaceFolder}",
-            "allowGlobalDebugging": true
+            "allowGlobalDebugging": true,
+            "env": {
+                "abc": "123"
+            }
         },
         {
             "type": "R-Debugger",

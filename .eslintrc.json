@@ -3,16 +3,28 @@
     "parser": "@typescript-eslint/parser",
     "parserOptions": {
         "ecmaVersion": 2018,
-        "sourceType": "module"
+        "sourceType": "module",
+        "project": "./tsconfig.json"
     },
+    "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended",
+        "plugin:@typescript-eslint/recommended-requiring-type-checking"
+    ],
     "plugins": [
         "@typescript-eslint"
     ],
     "rules": {
+        "@typescript-eslint/no-inferrable-types": "off",
+        "@typescript-eslint/no-floating-promises": "warn",
         "@typescript-eslint/semi": "warn",
+        "@typescript-eslint/no-unused-vars": "off",
+        "@typescript-no-unused-vars": "off",
+        "@typescript-eslint/no-explicit-any": "off",
         "curly": "warn",
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
-        "semi": "warn"
+        "semi": "warn",
+        "quotes": ["warn", "single"]
     }
 }
