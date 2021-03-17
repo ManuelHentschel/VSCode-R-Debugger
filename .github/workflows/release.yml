@@ -70,7 +70,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: npm install
-      - run: npm install -g npx
       - run: npx ovsx publish -p $OPEN_VSX_TOKEN
         env:
           OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
