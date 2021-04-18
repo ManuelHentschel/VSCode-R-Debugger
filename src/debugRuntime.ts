@@ -286,7 +286,6 @@ export class DebugRuntime extends EventEmitter {
 					// R has entered the browser
 					line = line.replace(browserRegex,'');
 					showLine = false;
-					this.stdoutIsBrowserInfo = false; // input prompt is last part of browser-info
 				} 
 
 
@@ -369,7 +368,7 @@ export class DebugRuntime extends EventEmitter {
 	}
 
 	protected async handlePrompt(which: 'browser'|'topLevel', text?: string): Promise<void> {
-		logger.debug('matches prompt: ' + which);
+		logger.debug(`matches prompt: ${which}`);
 
 		// wait for timeout to give json socket time to catch up
 		// might be useful to avoid async issues
@@ -377,6 +376,11 @@ export class DebugRuntime extends EventEmitter {
 		if(timeout>0){
 			await new Promise(resolve => setTimeout(resolve, timeout));
 		}
+		logger.debug(`handling prompt: ${which}`);
+
+		// input prompt is last part of browser-info
+		// toggle after delay, to give sink-socket time to arrive
+		this.stdoutIsBrowserInfo = false;
 	
 		const wop = this.writeOnPrompt.shift();
 		if(wop){
