@@ -25,7 +25,7 @@ For many variables it is also possible to assign a new value to the variable or 
 
 
 ## Installation
-The latest "stable" version of the VS Code extension can be installed from the
+The latest version of the VS Code extension can be installed from the
 [marketplace](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).
 After installing the extension, the R package can be installed using the command 
 `r.debugger.updateRPackage`.
@@ -70,7 +70,7 @@ in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv
 
 ## Configuration
 For a detailed explanation of possible launch config entries and other settings, see
-[configuration.md](./configuration.md) on github.
+[Configuration](https://manuelhentschel.github.io/vscDebugger/articles/configuration.html).
 
 ## How it works
 The debugger works as follows:
@@ -90,7 +90,7 @@ These lines are also hidden from the user.
 
 
 ## Debugging R Packages
-**New:** Packages can now be debugged using `load_all` from `pkgload`.
+Packages can now be debugged using `load_all` from `pkgload`.
 To do so, it is required to install `pkgload` (part of `devtools`).
 By default, `load_all` will be masked by a modified version that automatically sets breakpoints
 in the loaded package and attaches the modified versions of `print`, `cat`, `message`.
@@ -127,22 +127,8 @@ message <- message
 This assignment can be overwritten by the debugger with
 `.vsc.print`/`.vsc.cat`/`.vsc.message`, but has no effect when not using the debugger.
 
-## Warning
-In the following cases the debugger might not work correctly/as expected:
-
-* Calls to `trace()`, `tracingstate()`:
-These are used to implement breakpoints, so usage might interfere with the debugger's breakpoints
-* Custom `options(error=...)`: the debugger uses its own `options(error=...)` to show stack trace etc. on error
-* Any form of (interactive) user input in the terminal during runtime (e.g. `readline(stdin())`), since
-the debugger passes all user input through `eval(...)`.
-* Code that contains calls to `sys.calls()`, `sys.frames()`, `attr(..., 'srcref')` etc.:
-Since pretty much all code is evaluated through calls to `eval(...)` these results might be wrong. <!-- If required, input in the debug console can be sent directly to R's `stdin` by prepending `###stdin`. -->
-* Extensive use of graphical output/input, stdio-redirecting, `sink()`
-* Extensive use of lazy evaluation, promises, side-effects:
-In the general case, the debugger recognizes unevaluated promises and preserves them.
-It might be possible, however, that the gathering of information about the stack/variables leads to unexpected side-effects.
-Especially watch-expressions must be safe to be evaluated in any frame,
-since these are passed to `eval()` in the currently viewed frame any time the debugger hits a breakpoint or steps through the code.
+## Troubleshooting
+For troubleshooting info, see [Troubleshooting](https://manuelhentschel.github.io/vscDebugger/articles/troubleshooting.html)
 
 ## Contributing
 This package is still under development.
