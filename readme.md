@@ -32,7 +32,7 @@ After installing the extension, the R package can be installed using the command
 If this does not work, you can find the source code and compiled binaries on the
 [releases site](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases).
 
-The provided packages were built using R 4.0.2 and might be incompatible with older R versions.
+The provided packages were built using the latest R release and might be incompatible with older R versions.
 In these cases it is necessary to build the package from code.
 
 If you want to install a development version, the VS Code extension can be installed from the .vsix-files found 
