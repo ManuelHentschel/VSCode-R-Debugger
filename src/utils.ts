@@ -39,10 +39,12 @@ function getRfromEnvPath(platform: string) {
 
 export async function getRpathFromSystem(): Promise<string> {
     
-    let rpath: string = '';
+    let rpath = '';
     const platform: string = process.platform;
     
-    if ( platform === 'win32') {
+    rpath ||= getRfromEnvPath(platform);
+
+    if ( !rpath && platform === 'win32') {
         // Find path from registry
         try {
             const key = new winreg({
@@ -56,8 +58,6 @@ export async function getRpathFromSystem(): Promise<string> {
             rpath = '';
         }
     }
-
-    rpath ||= getRfromEnvPath(platform);
 
     return rpath;
 }
