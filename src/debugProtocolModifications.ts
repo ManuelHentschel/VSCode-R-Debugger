@@ -15,7 +15,7 @@ export type DebugMode = 'function'|'file'|'workspace';
 export interface RStartupArguments {
     path: string;
     args: string[];
-    jsonPort?: number;
+    dapPort?: number;
     sinkPort?: number;
     cwd?: string;
     env?: {
@@ -124,9 +124,9 @@ export interface InitializeRequest extends DebugProtocol.InitializeRequest {
 export interface InitializeRequestArguments extends DebugProtocol.InitializeRequestArguments {
     rStrings?: RStrings;
     threadId?: number;
-    useJsonSocket?: boolean;
-    jsonPort?: number;
-    jsonHost?: string;
+    useDapSocket?: boolean;
+    dapPort?: number;
+    dapHost?: string;
     useSinkSocket?: boolean;
     sinkPort?: number;
     sinkHost?: string;

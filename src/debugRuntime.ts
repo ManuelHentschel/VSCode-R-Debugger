@@ -15,9 +15,9 @@ import { Subject } from './subject';
 import { logger } from './logging';
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
-export type JsonHandler = (json: string, from: DataSource, isFullLine: boolean) => string;
+export type DapHandler = (dap: string) => string;
 
-export type DataSource = 'stdout'|'stderr'|'jsonSocket'|'sinkSocket'|'stdin';
+export type DataSource = 'stdout'|'stderr'|'dapSocket'|'sinkSocket'|'stdin';
 export type OutputMode = 'all'|'filtered'|'nothing';
 
 interface WriteOnPrompt {
@@ -125,15 +125,15 @@ export class DebugRuntime extends EventEmitter {
 		const tmpHandleLine: LineHandler = (line: string, from: DataSource, isFullLine: boolean) => {
 			return this.handleLine(line, from, isFullLine);
 		};
-		const tmpHandleJsonString: JsonHandler = (json: string, from?: DataSource, isFullLine: boolean = true) => {
-			return this.handleJsonString(json, from, isFullLine);
+		const tmpHandleDapString: DapHandler = (dap: string) => {
+			return this.handleDapString(dap);
 		};
 		const tmpEchoStdin = (text: string) => {
 			if(this.outputModes['stdin'] === 'all'){
 				setTimeout(() => this.writeOutput(text, false, 'stdout'), 0);
 			}
 		};
-		this.rSession = new RSession(tmpHandleLine, tmpHandleJsonString, tmpEchoStdin);
+		this.rSession = new RSession(tmpHandleLine, tmpHandleDapString, tmpEchoStdin);
 		// check that the child process launched properly
 		const successTerminal = await this.rSession.startR(rStartupArguments);
 		if (!successTerminal) {
@@ -143,14 +143,14 @@ export class DebugRuntime extends EventEmitter {
 		}
 
 		// read ports that were assigned to the child process and add to initialize args
-		if(this.rSession.jsonPort <= 0 || this.rSession.sinkPort <= 0){
+		if(this.rSession.dapPort <= 0 || this.rSession.sinkPort <= 0){
 			const message = 'Failed to listen on port!';
 			await this.abortInitializeRequest(response, message);
 			return false;
 		} else{
-			args.useJsonSocket = true;
-			args.jsonHost = this.rSession.host;
-			args.jsonPort = this.rSession.jsonPort;
+			args.useDapSocket = true;
+			args.dapHost = this.rSession.host;
+			args.dapPort = this.rSession.dapPort;
 			args.useSinkSocket = true;
 			args.sinkHost = this.rSession.host;
 			args.sinkPort = this.rSession.sinkPort;
@@ -209,24 +209,20 @@ export class DebugRuntime extends EventEmitter {
 				shortMessage = 'Please install the R package "' + this.rStrings.packageName + '"!';
 				longMessage = 'The debugger requries the R package "' + this.rStrings.packageName + '"!';
 			}
-			this.endOutputGroup();
 			const tmpWriteOutput = (text: string) => {
 				this.writeOutput(text, true, 'console');
 			};
 			explainRPackage(tmpWriteOutput, longMessage);
-			await this.abortInitializeRequest(response, shortMessage, false);
+			await this.abortInitializeRequest(response, shortMessage);
 			return false;
 		}
 		// everything ok:
 		return true;
 	}
 
-	protected async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string, endOutputGroup: boolean = true): Promise<boolean>{
+	protected async abortInitializeRequest(response: DebugProtocol.InitializeResponse, message: string): Promise<boolean>{
 		// used to abort the debug session and return an unsuccessful InitializeResponse
 		logger.error(message);
-		if(endOutputGroup){
-			this.endOutputGroup();
-		}
 		// timeout to give messages time to appear before shutdown
 		await timeout(this.terminateTimeout);
 		// prep and send response
@@ -398,9 +394,9 @@ export class DebugRuntime extends EventEmitter {
 				logger.error('invalid writeOnPrompt entry');
 			}
 		} else {
-			const cmdListen = `${this.rStrings.packageName}::.vsc.listenForJSON(timeout = -1)`;
-			this.rSession?.writeToStdin(cmdListen);
-			this.sendShowingPromptRequest(which, text);
+			// const cmdListen = `${this.rStrings.packageName}::.vsc.listenForDAP(timeout = -1)`;
+			// this.rSession?.writeToStdin(cmdListen);
+			// this.sendShowingPromptRequest(which, text);
 		}
 	}
 
@@ -418,14 +414,23 @@ export class DebugRuntime extends EventEmitter {
 		this.dispatchRequest(request);
 	}
 
-	protected handleJsonString(json: string, from?: DataSource, isFullLine: boolean = true): string {
-		if(!isFullLine){
-			return json;
-		} else{
-			const j = <{[key: string]: any}>JSON.parse(json);
-			this.handleJson(j);
-			return '';
+	protected handleDapString(dap: string): string {
+		while(dap.length > 0){
+			const m = /^Content-Length: (\d+)\r\n\r\n/.exec(dap);
+			if(!m){
+				break;
+			}
+			const contentLength = Number(m[1]);
+			const headerLength = m[0].length;
+			if(dap.length < headerLength + headerLength){
+				break;
+			}
+			const jsonString = dap.substr(headerLength, contentLength);
+			const json = <{[key: string]: any}>JSON.parse(jsonString);
+			this.handleJson(json);
+			dap = dap.substr(headerLength + contentLength);
 		}
+		return dap;
 	}
 
 	protected handleJson(json: {[key: string]: any}): void {
@@ -522,14 +527,18 @@ export class DebugRuntime extends EventEmitter {
 	// This version dispatches requests to the tcp connection instead of stdin
 	public dispatchRequest(request: DebugProtocol.Request, usePort: boolean = true): void {
 		const json = JSON.stringify(request);
-		if(!this.rSession?.jsonSocket){
-			const escapedJson = escapeStringForR(json);
-			const cmdJson = `${this.rStrings.packageName}::.vsc.handleJson(json=${escapedJson})`;
+		const contentLength = Buffer.byteLength(json, 'utf8');
+		const dapString = `Content-Length: ${contentLength}\r\n\r\n${json}`;
+		if(!this.rSession){
+			// ignore
+		// } else if(this.rSession.dapSocket){
+		// 	this.rSession.writeToDapSocket(dapString);
+		} else {
+			const escapedDap = escapeStringForR(dapString);
+			const cmdJson = `${this.rStrings.packageName}:::tmpHandleDAP(${escapedDap})`;
 			this.rSession?.writeToStdin(cmdJson);
 			// console.log(cmdJson);
 			// this.rSession.callFunction('.vsc.handleJson', {json: json});
-		} else {
-			this.rSession.writeToJsonSocket(json + '\n');
 		}
 	}
 
@@ -542,22 +551,11 @@ export class DebugRuntime extends EventEmitter {
 		addNewline = false,
 		category: ('console'|'stdout'|'stderr'|'telemetry') = 'stdout',
 		line = 1,
-		group?: ('start'|'startCollapsed'|'end'),
-		data: any = {}
 	): boolean {
 		// writes output to the debug console (of the vsc instance runnning the R code)
 		// used during start up to print info about errors/progress
 		if(text.slice(-1) !== '\n' && addNewline){
 			text = text + '\n';
-		}
-
-		if(group === 'end' && this.outputGroupLevel<=0){
-			// no more output groups to close -> abort
-			return false;
-		} else if(group==='start' || group==='startCollapsed'){
-			this.outputGroupLevel += 1;
-		} else if(group==='end'){
-			this.outputGroupLevel -= 1;
 		}
 
 		const event: DebugProtocol.OutputEvent = {
@@ -567,22 +565,12 @@ export class DebugRuntime extends EventEmitter {
 			body: {
 				category: category,
 				output: text,
-				group: group,
 				line: line,
 				column: 1,
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-				data: data
 			}
 		};
 		this.sendProtocolMessage(event);
 		return true; // output event was sent
-	}
-	public startOutputGroup(text: string = '', collapsed: boolean = false, addNewline = false, toStderr = false, line = 1): void {
-		const group = (collapsed ? 'startCollapsed' : 'start');
-		this.writeOutput(text, addNewline, (toStderr ? 'stderr' : 'stdout'), line, group);
-	}
-	public endOutputGroup(): void {
-		this.writeOutput('', false, 'stdout', 1, 'end');
 	}
 
 
@@ -593,3 +581,4 @@ export class DebugRuntime extends EventEmitter {
 		}
 	}
 }
+
