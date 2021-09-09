@@ -109,7 +109,7 @@ export class DebugRuntime extends EventEmitter {
 
 		// start R in child process
 		const rStartupArguments  = await getRStartupArguments(this.launchConfig);
-		rStartupArguments.cwd = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+		rStartupArguments.cwd ||= vscode.workspace.workspaceFolders?.[0].uri.fsPath;
 
 		if(!rStartupArguments.path){
 			const message = 'No R path was found in the settings/path/registry.\n(Can be changed in setting r.rpath.XXX)';

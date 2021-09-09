@@ -255,6 +255,10 @@ export class DebugConfigurationResolver implements vscode.DebugConfigurationProv
 		} else{
 			strictConfig = null;
 		}
+		
+		// set launchingDirectory to workingDirectory if not specified otherwise:
+		config.launchDirectory ||= config.workingDirectory;
+
 		return strictConfig;
 	}
 }
