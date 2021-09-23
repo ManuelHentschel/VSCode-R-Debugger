@@ -114,7 +114,11 @@ export function timeout(ms: number): Promise<unknown> {
 }
 
 
-export async function getRStartupArguments(launchConfig: {env?: {[key: string]: string}; commandLineArgs?: string[]} = {}): Promise<RStartupArguments> {
+export async function getRStartupArguments(launchConfig: {
+    env?: {[key: string]: string};
+    commandLineArgs?: string[];
+    launchDirectory?: string;
+} = {}): Promise<RStartupArguments> {
     const platform: string = process.platform;
 
     const rpath = await getRpath(true);
@@ -133,7 +137,7 @@ export async function getRStartupArguments(launchConfig: {env?: {[key: string]: 
     const ret: RStartupArguments = {
         path: rpath,
         args: rArgs,
-        cwd: undefined,
+        cwd: launchConfig.launchDirectory,
         env: launchConfig.env
     };
 
