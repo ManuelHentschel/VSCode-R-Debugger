@@ -422,7 +422,7 @@ export class DebugRuntime extends EventEmitter {
 			}
 			const contentLength = Number(m[1]);
 			const headerLength = m[0].length;
-			if(dap.length < headerLength + headerLength){
+			if(dap.length < headerLength + contentLength){
 				break;
 			}
 			const jsonString = dap.substr(headerLength, contentLength);
@@ -535,7 +535,7 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.writeToDapSocket(dapString);
 		} else {
 			const escapedDap = escapeStringForR(dapString);
-			const cmdJson = `${this.rStrings.packageName}:::tmpHandleDAP(${escapedDap})`;
+			const cmdJson = `${this.rStrings.packageName}:::.vsc.handleDap(${escapedDap})`;
 			this.rSession?.writeToStdin(cmdJson);
 			// console.log(cmdJson);
 			// this.rSession.callFunction('.vsc.handleJson', {json: json});
