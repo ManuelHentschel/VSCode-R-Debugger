@@ -394,9 +394,9 @@ export class DebugRuntime extends EventEmitter {
 				logger.error('invalid writeOnPrompt entry');
 			}
 		} else {
-			// const cmdListen = `${this.rStrings.packageName}::.vsc.listenForDAP(timeout = -1)`;
-			// this.rSession?.writeToStdin(cmdListen);
-			// this.sendShowingPromptRequest(which, text);
+			const cmdListen = `${this.rStrings.packageName}::.vsc.listenForDAP(timeout = -1)`;
+			this.rSession?.writeToStdin(cmdListen);
+			this.sendShowingPromptRequest(which, text);
 		}
 	}
 
@@ -531,8 +531,8 @@ export class DebugRuntime extends EventEmitter {
 		const dapString = `Content-Length: ${contentLength}\r\n\r\n${json}`;
 		if(!this.rSession){
 			// ignore
-		// } else if(this.rSession.dapSocket){
-		// 	this.rSession.writeToDapSocket(dapString);
+		} else if(this.rSession.dapSocket){
+			this.rSession.writeToDapSocket(dapString);
 		} else {
 			const escapedDap = escapeStringForR(dapString);
 			const cmdJson = `${this.rStrings.packageName}:::tmpHandleDAP(${escapedDap})`;
