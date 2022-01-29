@@ -119,7 +119,7 @@ export class RSession {
         this.dapSocket?.write(text);
         logger.log('dapOut', text);
         if(!this.dapSocket){
-            logger.error('No Json socket available');
+            logger.error('No DAP socket available');
         }
     }
 

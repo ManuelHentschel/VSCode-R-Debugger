@@ -366,7 +366,7 @@ export class DebugRuntime extends EventEmitter {
 	protected async handlePrompt(which: 'browser'|'topLevel', text?: string): Promise<void> {
 		logger.debug(`matches prompt: ${which}`);
 
-		// wait for timeout to give json socket time to catch up
+		// wait for timeout to give dap socket time to catch up
 		// might be useful to avoid async issues
 		const timeout = config().get<number>('timeouts.prompt', 0);
 		if(timeout>0){
@@ -535,10 +535,8 @@ export class DebugRuntime extends EventEmitter {
 			this.rSession.writeToDapSocket(dapString);
 		} else {
 			const escapedDap = escapeStringForR(dapString);
-			const cmdJson = `${this.rStrings.packageName}:::.vsc.handleDap(${escapedDap})`;
-			this.rSession?.writeToStdin(cmdJson);
-			// console.log(cmdJson);
-			// this.rSession.callFunction('.vsc.handleJson', {json: json});
+			const cmdDap = `${this.rStrings.packageName}:::.vsc.handleDap(${escapedDap})`;
+			this.rSession?.writeToStdin(cmdDap);
 		}
 	}
 

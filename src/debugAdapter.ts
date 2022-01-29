@@ -88,20 +88,20 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 //     logger.info('Launch Arguments:', request.arguments);
                 //     break;
                 // }
-                // case 'evaluate': {
-                //     const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments?.expression);
-                //     if(matches){
-                //         // send directly to stdin, don't send request
-                //         const toStdin = matches[1];
-                //         logger.debug('user to stdin:\n' + toStdin);
-                //         this.runtime.rSession?.writeToStdin(toStdin);
-                //     } else{
-                //         // dispatch normally
-                //         dispatchToR = true;
-                //         sendResponse = false;
-                //     }
-                //     break;
-                // }
+                case 'evaluate': {
+                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments?.expression);
+                    if(matches){
+                        // send directly to stdin, don't send request
+                        const toStdin = matches[1];
+                        logger.debug('user to stdin:\n' + toStdin);
+                        this.runtime.rSession?.writeToStdin(toStdin);
+                    } else{
+                        // dispatch normally
+                        dispatchToR = true;
+                        sendResponse = false;
+                    }
+                    break;
+                }
                 case 'disconnect': {
                     // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
