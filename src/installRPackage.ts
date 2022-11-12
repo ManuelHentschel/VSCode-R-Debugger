@@ -15,12 +15,39 @@ export type VersionCheckLevel = 'none'|'required'|'recommended';
 
 
 export async function updateRPackage(extensionPath: string, packageName:string = 'vscDebugger'): Promise<void> {
-    void vscode.window.showInformationMessage('Installing R Packages...');
     const url = getRDownloadLink(packageName);
-    const rPath = (await getRStartupArguments()).path;
-    const terminal = vscode.window.createTerminal('InstallRPackage');
-    terminal.show();
-    terminal.sendText(`${rPath} --no-restore --quiet -f "${join(extensionPath, 'R', 'install.R')}" --args "${url}"`);
+    const rPath = (await getRStartupArguments()).path.replace(/^"(.*)"$/, '$1');
+    const taskDefinition: vscode.TaskDefinition = {
+        type: 'process'
+    };
+    const args = [
+        '--no-restore',
+        '--quiet',
+        '-f',
+        `"${join(extensionPath, 'R', 'install.R')}"`,
+        '--args',
+        `"${url}"`
+    ];
+    const processExecution = new vscode.ProcessExecution(rPath, args);
+    const installationTask = new vscode.Task(
+        taskDefinition,
+        vscode.TaskScope.Global,
+        'Install vscDebugger',
+        'R-Debugger',
+        processExecution
+    );
+    
+    const taskExecutionRunning = await vscode.tasks.executeTask(installationTask);
+    
+    const taskDonePromise = new Promise<void>((resolve) => {
+        vscode.tasks.onDidEndTask(e => {
+            if (e.execution === taskExecutionRunning) {
+                resolve();
+            }
+        });
+    });
+    
+    return await taskDonePromise;
 }
 
 export function explainRPackage(writeOutput: (text: string)=>void, message: string = ''): void {

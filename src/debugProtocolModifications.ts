@@ -67,7 +67,8 @@ export interface LaunchConfiguration extends DebugConfiguration {
     commandLineArgs?: string[];
     env?: {
         [key: string]: string;
-    }
+    };
+    launchDirectory?: string;
 }
 
 export interface FunctionDebugConfiguration extends LaunchConfiguration {

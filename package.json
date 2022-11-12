@@ -202,7 +202,12 @@
               },
               "workingDirectory": {
                 "type": "string",
-                "markdownDescription": "Absolute path to a directory.",
+                "markdownDescription": "Absolute path to a directory. Is switched to using `setwd()` after launching R.",
+                "default": "${workspaceFolder}"
+              },
+              "launchDirectory": {
+                "type": "string",
+                "markdownDescription": "Absolute path to a directory. The R process is launched in this directory.",
                 "default": "${workspaceFolder}"
               },
               "file": {

@@ -5,7 +5,7 @@ This extension adds debugging capabilities for the
 programming language to Visual Studio Code
 and depends on the R package [vscDebugger](https://github.com/ManuelHentschel/vscDebugger)
 ([documentation](https://manuelhentschel.github.io/vscDebugger/)).
-For further R support in VS Code see e.g. [vscode-R](https://github.com/Ikuyadeu/vscode-R) and [R LSP](https://github.com/REditorSupport/vscode-r-lsp).
+For further R support in VS Code see [vscode-R](https://github.com/Ikuyadeu/vscode-R).
 
 ## Features
 
