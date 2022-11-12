@@ -5,8 +5,6 @@ testR
 R/test*
 *.vsix
 
-.vscode
-
 test/R/*
 !test/R/.vscode/launch.json
 !test/R/objects.R
