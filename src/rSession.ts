@@ -1,7 +1,7 @@
 
 
 import * as child from 'child_process';
-import { LineHandler, JsonHandler, DataSource } from'./debugRuntime';
+import { LineHandler, DapHandler, DataSource } from'./debugRuntime';
 import { RStartupArguments } from './debugProtocolModifications';
 import { config, getPortNumber } from './utils';
 import * as net from 'net';
@@ -16,28 +16,28 @@ import kill = require('tree-kill');
 export class RSession {
     private cp?: child.ChildProcessWithoutNullStreams;
     private handleLine: LineHandler;
-    private handleJsonString: JsonHandler;
+    private handleDapString: DapHandler;
     private echoStdin: (text: string) => void;
     private restOfLine: {[k in DataSource]?: string} = {};
 
     public ignoreOutput: boolean = false;
 
     public host: string = 'localhost';
-    public jsonSocket?: net.Socket;
+    public dapSocket?: net.Socket;
     public sinkSocket?: net.Socket;
-    public jsonServer?: net.Server;
+    public dapServer?: net.Server;
     public sinkServer?: net.Server;
-    public jsonPort: number = -1;
+    public dapPort: number = -1;
     public sinkPort: number = -1;
 
     constructor(
         handleLine: LineHandler,
-        handleJson: JsonHandler,
+        handleDapString: DapHandler,
         echoStdin?: (text: string) => void
     ){
         // store line/json handlers (are called by this.handleData)
         this.handleLine = handleLine;
-        this.handleJsonString = handleJson;
+        this.handleDapString = handleDapString;
         this.echoStdin = echoStdin || ((text: string) => {/* dummy */});
     }
     
@@ -60,19 +60,19 @@ export class RSession {
 
         // set up json port
         // used for protocol messages, formatted as json
-        const jsonPort = args.jsonPort || 0;
-        const jsonServerReady = new Subject();
+        const dapPort = args.dapPort || 0;
+        const dapServerReady = new Subject();
 
-        this.jsonServer = net.createServer((socket) => {
+        this.dapServer = net.createServer((socket) => {
             socket.on('data', (data) => {
-                this.handleData(data, 'jsonSocket');
-                logger.log('jsonIn', data);
+                this.handleData(data, 'dapSocket');
+                logger.log('dapOut', data);
             });
-            this.jsonSocket = socket;
+            this.dapSocket = socket;
         });
-        this.jsonServer.listen(jsonPort, this.host, () => {
-            this.jsonPort = getPortNumber(this.jsonServer);
-            jsonServerReady.notify();
+        this.dapServer.listen(dapPort, this.host, () => {
+            this.dapPort = getPortNumber(this.dapServer);
+            dapServerReady.notify();
         });
 
         // set up sink port
@@ -95,7 +95,7 @@ export class RSession {
 
         // wait for servers to connect to port
         const timeout = config().get<number>('timeouts.startup', 1000);
-        await jsonServerReady.wait(timeout);
+        await dapServerReady.wait(timeout);
         await sinkServerReady.wait(timeout);
 
         return true;
@@ -115,11 +115,11 @@ export class RSession {
             logger.error('No child process available');
         }
     }
-    public writeToJsonSocket(text: string): void {
-        this.jsonSocket?.write(text);
-        logger.log('jsonOut', text);
-        if(!this.jsonSocket){
-            logger.error('No Json socket available');
+    public writeToDapSocket(text: string): void {
+        this.dapSocket?.write(text);
+        logger.log('dapOut', text);
+        if(!this.dapSocket){
+            logger.error('No DAP socket available');
         }
     }
 
@@ -139,11 +139,17 @@ export class RSession {
     public handleData(data: Buffer, from: DataSource): void{
 
         let text: string = data.toString();
-        text = text.replace(/\r/g,''); //keep only \n as linebreak
+        // text = text.replace(/\r/g,''); //keep only \n as linebreak
         text = (this.restOfLine[from] || '') + text; // append to rest of line from previouse call
         const lines = text.split(/\n/); // split into lines
 
         // logger.debug(`data from ${from}: ${text}`);
+        // 
+        if(from === 'dapSocket'){
+            const restOfLine = this.handleDapString(text);
+            this.restOfLine[from] = restOfLine;
+            return;
+        }
         
         for(let i = 0; i<lines.length; i++){
 			// abort output handling if ignoreOutput has been set to true
@@ -156,8 +162,8 @@ export class RSession {
             let restOfLine: string;
             if(isLastLine && line === ''){
                 restOfLine = '';
-            } else if(from === 'jsonSocket'){
-                restOfLine = this.handleJsonString(line, from, !isLastLine);
+            // } else if(from === 'dapSocket'){
+                // restOfLine = this.handleDapString(line, from, !isLastLine);
             } else{
                 restOfLine = this.handleLine(line, from, !isLastLine);
             }

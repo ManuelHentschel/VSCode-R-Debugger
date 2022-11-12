@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 
 
 export type SourceName = (
-    'stdin' | 'stdout' | 'stderr' | 'jsonIn' | 'jsonOut' | 'sink' | 'DAP' |
+    'stdin' | 'stdout' | 'stderr' | 'dapOut' | 'dapIn' | 'sink' | 'DAP' |
     'info' | 'debug' | 'error' | 'cpinfo' | ''
 );
 

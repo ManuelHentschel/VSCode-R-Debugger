@@ -82,12 +82,12 @@ export class DebugAdapter implements vscode.DebugAdapter {
                     sendResponse = false;
                     break;
                 }
-                case 'launch':
-                    dispatchToR = true;
-                    sendResponse = false;
-                    logger.info('Launch Arguments:', request.arguments);
-                    this.runtime.endOutputGroup();
-                    break;
+                // case 'launch': {
+                //     dispatchToR = true;
+                //     sendResponse = false;
+                //     logger.info('Launch Arguments:', request.arguments);
+                //     break;
+                // }
                 case 'evaluate': {
                     const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments?.expression);
                     if(matches){
@@ -102,7 +102,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                     }
                     break;
                 }
-                case 'disconnect':
+                case 'disconnect': {
                     // kill R process after timeout, in case it doesn't quit successfully
                     setTimeout(()=>{
                         logger.info('Killing R...');
@@ -111,6 +111,7 @@ export class DebugAdapter implements vscode.DebugAdapter {
                     dispatchToR = true;
                     sendResponse = false;
                     break;
+                }
                 case 'continue': {
                     // pass info about the currently open text editor
                     // can be used to start .vsc.debugSource(), when called from global workspace
@@ -125,15 +126,16 @@ export class DebugAdapter implements vscode.DebugAdapter {
                     sendResponse = false;
                     break;
                 }
-                case 'pause':
+                case 'pause': {
                     // this._runtime.killR('SIGSTOP'); // doesn't work
                     response.success = false;
                     break;
-                default:
+                }
+                default: {
                     // request not handled here -> send to R
                     dispatchToR = true;
                     sendResponse = false;
-                // end cases
+                }
             }
         } catch (e) {
             logger.error('Error while handling request:', request, e);
