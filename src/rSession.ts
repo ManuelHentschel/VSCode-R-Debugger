@@ -1,7 +1,7 @@
 
 
 import * as child from 'child_process';
-import { LineHandler, DapHandler, DataSource } from'./debugRuntime';
+import { LineHandler, DataSource, DapHandler } from'./debugRuntime';
 import { RStartupArguments } from './debugProtocolModifications';
 import { config, getPortNumber } from './utils';
 import * as net from 'net';
@@ -16,9 +16,10 @@ import kill = require('tree-kill');
 export class RSession {
     private cp?: child.ChildProcessWithoutNullStreams;
     private handleLine: LineHandler;
-    private handleDapString: DapHandler;
+    private handleDapData: DapHandler;
     private echoStdin: (text: string) => void;
     private restOfLine: {[k in DataSource]?: string} = {};
+    private restOfDap: Buffer = Buffer.from('');
 
     public ignoreOutput: boolean = false;
 
@@ -32,12 +33,12 @@ export class RSession {
 
     constructor(
         handleLine: LineHandler,
-        handleDapString: DapHandler,
+        handleDapData: DapHandler,
         echoStdin?: (text: string) => void
     ){
         // store line/json handlers (are called by this.handleData)
         this.handleLine = handleLine;
-        this.handleDapString = handleDapString;
+        this.handleDapData = handleDapData;
         this.echoStdin = echoStdin || ((text: string) => {/* dummy */});
     }
     
@@ -66,7 +67,7 @@ export class RSession {
         this.dapServer = net.createServer((socket) => {
             socket.on('data', (data) => {
                 this.handleData(data, 'dapSocket');
-                logger.log('dapOut', data);
+                logger.log('dapIn', data);
             });
             this.dapSocket = socket;
         });
@@ -138,22 +139,24 @@ export class RSession {
 
     public handleData(data: Buffer, from: DataSource): void{
 
+        // logger.debug(`data from ${from}: ${text}`);
+        // 
+        if(from === 'dapSocket'){
+            data = Buffer.concat([this.restOfDap, data]);
+            const restOfLine = this.handleDapData(data);
+            this.restOfDap = restOfLine;
+            return;
+        }
+        
+
         let text: string = data.toString();
         // text = text.replace(/\r/g,''); //keep only \n as linebreak
         text = (this.restOfLine[from] || '') + text; // append to rest of line from previouse call
         const lines = text.split(/\n/); // split into lines
 
-        // logger.debug(`data from ${from}: ${text}`);
-        // 
-        if(from === 'dapSocket'){
-            const restOfLine = this.handleDapString(text);
-            this.restOfLine[from] = restOfLine;
-            return;
-        }
-        
         for(let i = 0; i<lines.length; i++){
-			// abort output handling if ignoreOutput has been set to true
-			// used to avoid handling remaining output after debugging has been stopped
+            // abort output handling if ignoreOutput has been set to true
+            // used to avoid handling remaining output after debugging has been stopped
             if(this.ignoreOutput){
                 return;
             }

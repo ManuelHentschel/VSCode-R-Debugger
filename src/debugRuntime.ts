@@ -15,7 +15,7 @@ import { Subject } from './subject';
 import { logger } from './logging';
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
-export type DapHandler = (dap: string) => string;
+export type DapHandler = (dap: Buffer) => Buffer;
 
 export type DataSource = 'stdout'|'stderr'|'dapSocket'|'sinkSocket'|'stdin';
 export type OutputMode = 'all'|'filtered'|'nothing';
@@ -125,15 +125,15 @@ export class DebugRuntime extends EventEmitter {
 		const tmpHandleLine: LineHandler = (line: string, from: DataSource, isFullLine: boolean) => {
 			return this.handleLine(line, from, isFullLine);
 		};
-		const tmpHandleDapString: DapHandler = (dap: string) => {
-			return this.handleDapString(dap);
+		const tmpHandleDapData: DapHandler = (dap: Buffer) => {
+			return this.handleDapData(dap);
 		};
 		const tmpEchoStdin = (text: string) => {
 			if(this.outputModes['stdin'] === 'all'){
 				setTimeout(() => this.writeOutput(text, false, 'stdout'), 0);
 			}
 		};
-		this.rSession = new RSession(tmpHandleLine, tmpHandleDapString, tmpEchoStdin);
+		this.rSession = new RSession(tmpHandleLine, tmpHandleDapData, tmpEchoStdin);
 		// check that the child process launched properly
 		const successTerminal = await this.rSession.startR(rStartupArguments);
 		if (!successTerminal) {
@@ -413,10 +413,10 @@ export class DebugRuntime extends EventEmitter {
 		};
 		this.dispatchRequest(request);
 	}
-
-	protected handleDapString(dap: string): string {
+	
+	protected handleDapData(dap: Buffer): Buffer {
 		while(dap.length > 0){
-			const m = /^Content-Length: (\d+)\r\n\r\n/.exec(dap);
+			const m = /^Content-Length: (\d+)\r\n\r\n/.exec(dap.toString('utf-8'));
 			if(!m){
 				break;
 			}
@@ -425,10 +425,11 @@ export class DebugRuntime extends EventEmitter {
 			if(dap.length < headerLength + contentLength){
 				break;
 			}
-			const jsonString = dap.substr(headerLength, contentLength);
+			const jsonString = dap.slice(headerLength, headerLength + contentLength).toString('utf-8');
+			// const jsonString = dap.substr(headerLength, contentLength);
 			const json = <{[key: string]: any}>JSON.parse(jsonString);
 			this.handleJson(json);
-			dap = dap.substr(headerLength + contentLength);
+			dap = dap.slice(headerLength + contentLength);
 		}
 		return dap;
 	}

@@ -2,6 +2,8 @@
 
 # options(error = traceback)
 
+# options(vsc.doLogPrint = TRUE)
+
 options(vsc.matricesByRow = FALSE)
 options(vsc.dataFramesByRow = TRUE)
 
@@ -117,6 +119,7 @@ s3 <- "a"
 s4 <- 1 + 2i
 s5 <- TRUE
 s6 <- charToRaw("h")
+s7 <- 'öé'
 
 # ...
 fun <- function(x, y=x, ...) {
