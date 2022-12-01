@@ -119,7 +119,7 @@ s3 <- "a"
 s4 <- 1 + 2i
 s5 <- TRUE
 s6 <- charToRaw("h")
-s7 <- 'öé'
+# s7 <- 'öé' # <- this currently causes the debugger to freeze!!!
 
 # ...
 fun <- function(x, y=x, ...) {

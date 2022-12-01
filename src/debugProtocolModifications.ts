@@ -1,6 +1,6 @@
 
 
-import { DebugProtocol } from 'vscode-debugprotocol';
+import { DebugProtocol } from '@vscode/debugprotocol';
 
 import * as vsCode from 'vscode';
 // import { DebugProtocol } from './debugProtocol';

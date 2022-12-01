@@ -5,7 +5,7 @@ import { config, escapeForRegex, getRStartupArguments, timeout, escapeStringForR
 import { checkPackageVersion } from './installRPackage';
 
 import { RSession } from './rSession';
-import { DebugProtocol } from 'vscode-debugprotocol';
+import { DebugProtocol } from '@vscode/debugprotocol';
 import * as MDebugProtocol from './debugProtocolModifications';
 import { explainRPackage, PackageVersionInfo } from './installRPackage';
 import { RExtension, HelpPanel } from './rExtensionApi';

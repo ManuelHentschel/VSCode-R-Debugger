@@ -16,7 +16,7 @@ import { HelpPanel } from './rExtensionApi';
 import { logger } from './logging';
 import * as MDebugProtocol from './debugProtocolModifications';
 
-import { DebugProtocol } from 'vscode-debugprotocol';
+import { DebugProtocol } from '@vscode/debugprotocol';
 import * as vscode from 'vscode';
 
 
