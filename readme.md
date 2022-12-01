@@ -72,6 +72,13 @@ in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv
 For a detailed explanation of possible launch config entries and other settings, see
 [Configuration](https://manuelhentschel.github.io/vscDebugger/articles/configuration.html).
 
+## Encoding issues on windows
+Due to some changes in v0.5.0 concerning the communication between this extension and the R package `vscDebugger`,
+combined with the way non-utf-8 encodings are handled in R,
+there might be some problems with this extension on Windows.
+However, as of R-version 4.2.2, R can handle UTF-8 encoded communication on Windows much better.
+To avoid these issues, it is recommended to update R to at least v4.2.2 and use the latest version of this extension and the related R package.
+
 ## How it works
 The debugger works as follows:
 
