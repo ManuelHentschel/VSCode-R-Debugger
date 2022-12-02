@@ -2,7 +2,7 @@
   "name": "r-debugger",
   "displayName": "R Debugger",
   "description": "R Debugger for VS Code",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "RDebugger",
   "license": "MIT",
   "author": {
@@ -11,7 +11,7 @@
   "rPackageInfo": {
     "name": "vscDebugger",
     "required": "0.5.0",
-    "recommended": "0.5.1",
+    "recommended": "0.5.2",
     "warnIfNewer": "0.6.0"
   },
   "repository": {
