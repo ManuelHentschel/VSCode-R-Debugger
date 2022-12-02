@@ -119,7 +119,8 @@ s3 <- "a"
 s4 <- 1 + 2i
 s5 <- TRUE
 s6 <- charToRaw("h")
-# s7 <- 'öé' # <- this currently causes the debugger to freeze!!!
+s7 <- 'öé'
+s8 <- '\xf6' # <- this is read literally on linux, windows-4.2.2; but as "ö" on windows-4.1.0 (?)
 
 # ...
 fun <- function(x, y=x, ...) {
