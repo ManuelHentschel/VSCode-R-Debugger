@@ -5,10 +5,10 @@ import { join } from 'path';
 import semver = require('semver');
 
 export interface PackageVersionInfo {
-	versionOk: boolean;
+    versionOk: boolean;
     shortMessage: string;
     longMessage?: string;
-	version?: string;
+    version?: string;
 }
 
 export type VersionCheckLevel = 'none'|'required'|'recommended';
@@ -24,9 +24,9 @@ export async function updateRPackage(extensionPath: string, packageName:string =
         '--no-restore',
         '--quiet',
         '-f',
-        `"${join(extensionPath, 'R', 'install.R')}"`,
+        `${join(extensionPath, 'R', 'install.R')}`,
         '--args',
-        `"${url}"`
+        `${url}`
     ];
     const processExecution = new vscode.ProcessExecution(rPath, args);
     const installationTask = new vscode.Task(
