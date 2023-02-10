@@ -13,50 +13,9 @@ export interface PackageVersionInfo {
 
 export type VersionCheckLevel = 'none'|'required'|'recommended';
 
-
-export async function updateRPackage(extensionPath: string, packageName:string = 'vscDebugger'): Promise<void> {
-    const url = getRDownloadLink(packageName);
-    const rPath = (await getRStartupArguments()).path.replace(/^"(.*)"$/, '$1');
-    const taskDefinition: vscode.TaskDefinition = {
-        type: 'process'
-    };
-    const args = [
-        '--no-restore',
-        '--quiet',
-        '-f',
-        `"${join(extensionPath, 'R', 'install.R')}"`,
-        '--args',
-        `"${url}"`
-    ];
-    const processExecution = new vscode.ProcessExecution(rPath, args);
-    const installationTask = new vscode.Task(
-        taskDefinition,
-        vscode.TaskScope.Global,
-        'Install vscDebugger',
-        'R-Debugger',
-        processExecution
-    );
-    
-    const taskExecutionRunning = await vscode.tasks.executeTask(installationTask);
-    
-    const taskDonePromise = new Promise<void>((resolve) => {
-        vscode.tasks.onDidEndTask(e => {
-            if (e.execution === taskExecutionRunning) {
-                resolve();
-            }
-        });
-    });
-    
-    return await taskDonePromise;
-}
-
 export function explainRPackage(writeOutput: (text: string)=>void, message: string = ''): void {
     message = message + (
-        '\n\nIt can be attempted to install this package and the dependencies (currently R6 and jsonlite) automatically.'
-        + '\n\nTo do so, run the following command in the command palette (ctrl+shift+p):'
-        + '\n\n\n\t\t' + 'r.debugger.updateRPackage' + '\n'
-        + '\n\nThis feature is still somewhat experimental!'
-        + '\n\nIf this does not work or you want to make sure you have the latest version, follow the instructions in the readme to install the package yourself.'
+        '\n\n Follow the instructions in the readme to install the package yourself.'
         + '\n\n\n'
     );
 

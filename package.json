@@ -30,7 +30,6 @@
     "Debuggers"
   ],
   "activationEvents": [
-    "onCommand:r.debugger.updateRPackage",
     "onCommand:r.debugger.showDataViewer",
     "onDebugDynamicConfigurations:R-Debugger",
     "onDebug"
@@ -43,11 +42,6 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "r.debugger.updateRPackage",
-        "title": "Update or install the required R Package",
-        "category": "R Debugger"
-      },
       {
         "command": "r.debugger.showDataViewer",
         "title": "Show in data viewer",
