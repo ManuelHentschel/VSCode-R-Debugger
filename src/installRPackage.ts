@@ -11,11 +11,11 @@ export interface PackageVersionInfo {
     version?: string;
 }
 
-export type VersionCheckLevel = 'none'|'required'|'recommended';
+type VersionCheckLevel = 'none'|'required'|'recommended';
 
 
-export async function updateRPackage(extensionPath: string, packageName:string = 'vscDebugger'): Promise<void> {
-    const url = getRDownloadLink(packageName);
+export async function updateRPackage(extensionPath: string): Promise<void> {
+    const url = getRDownloadLink();
     const rPath = (await getRStartupArguments()).path.replace(/^"(.*)"$/, '$1');
     const taskDefinition: vscode.TaskDefinition = {
         type: 'process'

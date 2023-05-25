@@ -8,7 +8,20 @@ import path = require('path');
 import fs = require('fs');
 import winreg = require('winreg');
 
-const packageJson = <{[key: string]: any}>(require('../package.json'));
+export interface RPackageInfo {
+    name: string,
+    required: string,
+    recommended: string,
+    warnIfNewer: string
+}
+
+export interface PackageJson {
+    [key: string]: any
+    rPackageInfo: RPackageInfo
+    version: string
+}
+
+const packageJson = <PackageJson>(require('../package.json'));
 
 export function config(onlyDebugger: boolean = true): vscode.WorkspaceConfiguration {
     if(onlyDebugger){
@@ -148,19 +161,21 @@ export async function getRStartupArguments(launchConfig: {
 }
 
 
-export function getRDownloadLink(packageName: string): string{
+export function getRDownloadLink(): string{
     let url: string = config().get<string>('packageURL', '');
 
     if(url === ''){
-        const platform: string = process.platform;
-        const version: string = String(packageJson.version); // e.g. "0.1.2"
+        const platform = process.platform;
+        const extensionVersion = packageJson.version;
+        const rPackageVersion = packageJson.rPackageInfo.recommended; // e.g. "0.1.2"
+        const rPackageName = packageJson.rPackageInfo.name;
         const urlBase = 
             'https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/download/v' +
-            version +
+            extensionVersion +
             '/' +
-            packageName +
+            rPackageName +
             '_' +
-            version;
+            rPackageVersion;
 
         if(platform === 'win32'){
             url = urlBase + '.zip';
@@ -181,19 +196,8 @@ export function escapeForRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
-export interface RequiredRPackageVersion {
-    name?: string,
-    required?: string,
-    recommended?: string,
-    warnIfNewer?: string
-}
-
-export function getRequiredRPackageVersion(): RequiredRPackageVersion {
-    if(typeof packageJson.rPackageInfo === 'object'){
-        return <RequiredRPackageVersion>packageJson.rPackageInfo;
-    } else{
-        return {};
-    }
+export function getRequiredRPackageVersion(): RPackageInfo {
+    return packageJson.rPackageInfo;
 }
 
 
