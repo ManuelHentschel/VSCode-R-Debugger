@@ -64,7 +64,7 @@ The specified file is executed using the default `source` command and breakpoint
 The remaining config entries are:
 * `"workingDirectory"`: An absolute path to the desired work directory.
 Defaults to the workspace folder.
-The R process is always launched in the workspace folder (reading the `.Rprofile` there) and then changes directory.
+The R process is launched in this directory (reading the `.Rprofile` there).
 * `"file"`: Required for debug modes `"file"` and `"function"`. The file to be debugged/sourced before calling the main function.
 * `"mainFunction"`: Only used for debug mode `"function"`.
 The name of the main function to be debugged. Must be callable without arguments.
