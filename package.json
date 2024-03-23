@@ -50,8 +50,7 @@
       },
       {
         "command": "r.debugger.showDataViewer",
-        "title": "Show in data viewer",
-        "enablement": "false"
+        "title": "Show in data viewer"
       }
     ],
     "menus": {
