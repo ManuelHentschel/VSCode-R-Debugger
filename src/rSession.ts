@@ -182,8 +182,8 @@ function spawnRProcess(args: RStartupArguments){
     const options: child.SpawnOptionsWithoutStdio = {
         env: {
             VSCODE_DEBUG_SESSION: '1',
-            ...args.env,
-            ...process.env
+            ...process.env,
+            ...args.env
         },
         shell: true,
         cwd: args.cwd
