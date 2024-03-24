@@ -155,6 +155,7 @@ If no values are set, the defaults listed below are used.
 * `"vsc.showCustomAttributes" = TRUE`: Whether to show custom attributes in the variables view
 * `"vsc.showEvaluateName" = TRUE`: Whether to include an evaluate name to copy variables to another R session. Can be disabled for performance reasons when working with large variables/lists/vectors.
 * `"vsc.showInternalFrames" = FALSE`: Whether to show the frames on the bottom of the stack that belong to the R package 
+* `"vsc.showPromiseDetails" = FALSE`: Whether to show promise code and environment as child variables.
 * `"vsc.showUnclass" = TRUE`: Whether to show the value of `unclass()` in the variables view for object variables.
 * `"vsc.supportSetVariable" = TRUE`: Whether to enable support for settings the value of variables from the variables window
 * `"vsc.supportTerminateRequest" = FALSE`: Whether to try and exit only the main function/file when stop (Shift+F5) is used, preserving the R session itself.
