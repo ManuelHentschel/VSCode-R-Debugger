@@ -151,6 +151,9 @@ main <- function() {
 
 #
 
-f <- function(){
-  print("'#")
+f <- function(...){
+  print("'#") # <- Breakpoint here to show ellipsis in variable view
+  print(...)
 }
+
+f(1, 2)
