@@ -217,6 +217,11 @@
                 "default": "main",
                 "markdownDescription": "The name of the main function, if a single function is being debugged. Must be callable without arguments."
               },
+              "splitOverwrittenOutput": {
+                "type": "boolean",
+                "default": false,
+                "markdownDescription": "Whether to show the overwritten output in the normal stdout/stderr as well."
+              },
               "overwritePrint": {
                 "type": "boolean",
                 "default": true,
