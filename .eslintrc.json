@@ -21,6 +21,7 @@
         "@typescript-eslint/no-unused-vars": "off",
         "@typescript-no-unused-vars": "off",
         "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-var-requires": "off",
         "curly": "warn",
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
