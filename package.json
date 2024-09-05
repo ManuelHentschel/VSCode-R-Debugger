@@ -24,14 +24,12 @@
   },
   "icon": "images/Rlogo.png",
   "engines": {
-    "vscode": "^1.50.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Debuggers"
   ],
   "activationEvents": [
-    "onCommand:r.debugger.updateRPackage",
-    "onCommand:r.debugger.showDataViewer",
     "onDebugDynamicConfigurations:R-Debugger",
     "onDebug"
   ],
@@ -507,7 +505,7 @@
   "devDependencies": {
     "@types/node": "^13.13.27",
     "@types/semver": "^7.3.4",
-    "@types/vscode": "^1.50.0",
+    "@types/vscode": "^1.75.0",
     "@types/winreg": "^1.2.30",
     "@typescript-eslint/eslint-plugin": "^4.8.1",
     "@typescript-eslint/parser": "^4.8.1",
