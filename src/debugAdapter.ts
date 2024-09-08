@@ -5,7 +5,7 @@ This file contains an implementation of vscode.Debugadapter.
 DAP messages are received via `DebugAdapter.handleMessage` and sent via
 `onDidSendMessage`.
 
-Most messages are simply passed to the R pacakge by calling
+Most messages are simply passed to the R package by calling
 `this.debugRuntime.dispatchRequest()`, only some requests are modified/handled
 in `this.dispatchRequest()`.
 */
