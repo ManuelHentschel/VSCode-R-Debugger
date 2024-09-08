@@ -27,24 +27,31 @@ For many variables it is also possible to assign a new value to the variable or 
 ## Installation
 The latest version of the VS Code extension can be installed from the
 [marketplace](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).
-After installing the extension, the R package can be installed using the command 
-`r.debugger.updateRPackage`.
-If this does not work, you can find the source code and compiled binaries on the
+After installing the extension, the R package can be installed or updated using the command 
+`r.debugger.installOrUpdateRPackage`.
+If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in the setting `r.rpath.xxx`.
+
+If the package installation does not work,
+the command `r.debugger.installRPackage` will attempt to install from 
+a release on [r-universe.dev](https://manuelhentschel.r-universe.dev),
+the source code on [GitHub](https://GitHub.com/ManuelHentschel/vscDebugger),
+and a [GitHub Release](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases)
+(in that order).
+You can also install the package manually using
+```r
+# OPTION 1: From r-universe.dev:
+install.packages("vscDebugger", repos = "https://manuelhentschel.r-universe.dev")
+
+# OPTION 2: From source code on GitHub:
+remotes::install_github("ManuelHentschel/vscDebugger")
+```
+or from artifacts on the
 [releases site](https://github.com/ManuelHentschel/VSCode-R-Debugger/releases).
 
-The provided packages were built using the latest R release and might be incompatible with older R versions.
-In these cases it is necessary to build the package from code.
 
-If you want to install a development version, the VS Code extension can be installed from the .vsix-files found 
-[here](https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain).
-To download the correct file, filter the commits by branch, select the latest commit,
-and download the file `r-debugger.vsix` under the caption "Artifacts".
-To install the latest development version of the required R-package from GitHub, run
-`devtools::install_github("ManuelHentschel/vscDebugger")`
-or install from the artifacts found 
-[here](https://github.com/ManuelHentschel/vscDebugger/actions).
-
-If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in `r.rpath.xxx`.
+If you want to install a development version of the extension,
+it can be installed from the .vsix-files found in the artifacts of the
+[GitHub Actions Workflows](https://github.com/ManuelHentschel/VSCode-R-Debugger/actions?query=workflow%3Amain).
 
 ## Using the Debugger
 ### Launch Mode
@@ -119,7 +126,7 @@ to compile the binaries and again with
 to retain the source information.
 
 The packages that are being debugged then need to be specified in the launch config as follows:
-```json
+```jsonc
 "debuggedPackages": ["MyPackage"],
 ...
 ```

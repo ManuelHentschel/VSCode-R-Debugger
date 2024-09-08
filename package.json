@@ -42,8 +42,18 @@
   "contributes": {
     "commands": [
       {
-        "command": "r.debugger.updateRPackage",
-        "title": "Update or install the required R Package",
+        "command": "r.debugger.installOrUpdateRPackage",
+        "title": "Install or update the required R Package (quick)",
+        "category": "R Debugger"
+      },
+      {
+        "command": "r.debugger.installRPackage",
+        "title": "Install the required R Package (slow, multiple sources)",
+        "category": "R Debugger"
+      },
+      {
+        "command": "r.debugger.removeRPackage",
+        "title": "Remove the required R Package",
         "category": "R Debugger"
       },
       {

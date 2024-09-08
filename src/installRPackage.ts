@@ -1,7 +1,7 @@
 
 import { getRDownloadLink, getRStartupArguments, config, getRequiredRPackageVersion } from './utils';
 import * as vscode from 'vscode';
-import { join } from 'path';
+import * as path from 'path';
 import semver = require('semver');
 
 export interface PackageVersionInfo {
@@ -13,18 +13,31 @@ export interface PackageVersionInfo {
 
 type VersionCheckLevel = 'none'|'required'|'recommended';
 
+type InstallType = 'install'|'installOrUpdate'|'remove';
 
-export async function updateRPackage(extensionPath: string): Promise<void> {
+
+export async function installRPackage(extensionPath: string, installType: InstallType): Promise<void> {
     const url = getRDownloadLink();
     const rPath = (await getRStartupArguments()).path.replace(/^"(.*)"$/, '$1');
     const taskDefinition: vscode.TaskDefinition = {
         type: 'process'
     };
+    let filename: string;
+    if(installType==='installOrUpdate'){
+        filename = 'install_or_update.R';
+    } else if(installType==='remove'){
+        filename = 'remove.R';
+    } else {
+        filename = 'install.R';
+    }
+    filename = `${path.join(extensionPath, 'R', filename)}`;
+
     const args = [
         '--no-restore',
+        '--no-save',
         '--quiet',
         '-f',
-        `${join(extensionPath, 'R', 'install.R')}`,
+        filename,
         '--args',
         `${url}`
     ];

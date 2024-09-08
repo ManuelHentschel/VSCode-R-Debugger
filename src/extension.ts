@@ -1,7 +1,7 @@
 
 import * as vscode from 'vscode';
 
-import { updateRPackage } from './installRPackage';
+import { installRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
 
 import { RExtension, HelpPanel } from './rExtensionApi';
@@ -64,7 +64,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('r.debugger.updateRPackage', () => updateRPackage(context.extensionPath)),
+		vscode.commands.registerCommand('r.debugger.installOrUpdateRPackage', () => installRPackage(context.extensionPath, 'installOrUpdate')),
+		vscode.commands.registerCommand('r.debugger.installRPackage', () => installRPackage(context.extensionPath, 'install')),
+		vscode.commands.registerCommand('r.debugger.removeRPackage', () => installRPackage(context.extensionPath, 'remove')),
 		vscode.commands.registerCommand('r.debugger.showDataViewer', (arg: DebugWindowCommandArg) => {
 			showDataViewer(arg);
 		})
