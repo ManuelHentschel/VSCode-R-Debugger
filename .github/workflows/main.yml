@@ -12,7 +12,7 @@ jobs:
       - name: Identify output file # can be retrieved as steps.filenames.outputs.file_out
         id: filenames
         run: echo "::set-output name=file_out::$(ls | grep "^.*\.vsix$" | head -1)"
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.filenames.outputs.file_out }}
           path: ${{ steps.filenames.outputs.file_out }}
