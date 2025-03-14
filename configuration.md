@@ -31,12 +31,8 @@ It is recommended to set this setting to `recommended` or `required`.
 These settings can be set by editing the `settings.json`, either globally or on a per workspace basis.
 They are useful mostly for debugging the debugger itself and their behaviour might change without notice.
 
-* `r.debugger.logLevelRuntime`, `r.debugger.logLevelSession`, `r.debugger.logLevelRSession`
-(`"silent"|"info"|"debug"`):
-Log level of the debugger itself
-(visible e.g. in the 'parent session' when running the debugger from code).
 * `r.debugger.packageURL`: Overwrite for the URL used to download the R package when installing it automatically.
-* `r.debugger.printStdout`, `r.debugger.printStderr`, `r.debugger.printSinkSocket` (`"nothing"|"all"|"filtered"`):
+* `r.debugger.printStdout`, `r.debugger.printStderr`, `r.debugger.printStdin`, `r.debugger.printSinkSocket` (`"nothing"|"all"|"filtered"`):
 To what extent output by the R process is printed to the debug console.
 
 ## 3. Launch Config
@@ -62,6 +58,7 @@ To provide a somewhat 'cleaner' method of running code, this debug mode can be u
 The specified file is executed using the default `source` command and breakpoints are set by using R's `trace(..., tracer=browser)` function, which is more robust than the custom breakpoint mechanism.
 
 The remaining config entries are:
+
 * `"workingDirectory"`: An absolute path to the desired work directory.
 Defaults to the workspace folder.
 The R process is launched in this directory (reading the `.Rprofile` there).
@@ -82,7 +79,8 @@ For config entries shared with attach requests see 3.3.
 These configurations are specified by the entry `"request": "attach"`.
 In this mode, the debugger is attached to an already running R process.
 To answer the requests sent by VS Code, the function `.vsc.listenForDAP()` must be called manually.
-This mode is ideal to give the user a more direct access to the R process.
+This mode gives the user a more direct access to the R process.
+However, support of breakpoints and `.vsc.debugSource()` is limited and might not work as expected.
 
 This mode should work fine with the defaults, but can be finetuned with the following config entries:
 
@@ -93,8 +91,6 @@ Whether to use a separate socket for custom events.
 Is necessary to allow flow control (stepping through code).
 * `"customPort"`: Port number of custom socket. Leave emtpy/0 to assign automatically.
 * `"customHost"`: Host name of custom socket. Leave empty to use localhost.
-* `"splitOverwrittenOutput"`:
-Whether to show the overwritten output in the normal stdout/stderr as well.
 
 
 ### 3.3 Shared config entries
@@ -113,6 +109,8 @@ Breakpoints and the modified `print`/`cat`/`message`/`str` functions are applied
 * `"overwriteStr"`: Same as above for `str()`.
 * `"overwriteMessage"`: Same as above for `message()`
 * `"overwriteSource"`: Whether to overwrite the `source` function with a custom version that is affected by breakpoints set in VS Code.
+* `"splitOverwrittenOutput"`:
+Whether to show the overwritten output in the normal stdout/stderr as well.
 
 
 ## 4. R Options
@@ -144,6 +142,7 @@ If no values are set, the defaults listed below are used.
 * `"vsc.defaultOverwriteStr" = TRUE` Default value for the launch config entry `overwriteStr`
 * `"vsc.defaultSetBreakpointsInPackages" = FALSE` Default value for the launch config entry `setBreakpointsInPackages`
 * `"vsc.deparseMaxBytes" = 1e5`: Maximum size for variables to be deparsed.
+* `"vsc.doLogPrint" = FALSE`: Whether to show output from internal functions `logCat` and `logPrint`. This is used for debugging the `vscDebugger` package itself.
 * `"vsc.dropArrays" = TRUE`: Whether to skip dimensions of size one when showing arrays in the variables window
 * `"vsc.evaluateActiveBindings" = FALSE`: Whether to evaluate active bindings and show the value in the variables view
 * `"vsc.groupAttributes" = FALSE`: Whether to group attributes in the variables view

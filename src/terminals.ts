@@ -82,7 +82,7 @@ export class TerminalHandler {
     public constructor(port: number = 0, host: string = 'localhost'){
         const timeout = config().get<number>('timeouts.startup', 1000);
         this.server = net.createServer((socket) => {
-            logger.debug('Cusotm server: connection!');
+            logger.debug('Custom server: connection!');
             socket.on('data', (data) => {
                 this.handleData(data, socket);
             });
