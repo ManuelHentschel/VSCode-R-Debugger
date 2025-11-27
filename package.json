@@ -207,6 +207,11 @@
                 "default": true,
                 "markdownDescription": "Whether to allow debugging in the global workspace after running the function/file."
               },
+              "rPath": {
+                "type": "string",
+                "markdownDescription": "Path to an R executable. Set to the empty string to use the path from the settings.",
+                "default": ""
+              },
               "workingDirectory": {
                 "type": "string",
                 "markdownDescription": "Absolute path to a directory. Is switched to using `setwd()` after launching R.",

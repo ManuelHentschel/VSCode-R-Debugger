@@ -64,6 +64,7 @@ export interface DebugConfiguration extends vsCode.DebugConfiguration {
 
 export interface LaunchConfiguration extends DebugConfiguration {
     request: 'launch';
+    rPath?: string;
     commandLineArgs?: string[];
     env?: {
         [key: string]: string;

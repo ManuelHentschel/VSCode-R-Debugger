@@ -50,7 +50,7 @@ function getRfromEnvPath(platform: string) {
     return '';
 }
 
-export async function getRpathFromSystem(): Promise<string> {
+async function getRpathFromSystem(): Promise<string> {
     
     let rpath = '';
     const platform: string = process.platform;
@@ -75,41 +75,49 @@ export async function getRpathFromSystem(): Promise<string> {
     return rpath;
 }
 
-export async function getRpath(quote: boolean=false, overwriteConfig?: string): Promise<string> {
-    let rpath: string | undefined = undefined;
-    
+export function getRpathFromConfig(): string | undefined {
+    const platform: string = process.platform;
     const configEntry = (
-        process.platform === 'win32' ? 'rpath.windows' :
-        process.platform === 'darwin' ? 'rpath.mac' :
+        platform === 'win32' ? 'rpath.windows' :
+        platform === 'darwin' ? 'rpath.mac' :
         'rpath.linux'
     );
+    return config(false).get<string>(configEntry);
+}
 
-    // try the config entry specified in the function arg:
-    if(overwriteConfig){
-        rpath = config().get<string>(overwriteConfig);
+export function quoteRPathIfNeeded(rpath: string): string {
+    if (/^'.* .*'$/.exec(rpath) || /^".* .*"$/.exec(rpath)) {
+        // already quoted
+        return rpath;
+    } else if (/.* .*/.exec(rpath)) {
+        // contains spaces, add quotes
+        if (process.platform === 'win32') {
+            return `"${rpath}"`;
+        } else {
+            return `'${rpath}'`;
+        }
+    } else {
+        // no spaces, no quotes needed
+        return rpath;
     }
+}
 
+export async function getRpath(): Promise<string> {
+    let rpath: string | undefined;
+    
     // try the os-specific config entry for the rpath:
-    rpath ||= config(false).get<string>(configEntry);
+    rpath = getRpathFromConfig();
 
     // read from path/registry:
     rpath ||= await getRpathFromSystem();
 
-    // represent all invalid paths (undefined, '', null) as '':
-    rpath ||= '';
-
     if(!rpath){
         // inform user about missing R path:
-        void vscode.window.showErrorMessage(`${process.platform} can't use R`);
-    } else if(quote && /^[^'"].* .*[^'"]$/.exec(rpath)){
-        // if requested and rpath contains spaces, add quotes:
-        rpath = `"${rpath}"`;
-    } else if(process.platform === 'win32' && /^'.* .*'$/.exec(rpath)){
-        // replace single quotes with double quotes on windows
-        rpath = rpath.replace(/^'(.*)'$/, '"$1"');
+        void vscode.window.showErrorMessage(`No R executable found. Please set the path in the settings r.rPath.xxx!`);
     }
 
-    return rpath;
+    // represent all invalid paths (undefined, '', null) as '':
+    return rpath || '';
 }
 
 export function getPortNumber(server?: net.Server): number {
@@ -131,10 +139,13 @@ export async function getRStartupArguments(launchConfig: {
     env?: {[key: string]: string};
     commandLineArgs?: string[];
     launchDirectory?: string;
+    rPath?: string;
 } = {}): Promise<RStartupArguments> {
     const platform: string = process.platform;
 
-    const rpath = await getRpath(true);
+    let rPath = launchConfig.rPath;
+    rPath ||= await getRpath();
+    rPath = quoteRPathIfNeeded(rPath);
 
     const rArgs: string[] = [
         '--quiet',
@@ -148,13 +159,13 @@ export async function getRStartupArguments(launchConfig: {
     rArgs.push(...(launchConfig.commandLineArgs || []));
 
     const ret: RStartupArguments = {
-        path: rpath,
+        path: rPath,
         args: rArgs,
         cwd: launchConfig.launchDirectory,
         env: launchConfig.env
     };
 
-    if(rpath === ''){
+    if(rPath === ''){
         void vscode.window.showErrorMessage(`${process.platform} can't find R`);
     }
     return ret;

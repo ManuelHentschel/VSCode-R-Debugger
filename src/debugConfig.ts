@@ -12,6 +12,7 @@ import { HelpPanel } from './rExtensionApi';
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { getRpathFromConfig } from './utils';
 
 
 export class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
@@ -214,8 +215,10 @@ export class DebugConfigurationResolver implements vscode.DebugConfigurationProv
 		config.debugMode ||= (docValid ? 'file' : 'workspace');
 		config.allowGlobalDebugging ??= true;
 
-		// fill custom capabilities/socket info
+		// fill custom capabilities/socket info/rPath
 		if(config.request === 'launch'){
+			// if not specified, set rPath from config
+			config.rPath ||= getRpathFromConfig();
 			// capabilities that are always true for this extension:
 			config.supportsStdoutReading = true;
 			config.supportsWriteToStdinEvent = true;

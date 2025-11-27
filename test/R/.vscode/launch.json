@@ -12,8 +12,12 @@
             "workingDirectory": "${workspaceFolder}",
             "allowGlobalDebugging": true,
             "env": {
-                "abc": "123"
-            }
+                "abc": "123",
+                "dcUserProfile": "${env:USERPROFILE}",
+                "dcUserHome": "${userHome}",
+                "dcRPath": "${userHome}/../../Program Files/R/R-4.3.3/bin/x64/R.exe",
+            },
+            "rPath": "${userHome}/../../Program Files/R/R-4.4.3/bin/x64/R.exe",
         },
         {
             "type": "R-Debugger",
