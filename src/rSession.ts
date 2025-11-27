@@ -52,10 +52,10 @@ export class RSession {
         }
 
 		// handle output from the R-process
-		this.cp.stdout.on('data', data => {
+		this.cp.stdout.on('data', (data: Buffer) => {
 			this.handleData(data, 'stdout');
 		});
-		this.cp.stderr.on('data', data => {
+		this.cp.stderr.on('data', (data: Buffer) => {
 			this.handleData(data, 'stderr');
         });
 

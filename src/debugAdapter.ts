@@ -89,7 +89,14 @@ export class DebugAdapter implements vscode.DebugAdapter {
                 //     break;
                 // }
                 case 'evaluate': {
-                    const matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(request.arguments?.expression);
+                    let matches: RegExpExecArray | null;
+                    const expr: unknown = request.arguments?.expression;
+                    if (typeof expr === 'string'){
+                        matches = /^### ?[sS][tT][dD][iI][nN]\s*(.*)$/s.exec(expr);
+                    } else {
+                        matches = null;
+                    }
+
                     if(matches){
                         // send directly to stdin, don't send request
                         const toStdin = matches[1];

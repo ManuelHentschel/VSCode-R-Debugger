@@ -454,9 +454,9 @@ export class DebugRuntime extends EventEmitter {
 			}
 		} else if(json.type === 'event'){
 			if(json.event === 'custom'){
-				const body = json.body as {[key: string]: any};
+				const body = json.body as MDebugProtocol.CustomEventBody;
 				if(body.reason === 'writeToStdin'){
-					this.handleWriteToStdinEvent(json.body);
+					this.handleWriteToStdinEvent(body);
 				} else if(body.reason === 'viewHelp' && body.requestPath){
 					this.helpPanel?.showHelpForPath(body.requestPath);
 				}

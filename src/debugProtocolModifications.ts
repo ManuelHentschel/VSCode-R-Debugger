@@ -192,6 +192,8 @@ export interface WriteToStdinBody {
     ppid?: number;
 }
 
+export type CustomEventBody = ViewHelpBody | WriteToStdinBody;
+
 // Used to send info to R that is not part of the DAP
 export interface CustomRequest extends DebugProtocol.Request {
     command: 'custom'

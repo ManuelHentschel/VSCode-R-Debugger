@@ -24,10 +24,6 @@ export class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescrip
 	createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
 		const config = session.configuration;
 		if(config.request === 'launch'){
-			const commandLineArgs = [];
-			if('commandLineArgs' in config){
-				commandLineArgs.push(...config.commandLineArgs);
-			}
 			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel, <LaunchConfiguration>config));
 		} else if(config.request === 'attach'){
 			const port = Number(config.port || 18721);

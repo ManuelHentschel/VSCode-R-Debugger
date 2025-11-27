@@ -37,19 +37,21 @@ export class Logger {
         txt.map((t) => this.logSingleText(source, t));
     }
     
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     log(source: SourceName, ...msg: any[]): void {
         const txt = msg.map(m => forceString(m));
         this.logText(source, ...txt);
     }
     
     info(...msg: any[]): void {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.log('info', ...msg);
     }
     debug(...msg: any[]): void {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.log('debug', ...msg);
     }
     error(...msg: any[]): void {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.log('error', ...msg);
     }
 }
