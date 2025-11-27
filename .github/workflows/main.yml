@@ -21,7 +21,5 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
-        with:
-          node-version: "13.x"
       - run: npm install
       - run: npm run lint
