@@ -1,14 +1,14 @@
 {
 	"compilerOptions": {
 		"module": "commonjs",
-        "target": "es2018",
-        "outDir": "out",
-        "lib": [
-            "es2018"
-        ],
+		"target": "es2021",
+		"outDir": "out",
+		"lib": [
+			"es2021"
+		],
 		"sourceMap": true,
 		"rootDir": "src",
-		"strict": true,   /* enable all strict type-checking options */
+		"strict": true, /* enable all strict type-checking options */
 		"strictNullChecks": true,
 		/* Additional Checks */
 		"noImplicitReturns": true, /* Report error when not all code paths in function return a value. */

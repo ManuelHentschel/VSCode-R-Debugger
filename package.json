@@ -518,21 +518,21 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/node": "^13.13.27",
-    "@types/semver": "^7.3.4",
-    "@types/vscode": "^1.75.0",
-    "@types/winreg": "^1.2.30",
-    "@typescript-eslint/eslint-plugin": "^4.8.1",
-    "@typescript-eslint/parser": "^4.8.1",
-    "eslint": "^7.14.0",
-    "typescript": "^4.1.2",
-    "@vscode/debugprotocol": "^1.65.0"
+    "@types/node": "^24.10.1",
+    "@types/semver": "^7.7.1",
+    "@types/vscode": "^1.106.1",
+    "@types/winreg": "^1.2.36",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "@vscode/debugprotocol": "^1.68.0"
   },
   "dependencies": {
-    "loglevel": "^1.7.0",
+    "loglevel": "^1.9.2",
     "net": "^1.0.2",
-    "semver": "^7.3.2",
+    "semver": "^7.7.3",
     "tree-kill": "^1.2.2",
-    "winreg": "^1.2.4"
+    "winreg": "^1.2.5"
   }
 }
