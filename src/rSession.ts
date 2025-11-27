@@ -126,12 +126,18 @@ export class RSession {
 
     // Kill the child process
     public killChildProcess(signal = 'SIGKILL'): void{
+        const pid = this.cp?.pid;
         if(!this.cp){
             // logger.info('No child process to kill');
         } else if(this.cp.exitCode === null){
-            logger.log('cpinfo', `sending signal ${signal}...`);
-            kill(this.cp.pid, signal);
-            logger.log('cpinfo', 'sent signal');
+            const pid = this.cp.pid;
+            if(pid === undefined){
+                logger.log('cpinfo', 'No pid found for child process');
+            } else{
+                logger.log('cpinfo', `sending signal ${signal}...`);
+                kill(pid, signal);
+                logger.log('cpinfo', 'sent signal');
+            }
         } else{
             logger.log('cpinfo', `process already exited with code ${this.cp.exitCode}`);
         }
