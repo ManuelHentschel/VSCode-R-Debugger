@@ -525,7 +525,7 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/semver": "^7.7.1",
-    "@types/vscode": "^1.106.1",
+    "@types/vscode": "^1.75.0",
     "@types/winreg": "^1.2.36",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
