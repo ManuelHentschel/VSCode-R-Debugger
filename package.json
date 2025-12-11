@@ -91,13 +91,17 @@
     "breakpoints": [
       {
         "language": "r"
+      },
+      {
+        "language": "rmd"
       }
     ],
     "debuggers": [
       {
         "type": "R-Debugger",
         "languages": [
-          "r"
+          "r",
+          "rmd"
         ],
         "label": "R Debugger",
         "program": "./out/debugAdapter.js",
