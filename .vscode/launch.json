@@ -12,7 +12,7 @@
 			"runtimeExecutable": "${execPath}",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
-				"${workspaceFolder}/test/R"
+				// "${workspaceFolder}/test/R"
 			],
 			"outFiles": [
 				"${workspaceFolder}/out/**/*.js"
