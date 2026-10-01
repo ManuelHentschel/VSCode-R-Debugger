@@ -1,12 +1,16 @@
 {
 	"compilerOptions": {
-		"module": "commonjs",
+		"module": "node16",
+		"moduleResolution": "node16",
 		"target": "es2021",
-		"outDir": "out",
 		"lib": [
 			"es2021"
 		],
+		"types": [ // required for tsc>=6.0
+			"node"
+		],
 		"sourceMap": true,
+		"outDir": "out",
 		"rootDir": "src",
 		"strict": true, /* enable all strict type-checking options */
 		"strictNullChecks": true,
