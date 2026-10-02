@@ -7,6 +7,7 @@ import * as net from 'net';
 import path = require('path');
 import fs = require('fs');
 import winreg = require('winreg');
+import { getRExtensionApi } from './extension';
 
 export interface RPackageInfo {
     name: string,
@@ -75,14 +76,23 @@ async function getRpathFromSystem(): Promise<string> {
     return rpath;
 }
 
-export function getRpathFromConfig(): string | undefined {
+export function getRpathFromOldConfig(warnIfFound: boolean = true): string | undefined {
     const platform: string = process.platform;
     const configEntry = (
         platform === 'win32' ? 'rpath.windows' :
         platform === 'darwin' ? 'rpath.mac' :
         'rpath.linux'
     );
-    return config(false).get<string>(configEntry);
+    const rpath = config(false).get<string>(configEntry);
+    if(rpath && warnIfFound){
+        void vscode.window.showWarningMessage(`Configuration entry \`r.${configEntry}\` is deprecated. Use \`r.executablePath\` instead.`);
+    }
+    return rpath;
+}
+
+async function getRpathFromRExtensionApi(): Promise<string | undefined> {
+    const api = await getRExtensionApi();
+    return await api?.getRpath?.(false);
 }
 
 export function quoteRPathIfNeeded(rpath: string): string {
@@ -102,11 +112,16 @@ export function quoteRPathIfNeeded(rpath: string): string {
     }
 }
 
-export async function getRpath(): Promise<string> {
+async function getRpath(): Promise<string> {
     let rpath: string | undefined;
-    
+    // try the debugger-specific override:
+    rpath = config(true).get<string>('executablePathOverride', '') || undefined;
+
+    // try the vscocde-R extension API:
+    rpath ||= await getRpathFromRExtensionApi();
+
     // try the os-specific config entry for the rpath:
-    rpath = getRpathFromConfig();
+    rpath ||= getRpathFromOldConfig();
 
     // read from path/registry:
     rpath ||= await getRpathFromSystem();

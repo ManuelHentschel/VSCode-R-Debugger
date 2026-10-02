@@ -79,6 +79,17 @@ in the callstack labelled 'Global Workspace' to see the variables in `.GlobalEnv
 For a detailed explanation of possible launch config entries and other settings, see
 [Configuration](https://manuelhentschel.github.io/vscDebugger/articles/configuration.html).
 
+## Specifying the R executable
+When launching a new R process,
+the following sources are tried in order to find an R executable,
+using the first non-empty result.
+
+* Entry `rPath` in the launch config. Supports some [variable substitution](https://code.visualstudio.com/docs/debugtest/debugging-configuration#_variable-substitution).
+* Setting `r.debugger.executablePathOverride`. Does not support any variable substitutions.
+* The path determined by the `vscode-R` extension, if a recent version of it is installed. Considers the setting `r.executablePath`, allowing some variable substitutions, and R installations found on the path or the registry.
+* Legacy configuration entries `r.rPath.xxx`. Shows a deprecation warning.
+* R installations found on the path or the registry.
+
 ## Encoding issues on windows
 Due to some changes in v0.5.0 concerning the communication between this extension and the R package `vscDebugger`,
 combined with the way non-utf-8 encodings are handled in R,
