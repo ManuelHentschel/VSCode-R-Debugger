@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { installRPackage } from './installRPackage';
 import { trackTerminals, TerminalHandler } from './terminals';
 
-import { RExtension, HelpPanel } from './rExtensionApi';
+import { RExtensionAPI } from './rExtensionApi';
 
 import { checkSettings } from './utils';
 
@@ -26,25 +26,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		});
 	}
 	
-	const rExtension = vscode.extensions.getExtension<RExtension>('ikuyadeu.r');
-
-	let rHelpPanel: HelpPanel | undefined = undefined;
-	if(rExtension){
-		const api = await rExtension.activate();
-		if(api){
-			rHelpPanel = api.helpPanel;
-		}
-	}
-
-	const supportsHelpViewer = !!rHelpPanel;
-
 	const terminalHandler = new TerminalHandler();
 	const port = await terminalHandler.portPromise;
 
 	context.subscriptions.push(terminalHandler);
 
 	// register configuration resolver
-	const resolver = new DebugConfigurationResolver(port, 'localhost', supportsHelpViewer);
+	const resolver = new DebugConfigurationResolver(port, 'localhost');
 	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', resolver));
 
 	// register dynamic configuration provider
@@ -56,7 +44,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('R-Debugger', initialProvider, vscode.DebugConfigurationProviderTriggerKind.Initial));
 
 	// register the debug adapter descriptor provider
-    const factory = new DebugAdapterDescriptorFactory(rHelpPanel);
+    const factory = new DebugAdapterDescriptorFactory();
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('R-Debugger', factory));
 
 	if(vscode.workspace.getConfiguration('r.debugger').get<boolean>('trackTerminals', false)){
@@ -71,6 +59,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			showDataViewer(arg);
 		})
 	);
+}
+
+export async function getRExtensionApi(): Promise<RExtensionAPI | undefined> {
+	const rExtension = vscode.extensions.getExtension<RExtensionAPI>('reditorsupport.r');
+	const api = await rExtension?.activate();
+	return api;
 }
 
 // this method is called when the extension is deactivated

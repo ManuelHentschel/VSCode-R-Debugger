@@ -12,7 +12,6 @@ in `this.dispatchRequest()`.
 
 import { DebugRuntime } from './debugRuntime';
 import { config, getVSCodePackageVersion } from './utils';
-import { HelpPanel } from './rExtensionApi';
 import { logger } from './logging';
 import * as MDebugProtocol from './debugProtocolModifications';
 
@@ -29,9 +28,9 @@ export class DebugAdapter implements vscode.DebugAdapter {
     private runtime: DebugRuntime; // actually handles requests etc. that are not forwarded
     private disconnectTimeout: number = config().get<number>('timeouts.startup', 1000);
 
-    constructor(helpPanel: HelpPanel | undefined, launchConfig: MDebugProtocol.LaunchConfiguration) {
+    constructor(launchConfig: MDebugProtocol.LaunchConfiguration) {
 		// construct R runtime
-        this.runtime = new DebugRuntime(helpPanel, launchConfig);
+        this.runtime = new DebugRuntime(launchConfig);
         
 		// setup event handler
         this.runtime.on('protocolMessage', (message: DebugProtocol.ProtocolMessage) => {

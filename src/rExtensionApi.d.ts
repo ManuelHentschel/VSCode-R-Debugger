@@ -1,16 +1,13 @@
 
 
-
-export declare class RExtension {
+export declare class RExtensionAPI {
     helpPanel: HelpPanel;
 }
 
 
 export interface HelpPanel {
-	dispose(): void;
-	showHelpForInput(): Promise<boolean>;
-	showHelpForFunctionName(fncName: string, pkgName: string): void;
-	showHelpForPath(requestPath: string): void;
+    dispose(): void;
+    showHelpForPath(requestPath: string): void;
 }
 
 

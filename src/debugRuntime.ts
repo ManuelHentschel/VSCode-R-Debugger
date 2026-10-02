@@ -8,11 +8,11 @@ import { RSession } from './rSession';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import * as MDebugProtocol from './debugProtocolModifications';
 import { explainRPackage, PackageVersionInfo } from './installRPackage';
-import { RExtension, HelpPanel } from './rExtensionApi';
 
 import { Subject } from './subject';
 
 import { logger } from './logging';
+import { getRExtensionApi } from './extension';
 
 export type LineHandler = (line: string, from: DataSource, isFullLine: boolean) => string;
 export type DapHandler = (dap: Buffer) => Buffer;
@@ -44,7 +44,6 @@ export class DebugRuntime extends EventEmitter {
 	// The rSession used to run the code
 	public rSession?: RSession;
 
-	private readonly helpPanel?: HelpPanel;
 	private readonly launchConfig: MDebugProtocol.LaunchConfiguration;
 
 	// // state info about the R session
@@ -71,9 +70,8 @@ export class DebugRuntime extends EventEmitter {
 	private writeOnPrompt: WriteOnPrompt[] = [];
 
 	// constructor
-	constructor(helpPanel: HelpPanel | undefined, launchConfig: MDebugProtocol.LaunchConfiguration) {
+	constructor(launchConfig: MDebugProtocol.LaunchConfiguration) {
 		super();
-		this.helpPanel = helpPanel;
 		this.launchConfig = launchConfig;
 	}
 
@@ -458,7 +456,9 @@ export class DebugRuntime extends EventEmitter {
 				if(body.reason === 'writeToStdin'){
 					this.handleWriteToStdinEvent(body);
 				} else if(body.reason === 'viewHelp' && body.requestPath){
-					this.helpPanel?.showHelpForPath(body.requestPath);
+					void getRExtensionApi().then((api) => {
+						api?.helpPanel.showHelpForPath(body.requestPath);
+					});
 				}
 			} else{
 				this.sendProtocolMessage(json as DebugProtocol.ProtocolMessage);

@@ -8,23 +8,19 @@ import {
 	AttachConfiguration, LaunchConfiguration
 } from './debugProtocolModifications';
 
-import { HelpPanel } from './rExtensionApi';
-
 import * as fs from 'fs';
 import * as path from 'path';
 import { getRpathFromConfig } from './utils';
+import { getRExtensionApi } from './extension';
 
 
 export class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
-	helpPanel?: HelpPanel;
-
-	constructor(helpPanel?: HelpPanel){
-		this.helpPanel = helpPanel;
+	constructor(){
 	}
 	createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
 		const config = session.configuration;
 		if(config.request === 'launch'){
-			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(this.helpPanel, <LaunchConfiguration>config));
+			return new vscode.DebugAdapterInlineImplementation(new DebugAdapter(<LaunchConfiguration>config));
 		} else if(config.request === 'attach'){
 			const port = Number(config.port || 18721);
 			const host = String(config.host || 'localhost');
@@ -155,15 +151,13 @@ export class DebugConfigurationResolver implements vscode.DebugConfigurationProv
 
 	readonly customPort: number;
 	readonly customHost: string;
-	readonly supportsHelpViewer: boolean;
 
-	constructor(customPort: number, customHost: string = 'localhost', supportsHelpViewer: boolean = false) {
+	constructor(customPort: number, customHost: string = 'localhost') {
 		this.customPort = customPort;
 		this.customHost = customHost;
-		this.supportsHelpViewer = supportsHelpViewer;
 	}
 
-	resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken): vscode.ProviderResult<StrictDebugConfiguration> {
+	async resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken): Promise<StrictDebugConfiguration | null> {
 
 		let strictConfig: StrictDebugConfiguration|null = null;
 
@@ -221,7 +215,10 @@ export class DebugConfigurationResolver implements vscode.DebugConfigurationProv
 			config.supportsShowingPromptRequest = true;
 			// set to true if not specified. necessary since its default in vscDebugger is FALSE:
 			config.overwriteHelp ??= true; 
-			config.overwriteHelp &&= this.supportsHelpViewer; // check if helpview available
+			if(config.overwriteHelp){
+				const api = await getRExtensionApi();
+				config.overwriteHelp &&= !!api?.helpPanel; // make sure helpview is available
+			}
 		} else if (config.request === 'attach'){
 			// communication info with TerminalHandler():
 			config.customPort ??= this.customPort;
