@@ -13,8 +13,8 @@ These settings can be accessed e.g. by right-clicking on this extension
 in the Extensions-window and selecting `Extension Settings`.
 Current settings are:
 
-* `r.rpath.XXX (string)`: The path to the R executable itself (not just the directory!).
-Can usually be left empty on a windows installation with the default settings.
+* `r.debugger.executablePathOverride`: The path to the R executable itself (not just the directory!).
+If left empty, the extension tries to find R automatically.
 * `r.debugger.timeouts.startup (number)`: The maximum time in ms that is waited for R to startup.
 Can be set to a larger value if launching the debugger fails with a notification 
 "R path not valid".
@@ -62,8 +62,7 @@ The remaining config entries are:
 * `"workingDirectory"`: An absolute path to the desired work directory.
 Defaults to the workspace folder.
 The R process is launched in this directory (reading the `.Rprofile` there).
-* `"rPath"`: Path to the R executable.
-If not specified, the extension setting `r.rpath.XXX` is used.
+* `"rPath"`: The path to the R executable to be launched. If not specified, fall back to other settings, the path, or registry.
 * `"file"`: Required for debug modes `"file"` and `"function"`. The file to be debugged/sourced before calling the main function.
 * `"mainFunction"`: Only used for debug mode `"function"`.
 The name of the main function to be debugged. Must be callable without arguments.
