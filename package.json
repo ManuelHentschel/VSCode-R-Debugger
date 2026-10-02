@@ -394,6 +394,7 @@
           "r.debugger.executablePathOverride": {
             "type": "string",
             "default": "",
+            "scope": "machine-overridable",
             "markdownDescription": "Path to an R executable to be used by the R debugger. Does not support variable substitutions. Leave empty to determine automatically."
           },
           "r.debugger.commandLineArgs": {
