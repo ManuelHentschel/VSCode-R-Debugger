@@ -92,7 +92,7 @@ export function getRpathFromOldConfig(warnIfFound: boolean = true): string | und
 
 async function getRpathFromRExtensionApi(): Promise<string | undefined> {
     const api = await getRExtensionApi();
-    return await api?.getRExecutablePath?.(false);
+    return await api?.getRExecutablePath?.();
 }
 
 export function quoteRPathIfNeeded(rpath: string): string {
