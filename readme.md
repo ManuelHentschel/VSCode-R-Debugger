@@ -29,7 +29,7 @@ The latest version of the VS Code extension can be installed from the
 [marketplace](https://marketplace.visualstudio.com/items?itemName=RDebugger.r-debugger).
 After installing the extension, the R package can be installed or updated using the command 
 `r.debugger.installOrUpdateRPackage`.
-If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in the setting `r.rpath.xxx`.
+If your R path is neither in the Windows registry nor the `PATH` environment variable, make sure to provide a valid path to the R executable in the settings.
 
 If the package installation does not work,
 the command `r.debugger.installRPackage` will attempt to install from 

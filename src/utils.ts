@@ -128,7 +128,7 @@ async function getRpath(): Promise<string> {
 
     if(!rpath){
         // inform user about missing R path:
-        void vscode.window.showErrorMessage(`No R executable found. Please set the path in the settings r.rPath.xxx!`);
+        void vscode.window.showErrorMessage(`No R executable found. Please set the path in the settings or launch config!`);
     }
 
     // represent all invalid paths (undefined, '', null) as '':
