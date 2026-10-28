@@ -391,20 +391,11 @@
         "type": "object",
         "title": "R Debugger",
         "properties": {
-          "r.rpath.windows": {
+          "r.debugger.executablePathOverride": {
             "type": "string",
             "default": "",
-            "description": "Path to an R executable for Windows. Must be \"vanilla\" R, not radian etc.!"
-          },
-          "r.rpath.mac": {
-            "type": "string",
-            "default": "",
-            "description": "Path to an R executable for macOS. Must be \"vanilla\" R, not radian etc.!"
-          },
-          "r.rpath.linux": {
-            "type": "string",
-            "default": "",
-            "description": "Path to an R executable for Linux. Must be \"vanilla\" R, not radian etc.!"
+            "scope": "machine-overridable",
+            "markdownDescription": "Path to an R executable to be used by the R debugger. Does not support variable substitutions. Leave empty to determine automatically."
           },
           "r.debugger.commandLineArgs": {
             "type": "array",
@@ -442,72 +433,6 @@
           "r.debugger.trackTerminals": {
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
-          },
-          "rdebugger.rterm.windows": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "R.exe path for Windows. If empty, the registry and PATH are searched for an R executable.",
-            "markdownDeprecationMessage": "Deprecated. Use `#r.rpath.windows#` instead.",
-            "deprecationMessage": "Deprecated. Use r.rpath.windows instead."
-          },
-          "rdebugger.rterm.mac": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "R path for macOS. If empty, the PATH is searched for an R executable.",
-            "markdownDeprecationMessage": "Deprecated. Use `#r.rpath.mac#` instead.",
-            "deprecationMessage": "Deprecated. Use r.rpath.mac instead."
-          },
-          "rdebugger.rterm.linux": {
-            "type": "string",
-            "default": "",
-            "markdownDescription": "R path for Linux. If empty, the PATH is searched for an R executable.",
-            "markdownDeprecationMessage": "Deprecated. Use `#r.rpath.linux#` instead.",
-            "deprecationMessage": "Deprecated. Use r.rpath.linux instead."
-          },
-          "rdebugger.rterm.args": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "default": [],
-            "markdownDeprecationMessage": "Deprecated. Use `#r.debugger.commandLineArgs#` instead.",
-            "deprecationMessage": "Deprecated. Use r.debugger.commandLineArgs instead.",
-            "markdownDescription": "Additional command line arguments used when launching R."
-          },
-          "rdebugger.timeouts.startup": {
-            "type": "number",
-            "default": 0,
-            "markdownDeprecationMessage": "Deprecated. Use `#r.debugger.timeouts.startup#` instead.",
-            "deprecationMessage": "Deprecated. Use r.debugger.timeouts.startup instead.",
-            "markdownDescription": "The maximum time in ms that is waited for R to startup. Is also used for some other timeouts."
-          },
-          "rdebugger.timeouts.terminate": {
-            "type": "number",
-            "default": 0,
-            "markdownDeprecationMessage": "Deprecated. Use `#r.debugger.timeouts.terminate#` instead.",
-            "deprecationMessage": "Deprecated. Use r.debugger.timeouts.terminate instead.",
-            "markdownDescription": "Time in ms that is waited when terminating R to allow messages etc. to appear."
-          },
-          "rdebugger.timeouts.prompt": {
-            "type": "number",
-            "default": 0,
-            "markdownDeprecationMessage": "Deprecated. Use `#r.debugger.timeouts.prompt#` instead.",
-            "deprecationMessage": "Deprecated. Use r.debugger.timeouts.prompt instead.",
-            "markdownDescription": "Time in ms that is waited before handling input prompts on stdout (to avoid async issues)."
-          },
-          "rdebugger.checkVersion": {
-            "type": "string",
-            "default": "",
-            "markdownDeprecationMessage": "Deprecated. Use `#r.debugger.checkVersion#` instead.",
-            "deprecationMessage": "Deprecated. Use r.debugger.checkVersion instead.",
-            "markdownDescription": "Whether to check the version of the R package before launching the debugger."
-          },
-          "rdebugger.trackTerminals": {
-            "type": "boolean",
-            "default": false,
-            "markdownDeprecationMessage": "Deprecated. Use `#r.debugger.trackTerminals#` instead.",
-            "deprecationMessage": "Deprecated. Use r.debugger.trackTerminals instead.",
             "markdownDescription": "Whether to track terminals opened while using the extension. Recommended for debugging in attached mode on windows."
           }
         }
